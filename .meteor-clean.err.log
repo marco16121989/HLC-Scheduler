@@ -1,0 +1,14 @@
+npm warn cli npm v11.1.0 does not support Node.js v18.20.6. This version of npm supports the following node versions: `^20.17.0 || >=22.9.0`. You can find the latest version at https://nodejs.org/.
+(node:17012) Warning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[31mnpm warn Unknown env config "nodedir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.[0m
+[31mnpm warn Unknown env config "nodedir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.[0m
+(node:17012) Warning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(node:17584) Warning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:17584) Warning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(node:13980) Warning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19344) Warning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19344) Warning: The `util._extend` API is deprecated. Please use Object.assign() instead.

@@ -1,0 +1,11 @@
+
+> start
+> meteor run --port 3001
+
+[[[[[ C:\Users\Marco\Desktop\Progetti\hlcScheduler ]]]]]
+
+=> Started proxy.
+=> Started HMR server.
+=> Started MongoDB.
+=> Started Rspack HMR server at http://localhost:8081/                          
+=> Client modified -- refreshing

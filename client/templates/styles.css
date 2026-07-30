@@ -1,0 +1,687 @@
+/* Shared styles for the client templates. */
+
+:root {
+  /* Colors */
+  --color-background: hsl(210, 20%, 98%);
+  --color-foreground: hsl(220, 20%, 15%);
+  --color-card: hsl(0, 0%, 100%);
+  --color-primary: hsl(4, 70%, 55%);
+  --color-primary-hover: hsl(4, 70%, 45%);
+  --color-muted: hsl(220, 10%, 50%);
+  --color-border: hsl(220, 14%, 90%);
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px 0 hsl(220 20% 15% / 0.04),
+    0 1px 2px -1px hsl(220 20% 15% / 0.04);
+  --shadow-card-hover: 0 10px 15px -3px hsl(220 20% 15% / 0.08),
+    0 4px 6px -4px hsl(220 20% 15% / 0.04);
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* Border radius */
+  --radius: 0.75rem;
+  --radius-sm: 0.5rem;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 250ms ease;
+}
+
+/* ============ Reset & Base Styles ============ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ============ Layout ============ */
+.page {
+  min-height: 100vh;
+  background-color: var(--color-background);
+}
+
+.container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-left: var(--spacing-md);
+  padding-right: var(--spacing-md);
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding-left: var(--spacing-lg);
+    padding-right: var(--spacing-lg);
+  }
+}
+
+/* ============ Header / Navigation ============ */
+.header {
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-card);
+  border-radius: var(--radius);
+}
+
+.header .nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 4rem;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.logo {
+  width: 4rem;
+  height: 4rem;
+}
+
+.logo-text {
+  font-weight: 600;
+  color: var(--color-foreground);
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .logo-text {
+    display: inline;
+  }
+}
+
+.page-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 768px) {
+  .page-title {
+    font-size: 1.5rem;
+  }
+}
+
+.nav-link {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  transition: opacity var(--transition-fast);
+}
+
+.nav-link:hover {
+  opacity: 0.8;
+}
+
+/* ============ Main Content ============ */
+.main {
+  padding-top: var(--spacing-xl);
+  padding-bottom: var(--spacing-xl);
+}
+
+@media (min-width: 768px) {
+  .main {
+    padding-top: var(--spacing-2xl);
+    padding-bottom: var(--spacing-2xl);
+  }
+}
+
+/* ============ Card Component ============ */
+.card {
+  background-color: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+}
+
+/* ============ Counter Section ============ */
+.counter-card {
+  padding: var(--spacing-lg);
+  margin-bottom: 2.5rem;
+}
+
+@media (min-width: 768px) {
+  .counter-card {
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-2xl);
+  }
+}
+
+.counter-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+}
+
+@media (min-width: 640px) {
+  .counter-content {
+    flex-direction: row;
+  }
+}
+
+.counter-text {
+  color: var(--color-muted);
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .counter-text {
+    text-align: left;
+  }
+}
+
+/* Home and Login styles */
+.home-grid {
+  display: grid;
+  gap: var(--spacing-xl);
+}
+
+@media (min-width: 1024px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
+.hero-card {
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-2xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+}
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+}
+
+.login-main {
+  width: 100%;
+  max-width: 480px;
+  padding: 0;
+}
+
+.login-card {
+  width: 100%;
+  padding: var(--spacing-xl);
+}
+
+.login-logo {
+  display: block;
+  width: 7rem;
+  height: 7rem;
+  object-fit: contain;
+  margin: 0 auto var(--spacing-lg);
+  border-radius: var(--radius-sm);
+}
+
+.login-card h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.login-card > p {
+  margin-top: var(--spacing-sm);
+  color: var(--color-muted);
+}
+
+.login-form {
+  display: grid;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.field-label {
+  display: grid;
+  gap: var(--spacing-xs);
+  color: var(--color-foreground);
+  font-weight: 500;
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.login-input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.login-actions {
+  display: flex;
+  justify-content: stretch;
+  margin-top: var(--spacing-sm);
+}
+
+.login-actions .button {
+  width: 100%;
+}
+
+.eyebrow {
+  display: inline-block;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: var(--color-primary);
+  margin-bottom: 0.75rem;
+}
+
+.button-secondary {
+  background-color: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.button-secondary:hover {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.counter-value {
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+/* ============ Button Component ============ */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  padding: 0.625rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: white;
+  background-color: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-normal),
+    transform var(--transition-fast);
+}
+
+.button:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.button:active {
+  transform: scale(0.98);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ============ AdminLTE dashboard ============ */
+.app-wrapper {
+  min-height: 100vh;
+}
+
+.sidebar-overlay {
+  padding: 0;
+  border: 0;
+}
+
+.app-header .navbar-nav {
+  flex-direction: row;
+}
+
+.admin-icon-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.admin-user-email {
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.admin-avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  background: var(--color-primary);
+  font-weight: 700;
+}
+
+.brand-logo {
+  display: block;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  object-fit: cover;
+  border-radius: 0.375rem;
+}
+
+.brand-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-nav-icon,
+.admin-stat-icon {
+  font-style: normal;
+  font-weight: 700;
+}
+
+.admin-welcome-card {
+  border-left: 4px solid var(--color-primary);
+}
+
+.admin-welcome-card .card-body {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-avatar {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  font-size: 1.25rem;
+}
+
+.info-box {
+  min-height: 6rem;
+}
+
+.association-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.user-link-arrow {
+  display: inline-block;
+  margin-right: 0.45rem;
+  font-weight: 700;
+}
+
+.user-link-arrow.depth-1 {
+  margin-left: 1.25rem;
+}
+
+.user-link-arrow.depth-2 {
+  margin-left: 2.5rem;
+}
+
+.user-link-arrow.is-associated {
+  color: var(--bs-success);
+}
+
+.user-link-arrow.is-unassigned {
+  color: var(--bs-warning);
+}
+
+.user-row-unassigned > td:first-child {
+  border-left: 3px solid var(--bs-warning);
+}
+
+.hospital-departments-fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.hospital-department-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.hospital-department-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hospital-department-summary {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.hospital-department-summary > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.hospital-department-summary span {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+.doctor-departments-fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.doctor-department-options {
+  display: grid;
+  gap: 0.75rem;
+  max-height: 16rem;
+  padding: 0.75rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.doctor-hospital-name {
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-muted);
+}
+
+.doctor-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.doctor-contact a {
+  color: var(--bs-link-color);
+}
+
+.doctor-notes-cell {
+  min-width: 12rem;
+  max-width: 20rem;
+  white-space: pre-wrap;
+}
+
+.entity-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  padding: 0;
+  background: rgb(0 0 0 / 45%);
+  border: 0;
+}
+
+.entity-modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 1055;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  pointer-events: none;
+}
+
+.entity-modal-card {
+  width: min(100%, 52rem);
+  max-height: calc(100vh - 2rem);
+  margin: 0;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.entity-modal-card-sm {
+  width: min(100%, 34rem);
+}
+
+@media (max-width: 480px) {
+  .hospital-department-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .hospital-department-row > input:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+}
+
+@media (max-width: 575.98px) {
+  .app-content-header .breadcrumb {
+    display: none;
+  }
+
+  .admin-welcome-card .card-body {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    align-items: flex-start;
+    padding: var(--spacing-md);
+  }
+
+  .login-card {
+    padding: var(--spacing-lg);
+  }
+
+  .login-card h1 {
+    font-size: 1.75rem;
+  }
+}
+
+/* ============ Resources Section ============ */
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  margin-bottom: var(--spacing-lg);
+  letter-spacing: -0.025em;
+}
+
+.resources-grid {
+  list-style-type: none;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+@media (min-width: 640px) {
+  .resources-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ============ Resource Card ============ */
+.resource-link {
+  display: block;
+}
+
+.resource-card {
+  padding: 1.25rem;
+  transition: box-shadow var(--transition-slow),
+    transform var(--transition-slow);
+}
+
+.resource-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+.resource-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.resource-title {
+  font-weight: 500;
+  color: var(--color-foreground);
+  transition: color var(--transition-fast);
+}
+
+.resource-link:hover .resource-title {
+  color: var(--color-primary);
+}
+
+.resource-icon {
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-muted);
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+.resource-link:hover .resource-icon {
+  opacity: 1;
+  color: var(--color-primary);
+}

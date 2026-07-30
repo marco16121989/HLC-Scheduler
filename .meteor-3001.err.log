@@ -1,0 +1,21 @@
+npm warn cli npm v11.1.0 does not support Node.js v18.20.6. This version of npm supports the following node versions: `^20.17.0 || >=22.9.0`. You can find the latest version at https://nodejs.org/.
+(node:17784) Warning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Error starting Mongo (2 tries left): EBUSY: resource busy or locked,
+unlink
+'C:\Users\Marco\Desktop\Progetti\hlcScheduler\.meteor\local\db\mongod.lock'
+[31mnpm warn Unknown env config "nodedir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.[0m
+[31mnpm warn Unknown env config "nodedir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.[0m
+(node:17784) Warning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+C:\Users\Marco\AppData\Local\.meteor\packages\meteor-tool\3.5.0\mt-os.windows.x86_64\tools\runners\run-app.js:440
+        throw e;
+        ^
+
+[Error: EBUSY: resource busy or locked, rmdir 'C:\Users\Marco\Desktop\Progetti\hlcScheduler\.meteor\local\build\programs\server'] {
+  errno: -4082,
+  code: 'EBUSY',
+  syscall: 'rmdir',
+  path: 'C:\\Users\\Marco\\Desktop\\Progetti\\hlcScheduler\\.meteor\\local\\build\\programs\\server'
+}
+
+Node.js v24.15.0
