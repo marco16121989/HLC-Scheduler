@@ -548,7 +548,7 @@ export const Patients = ({
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
     { label: "Note", value: notes },
     { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
-    { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map(getGvpDisplayName).join(", ") : "Nessun GVP assegnato" },
+    { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato" },
     ...DETAIL_SECTIONS.flatMap((section) =>
       section.fields.map((field) => ({
         label: `${section.title} — ${field[1]}`,
@@ -925,7 +925,7 @@ export const Patients = ({
                           </div>
                           <div className="form-text mt-1">
                             {selectedGvpUsers.length > 0
-                              ? selectedGvpUsers.map(getGvpDisplayName).join(", ")
+                              ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ")
                               : "Nessun GVP associato."}
                           </div>
                           {gvpSelectionModalOpen && (
