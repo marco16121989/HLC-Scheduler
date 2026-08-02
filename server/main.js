@@ -49,6 +49,13 @@ const userView = (user) => ({
   ...(user.profile || {}),
 });
 
+Accounts.validateLoginAttempt((attempt) => {
+  if (attempt.allowed && attempt.user?.profile?.disabled) {
+    throw new Meteor.Error("account-disabled", "Il gestionale è stato disattivato per questo account.");
+  }
+  return attempt.allowed;
+});
+
 Meteor.publish("hlc-data", async function publishHlcData() {
   if (!this.userId) {
     return this.ready();
@@ -88,9 +95,32 @@ Meteor.publish("hlc-data", async function publishHlcData() {
 });
 
 Meteor.methods({
+  async "hlc.setPresidentActive"(presidentId, active) {
+    requireUser(this);
+    check(presidentId, String);
+    check(active, Boolean);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    if (actor.profile?.role !== "Admin") {
+      throw new Meteor.Error("not-authorized", "Operazione riservata agli amministratori.");
+    }
+    const president = await Meteor.users.findOneAsync(presidentId);
+    if (president?.profile?.role !== "Presidente") {
+      throw new Meteor.Error("invalid-president", "Presidente non valido.");
+    }
+    await Meteor.users.updateAsync(
+      { $or: [
+        { _id: presidentId },
+        { "profile.presidentId": presidentId },
+        { "profile.associationId": presidentId },
+      ] },
+      { $set: { "profile.disabled": !active } },
+      { multi: true },
+    );
+  },
+
   async "hlc.createSupportRequest"(data) {
     requireUser(this);
-    check(data, { type: String, subject: String, priority: String, message: String });
+    check(data, { type: String, subject: String, priority: String, phone: String, message: String });
     const type = ["Segnalazione", "Richiesta"].includes(data.type) ? data.type : "Richiesta";
     const priority = ["Bassa", "Normale", "Alta", "Urgente"].includes(data.priority) ? data.priority : "Normale";
     const subject = data.subject.trim();
@@ -98,7 +128,7 @@ Meteor.methods({
     if (!subject || !message) throw new Meteor.Error("invalid-request", "Oggetto e descrizione sono obbligatori.");
     const actor = await Meteor.users.findOneAsync(this.userId);
     await SupportRequestsCollection.insertAsync({
-      type, subject, priority, message, status: "Inviata",
+      type, subject, priority, phone: data.phone.trim(), message, status: "Inviata",
       createdBy: this.userId, createdByUsername: actor.username, createdAt: new Date(),
     });
   },
@@ -253,6 +283,7 @@ Meteor.methods({
         phone: record.phone ?? account?.profile?.phone ?? "",
         hospitalAssignments:
           record.hospitalAssignments ?? account?.profile?.hospitalAssignments ?? [],
+        disabled: record.disabled ?? account?.profile?.disabled ?? false,
       };
 
       if (!account) {

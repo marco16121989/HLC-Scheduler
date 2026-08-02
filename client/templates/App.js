@@ -64,6 +64,11 @@ export const App = () => {
     return null;
   }
 
+  if (user?.disabled) {
+    Meteor.logout();
+    return null;
+  }
+
   return user ? (
     <Home
       user={user}

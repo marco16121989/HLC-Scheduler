@@ -950,6 +950,12 @@ svg.admin-nav-icon {
 .support-request > p { margin: 0.75rem 0; white-space: pre-wrap; }
 .support-status-select { width: auto; min-width: 9rem; }
 
+.user-count-badge {
+  min-width: 2.25rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 767.98px) {
   .calendar-day { min-height: 4.5rem; }
   .calendar-event { width: 0.55rem; height: 0.55rem; padding: 0; border-radius: 50%; color: transparent; }

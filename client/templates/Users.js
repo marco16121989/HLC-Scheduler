@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Meteor } from "meteor/meteor";
 
 const roles = ["Admin", "Presidente", "CAS", "GVP"];
 
@@ -304,6 +305,15 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       current.filter((item) => !userIdsToDelete.has(item.id)),
     );
     resetForm();
+  };
+
+  const togglePresidentActive = (user) => {
+    const willActivate = Boolean(user.disabled);
+    const action = willActivate ? "riattivare" : "disattivare";
+    if (!globalThis.confirm(`Vuoi ${action} ${user.username} e tutti i suoi CAS e GVP?`)) return;
+    Meteor.call("hlc.setPresidentActive", user.id, willActivate, (methodError) => {
+      if (methodError) globalThis.alert(methodError.reason || "Impossibile aggiornare lo stato.");
+    });
   };
 
   const getAssociationLabel = (user) => {
@@ -615,6 +625,14 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                   <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0">
                       <thead>
+                        {manager?.role === "Admin" ? (
+                        <tr>
+                          <th>Presidente</th>
+                          <th>Numero CAS</th>
+                          <th>Numero GVP</th>
+                          <th className="text-end">Azioni</th>
+                        </tr>
+                        ) : (
                         <tr>
                           <th>Nome utente</th>
                           <th>Ruolo</th>
@@ -623,12 +641,13 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                           <th>Password</th>
                           <th className="text-end">Azioni</th>
                         </tr>
+                        )}
                       </thead>
                       <tbody>
                         {visibleUsers.length === 0 ? (
                           <tr>
-                            <td className="text-center text-secondary py-4" colSpan="6">
-                              Nessun utente inserito.
+                            <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "4" : "6"}>
+                              {manager?.role === "Admin" ? "Nessun presidente inserito." : "Nessun utente inserito."}
                             </td>
                           </tr>
                         ) : (
@@ -644,6 +663,23 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                               user.role === "CAS" || user.role === "GVP";
                             const isUnassigned =
                               requiresPresident && !getPresidentId(user, users);
+                            const casCount = users.filter(
+                              (candidate) => candidate.role === "CAS" && getPresidentId(candidate, users) === user.id,
+                            ).length;
+                            const gvpCount = users.filter(
+                              (candidate) => candidate.role === "GVP" && getPresidentId(candidate, users) === user.id,
+                            ).length;
+
+                            if (manager?.role === "Admin") {
+                              return (
+                                <tr key={user.id}>
+                                  <td className="fw-medium">{user.username} {user.disabled && <span className="badge text-bg-danger ms-2">Disattivato</span>}</td>
+                                  <td><span className="badge text-bg-primary user-count-badge">{casCount}</span></td>
+                                  <td><span className="badge text-bg-info user-count-badge">{gvpCount}</span></td>
+                                  <td className="text-end"><div className="d-inline-flex gap-2"><button className={`btn btn-sm ${user.disabled ? "btn-outline-success" : "btn-outline-danger"}`} type="button" onClick={() => togglePresidentActive(user)}>{user.disabled ? "Attiva" : "Disattiva"}</button><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(user)}>Modifica</button></div></td>
+                                </tr>
+                              );
+                            }
 
                             return (
                               <tr
