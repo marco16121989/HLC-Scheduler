@@ -1,6 +1,147 @@
 import { useState } from "react";
+import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
+
+const DETAIL_SECTIONS = [
+  {
+    title: "Notifica emergenza sanitaria",
+    fields: [
+      ["callDateTime", "Data e ora della chiamata", "datetime-local"],
+      ["callAuthor", "Autore della chiamata"],
+      ["callAuthorContacts", "Recapiti dell’autore della chiamata", "tel"],
+      ["requestedAssistance", "Assistenza richiesta dal paziente", "textarea"],
+      ["relationshipToPatient", "Relazione con il paziente"],
+    ],
+  },
+  {
+    title: "Informazioni sul paziente e sull’ospedale",
+    fields: [
+      ["sex", "Sesso", "select", ["Maschile", "Femminile", "Altro / non specificato"]],
+      ["age", "Età", "number"],
+      ["patientComments", "Commenti sul paziente", "textarea"],
+      ["isMinorOrNewborn", "Paziente minore o neonato?", "yesno"],
+      ["fatherName", "Nome del padre"],
+      ["fatherBaptized", "Padre battezzato?", "yesno"],
+      ["fatherGoodStanding", "Padre in buona reputazione?", "yesno"],
+      ["fatherDpaComplete", "DPA del padre completo?", "yesno"],
+      ["motherName", "Nome della madre"],
+      ["motherBaptized", "Madre battezzata?", "yesno"],
+      ["familySituation", "Situazione familiare", "textarea"],
+      ["hospitalName", "Nome dell’ospedale"],
+      ["hospitalRoom", "Stanza"],
+      ["hospitalPhone", "Telefono dell’ospedale", "tel"],
+      ["congregation", "Congregazione"],
+      ["localElders", "Anziani locali contattati"],
+      ["localEldersPhones", "Numeri di telefono degli anziani", "tel"],
+    ],
+  },
+  {
+    title: "Dati del neonato",
+    fields: [
+      ["birthWeight", "Peso alla nascita"],
+      ["apgarScore", "Punteggio APGAR"],
+      ["gestationalAge", "Età gestazionale (settimane)", "number"],
+      ["birthType", "Nascita"],
+      ["birthDate", "Data di nascita", "date"],
+      ["apgarFiveMinutes", "APGAR a 5 minuti"],
+    ],
+  },
+  {
+    title: "Quadro clinico",
+    fields: [
+      ["specificProblem", "Problema specifico / diagnosi attuale e relazione con il sangue", "textarea"],
+      ["medicalHistory", "Anamnesi rilevante / causa della crisi attuale", "textarea"],
+    ],
+  },
+  ...[1, 2, 3].map((index) => ({
+    title: `Valori di laboratorio — analisi ${index}`,
+    fields: [
+      [`lab${index}DateTime`, "Data e ora dell’analisi", "datetime-local"],
+      [`lab${index}Hemoglobin`, "Emoglobina (Hb g/dL)", "number-step"],
+      [`lab${index}Hematocrit`, "Ematocrito (Hct %)", "number-step"],
+      [`lab${index}Platelets`, "Numero piastrine (Plts/μL)", "number"],
+      [`lab${index}Other`, "Altri valori"],
+    ],
+  })),
+  {
+    title: "Informazioni sui medici e programma terapeutico",
+    fields: [
+      ["attendingDoctor", "Medico curante"],
+      ["attendingDoctorSpecialization", "Specializzazione del medico curante"],
+      ["otherAttendingDoctor", "Altro medico curante"],
+      ["otherDoctorSpecialization", "Specializzazione dell’altro medico"],
+      ["treatmentPlan", "Esami, procedure o trattamenti proposti", "textarea"],
+      ["staffInformed", "Personale informato della richiesta di assistenza del comitato sanitario?", "yesno"],
+      ["legalActionThreatened", "È stata minacciata un’azione legale?", "yesno"],
+    ],
+  },
+  {
+    title: "Strategie, alternative e articoli medici",
+    fields: [
+      ["strategies", "Modalità, procedure o tecniche da proporre ai medici", "textarea"],
+      ["medicalArticles", "Articoli e documentazione a supporto", "textarea"],
+      ["doctorWillCooperate", "Il medico è disposto a cooperare?", "yesno"],
+    ],
+  },
+  {
+    title: "Consulto da medico a medico",
+    fields: [
+      ["consultAvailable", "Il medico curante accetta il consulto con uno specialista?", "yesno"],
+      ["consultDoctorName", "Nome del medico da consultare"],
+      ["consultContactMethod", "Metodo di contatto preferito"],
+      ["consultSpecialization", "Specializzazione"],
+      ["consultNotes", "Ulteriori informazioni sul consulto", "textarea"],
+    ],
+  },
+  {
+    title: "Richiesta di trasferimento",
+    fields: [
+      ["transferMethod", "Metodo di trasferimento", "textarea"],
+      ["transferArrangementsConfirmed", "Accordi relativi al trasferimento confermati?", "yesno"],
+      ["healthInformationContacted", "Reparto Informazione Sanitaria contattato?", "yesno"],
+      ["transferHospital", "Nome dell’ospedale di trasferimento"],
+      ["transferDoctor", "Medico curante presso l’ospedale di trasferimento"],
+      ["transferHospitalPhone", "Numero dell’ospedale di trasferimento", "tel"],
+      ["transferNotes", "Ulteriori informazioni sul trasferimento", "textarea"],
+    ],
+  },
+  {
+    title: "Risultato e interventi successivi",
+    fields: [
+      ["outcome", "Risultato ed eventuali interventi successivi", "textarea"],
+      ["followUpElders", "Anziani locali contattati per interventi successivi", "textarea"],
+    ],
+  },
+];
+
+const PatientDetailField = ({ field, value, onChange }) => {
+  const [name, label, type = "text", options = []] = field;
+  const common = {
+    className: type === "select" || type === "yesno" ? "form-select" : "form-control",
+    id: `patient-${name}`,
+    value: value || "",
+    onChange: (event) => onChange(name, event.target.value),
+  };
+
+  return (
+    <div className="col-12 col-md-6">
+      <label className="form-label" htmlFor={common.id}>{label}</label>
+      {type === "textarea" ? (
+        <textarea {...common} rows="3" />
+      ) : type === "select" || type === "yesno" ? (
+        <select {...common}>
+          <option value="">Seleziona</option>
+          {(type === "yesno" ? ["Sì", "No", "Non noto"] : options).map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      ) : (
+        <input {...common} type={type === "number-step" ? "number" : type} step={type === "number-step" ? "0.01" : undefined} min={type === "number" || type === "number-step" ? "0" : undefined} />
+      )}
+    </div>
+  );
+};
 
 export const Patients = ({
   patients,
@@ -20,6 +161,7 @@ export const Patients = ({
     currentUser.role === "CAS" ? currentUser.id : "",
   );
   const [notes, setNotes] = useState("");
+  const [details, setDetails] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -46,6 +188,7 @@ export const Patients = ({
     setDoctorId("");
     setCasId(currentUser.role === "CAS" ? currentUser.id : "");
     setNotes("");
+    setDetails({});
     setEditingId(null);
     setError("");
     setModalOpen(false);
@@ -56,8 +199,7 @@ export const Patients = ({
     setModalOpen(true);
   };
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
+  const savePatient = () => {
     const normalizedFirstName = firstName.trim();
     const normalizedLastName = lastName.trim();
     const normalizedPathology = pathology.trim();
@@ -75,12 +217,10 @@ export const Patients = ({
       !normalizedFirstName ||
       !normalizedLastName ||
       !admissionDate ||
-      !normalizedPathology ||
-      !validDoctorId ||
-      !validCasId
+      !normalizedPathology
     ) {
-      setError("Completa paziente, patologia, medico responsabile e CAS.");
-      return;
+      setError("Completa nome, cognome, patologia e data di ingresso.");
+      return false;
     }
 
     const isDuplicate = patients.some(
@@ -93,7 +233,7 @@ export const Patients = ({
 
     if (isDuplicate) {
       setError("Il paziente e gia presente.");
-      return;
+      return false;
     }
 
     const patientData = {
@@ -106,23 +246,57 @@ export const Patients = ({
       doctorId: validDoctorId,
       casId: validCasId,
       notes: normalizedNotes,
+      details,
       presidentId,
+    };
+
+    const savedPatient = {
+      id: editingId || crypto.randomUUID(),
+      ...patientData,
     };
 
     if (isEditing) {
       setPatients((current) =>
         current.map((patient) =>
-          patient.id === editingId ? { ...patient, ...patientData } : patient,
+          patient.id === editingId ? { ...patient, ...savedPatient } : patient,
         ),
       );
     } else {
-      setPatients((current) => [
-        ...current,
-        { id: crypto.randomUUID(), ...patientData },
-      ]);
+      setPatients((current) => [...current, savedPatient]);
     }
 
     resetForm();
+    return savedPatient;
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    savePatient();
+  };
+
+  const handleOpenPdf = async () => {
+    const savedPatient = savePatient();
+    if (!savedPatient) return;
+
+    const pdfWindow = globalThis.open("", "_blank");
+    try {
+      const doctor = doctors.find((item) => item.id === savedPatient.doctorId);
+      const casUser = users.find((item) => item.id === savedPatient.casId);
+      const pdfUrl = await createPopulatedPatientPdf({
+        patient: savedPatient,
+        doctorName: doctor ? `${doctor.lastName} ${doctor.firstName}` : "",
+        casName: casUser?.username || "",
+      });
+      if (pdfWindow) {
+        pdfWindow.location.href = pdfUrl;
+      } else {
+        globalThis.location.href = pdfUrl;
+      }
+      globalThis.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
+    } catch (pdfError) {
+      pdfWindow?.close();
+      globalThis.alert(pdfError.message || "Impossibile generare il PDF compilato.");
+    }
   };
 
   const handleEdit = (patient) => {
@@ -137,6 +311,7 @@ export const Patients = ({
     setDoctorId(patient.doctorId || "");
     setCasId(patient.casId || "");
     setNotes(patient.notes || "");
+    setDetails(patient.details || {});
     setError("");
     setModalOpen(true);
   };
@@ -198,7 +373,14 @@ export const Patients = ({
                   {isEditing ? "Modifica paziente" : "Inserisci paziente"}
                 </h2>
                 <button
-                  className="btn-close ms-auto"
+                  className="btn btn-outline-secondary btn-sm ms-auto me-2"
+                  type="button"
+                  onClick={handleOpenPdf}
+                >
+                  Salva e apri HLC-7-I
+                </button>
+                <button
+                  className="btn-close"
                   type="button"
                   aria-label="Chiudi"
                   onClick={resetForm}
@@ -329,7 +511,6 @@ export const Patients = ({
                         setDoctorId(event.target.value);
                         setError("");
                       }}
-                      required
                     >
                       <option value="">Seleziona medico</option>
                       {visibleDoctors.map((doctor) => (
@@ -373,7 +554,6 @@ export const Patients = ({
                         setCasId(event.target.value);
                         setError("");
                       }}
-                      required
                     >
                       <option value="">Seleziona CAS</option>
                       {visibleCasUsers.map((casUser) => (
@@ -389,6 +569,29 @@ export const Patients = ({
                       </div>
                     )}
                   </div>
+
+                  <hr className="my-4" />
+                  <p className="text-secondary mb-3">
+                    Campi della scheda HLC-7-I. Compila solo le sezioni pertinenti al caso.
+                  </p>
+                  {DETAIL_SECTIONS.map((section) => (
+                    <fieldset className="patient-detail-section" key={section.title}>
+                      <legend>{section.title}</legend>
+                      <div className="row g-3">
+                        {section.fields.map((field) => (
+                          <PatientDetailField
+                            key={field[0]}
+                            field={field}
+                            value={details[field[0]]}
+                            onChange={(name, value) => {
+                              setDetails((current) => ({ ...current, [name]: value }));
+                              setError("");
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </fieldset>
+                  ))}
                 </div>
 
                 <div className="card-footer d-flex align-items-center gap-2">

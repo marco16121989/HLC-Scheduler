@@ -6,4 +6,3 @@ _build
 */build-chunks
 .rsdoctor
 .tools/
-.cloudflared-quick.*

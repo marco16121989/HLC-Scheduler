@@ -582,6 +582,23 @@ a {
   width: min(100%, 34rem);
 }
 
+.patient-detail-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}
+
+.patient-detail-section legend {
+  float: none;
+  width: auto;
+  margin: 0 0 0.75rem;
+  padding: 0 0.35rem;
+  color: var(--bs-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 @media (max-width: 480px) {
   .hospital-department-row {
     grid-template-columns: minmax(0, 1fr) auto;
