@@ -7,3 +7,4 @@ export const DoctorsCollection = new Mongo.Collection("doctors");
 export const PatientsCollection = new Mongo.Collection("patients");
 export const PresentationsCollection = new Mongo.Collection("presentations");
 export const SupportRequestsCollection = new Mongo.Collection("supportRequests");
+export const NotificationsCollection = new Mongo.Collection("notifications");

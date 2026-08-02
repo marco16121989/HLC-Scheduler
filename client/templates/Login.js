@@ -1,7 +1,7 @@
 import { Meteor } from "meteor/meteor";
 import { useState } from "react";
 
-export const Login = () => {
+export const Login = ({ theme, onToggleTheme }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,6 +18,10 @@ export const Login = () => {
 
   return (
     <div className="page login-page">
+      <button className="btn btn-outline-secondary theme-toggle-login" type="button" onClick={onToggleTheme} aria-label={theme === "dark" ? "Attiva tema giorno" : "Attiva tema notte"}>
+        <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+        <span className="ms-2">{theme === "dark" ? "Tema giorno" : "Tema notte"}</span>
+      </button>
       <main className="main login-main">
         <section className="card login-card">
           <img className="login-logo" src="/images/hlc-scheduler-logo.png" alt="HLC Scheduler" />

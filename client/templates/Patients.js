@@ -1,8 +1,31 @@
 import { useState } from "react";
+import { Meteor } from "meteor/meteor";
 import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
 import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPdf.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
+
+const getPatientGvpIds = (patient) =>
+  Array.isArray(patient?.gvpIds)
+    ? patient.gvpIds
+    : patient?.gvpId
+      ? [patient.gvpId]
+      : [];
+
+const getGvpNotes = (patient) => {
+  if (Array.isArray(patient?.gvpNotes)) return patient.gvpNotes;
+  if (typeof patient?.gvpNotes === "string" && patient.gvpNotes.trim()) {
+    return [{ id: "legacy", text: patient.gvpNotes, author: "GVP", authorRole: "GVP", createdAt: null }];
+  }
+  return [];
+};
+
+const getNoteRoleBadgeClass = (role) =>
+  role === "Presidente"
+    ? "text-bg-primary"
+    : role === "CAS"
+      ? "text-bg-success"
+      : "text-bg-warning";
 
 const DETAIL_SECTIONS = [
   {
@@ -131,12 +154,28 @@ const DETAIL_SECTIONS = [
   },
 ];
 
-const PatientDetailField = ({ field, value, onChange }) => {
+const SIMPLIFIED_FIELDS = [
+  ["congregation", "Congregazione"],
+  ["age", "Età", "number"],
+  ["patientPhone", "Numero di cellulare del paziente", "tel"],
+  ["healthProblems", "Problemi di salute", "textarea"],
+  ["spiritualCondition", "Condizione spirituale", "textarea"],
+  ["nonWitnessFamily", "Familiari non Testimoni coinvolti", "textarea"],
+  ["datCompleted", "DAT compilata?", "yesno"],
+  ["datRegistered", "DAT registrata?", "yesno"],
+  ["elderName", "Nome dell’anziano"],
+  ["elderEmail", "E-mail dell’anziano", "email"],
+  ["elderPhone", "Cellulare dell’anziano", "tel"],
+  ["simplifiedNotes", "Note per il CAS", "textarea"],
+];
+
+const PatientDetailField = ({ field, value, onChange, disabled = false }) => {
   const [name, label, type = "text", options = []] = field;
   const common = {
     className: type === "select" || type === "yesno" ? "form-select" : "form-control",
     id: `patient-${name}`,
     value: value || "",
+    disabled,
     onChange: (event) => onChange(name, event.target.value),
   };
   const columnClass = type === "textarea"
@@ -164,6 +203,13 @@ const PatientDetailField = ({ field, value, onChange }) => {
   );
 };
 
+const formatSummaryValue = (value) => {
+  if (value === null || value === undefined || value === "") return "Non compilato";
+  if (Array.isArray(value)) return value.filter(Boolean).join(", ");
+  if (typeof value === "boolean") return value ? "Sì" : "No";
+  return String(value);
+};
+
 export const Patients = ({
   patients,
   setPatients,
@@ -172,6 +218,7 @@ export const Patients = ({
   currentUser,
   presidentId,
 }) => {
+  const isGvp = currentUser.role === "GVP";
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [admissionType, setAdmissionType] = useState("emergency");
@@ -181,16 +228,38 @@ export const Patients = ({
   const [casId, setCasId] = useState(
     currentUser.role === "CAS" ? currentUser.id : "",
   );
+  const [gvpIds, setGvpIds] = useState([]);
+  const [casFilter, setCasFilter] = useState(
+    currentUser.role === "CAS" ? currentUser.id : "all",
+  );
+  const [gvpPatientScope, setGvpPatientScope] = useState("mine");
   const [notes, setNotes] = useState("");
   const [details, setDetails] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [notePatient, setNotePatient] = useState(null);
+  const [newGvpNote, setNewGvpNote] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [noteError, setNoteError] = useState("");
+  const [activeTab, setActiveTab] = useState("insertion");
 
   const isEditing = editingId !== null;
-  const visiblePatients = patients.filter(
+  const organizationPatients = patients.filter(
     (patient) => patient.presidentId === presidentId,
   );
+  const visiblePatients = isGvp
+    ? organizationPatients.filter((patient) => {
+        const patientGvpIds = getPatientGvpIds(patient);
+        const isMine = patientGvpIds.includes(currentUser.id) || patient.casId === currentUser.id;
+        return gvpPatientScope === "all" ? true : isMine;
+      })
+    : currentUser.role === "CAS" && casFilter !== "all"
+      ? organizationPatients.filter((patient) => patient.casId === casFilter)
+      : organizationPatients;
+  const currentNotePatient = notePatient
+    ? visiblePatients.find((patient) => patient.id === notePatient.id) || notePatient
+    : null;
   const visibleDoctors = doctors.filter(
     (doctor) => doctor.presidentId === presidentId,
   );
@@ -198,6 +267,14 @@ export const Patients = ({
     (user) =>
       user.role === "CAS" &&
       (user.presidentId || user.associationId) === presidentId,
+  );
+  const visibleGvpUsers = users.filter(
+    (user) =>
+      user.role === "GVP" &&
+      (user.casId || user.associationId) === casId,
+  );
+  const editingPatientNotes = getGvpNotes(
+    patients.find((patient) => patient.id === editingId),
   );
 
   const resetForm = () => {
@@ -208,10 +285,13 @@ export const Patients = ({
     setPathology("");
     setDoctorId("");
     setCasId(currentUser.role === "CAS" ? currentUser.id : "");
+    setGvpIds([]);
     setNotes("");
+    setNewGvpNote("");
     setDetails({});
     setEditingId(null);
     setError("");
+    setActiveTab("insertion");
     setModalOpen(false);
   };
 
@@ -233,6 +313,12 @@ export const Patients = ({
     const validCasId = visibleCasUsers.some((user) => user.id === casId)
       ? casId
       : "";
+    const validGvpIds = gvpIds.filter((gvpUserId) => users.some(
+      (user) =>
+        user.id === gvpUserId &&
+        user.role === "GVP" &&
+        (user.casId || user.associationId) === validCasId,
+    ));
 
     if (
       !normalizedFirstName ||
@@ -266,6 +352,8 @@ export const Patients = ({
       pathology: normalizedPathology,
       doctorId: validDoctorId,
       casId: validCasId,
+      gvpIds: validGvpIds,
+      gvpId: validGvpIds[0] || "",
       notes: normalizedNotes,
       details,
       presidentId,
@@ -349,9 +437,11 @@ export const Patients = ({
     setPathology(patient.pathology || "");
     setDoctorId(patient.doctorId || "");
     setCasId(patient.casId || "");
+    setGvpIds(getPatientGvpIds(patient));
     setNotes(patient.notes || "");
     setDetails(patient.details || {});
     setError("");
+    setActiveTab("insertion");
     setModalOpen(true);
   };
 
@@ -373,25 +463,130 @@ export const Patients = ({
     resetForm();
   };
 
+  const openNotes = (patient) => {
+    setNotePatient(patient);
+    setNewGvpNote("");
+    setNoteError("");
+  };
+
+  const closeNotes = () => {
+    setNotePatient(null);
+    setNewGvpNote("");
+    setNoteError("");
+  };
+
+  const saveGvpNotes = () => {
+    if (!notePatient || noteSaving || !newGvpNote.trim()) return;
+    setNoteSaving(true);
+    setNoteError("");
+    Meteor.call("hlc.addPatientNote", notePatient.id, newGvpNote, (methodError) => {
+      setNoteSaving(false);
+      if (methodError) {
+        setNoteError(methodError.reason || "Impossibile salvare le note.");
+        return;
+      }
+      closeNotes();
+    });
+  };
+
+  const deleteGvpNote = (note) => {
+    if (!notePatient || note.authorId !== currentUser.id) return;
+    if (!globalThis.confirm("Eliminare questa nota?")) return;
+    setNoteError("");
+    Meteor.call("hlc.deletePatientNote", notePatient.id, note.id, (methodError) => {
+      if (methodError) {
+        setNoteError(methodError.reason || "Impossibile eliminare la nota.");
+      }
+    });
+  };
+
+  const doctor = doctors.find((item) => item.id === doctorId);
+  const selectedCasUser = users.find((item) => item.id === casId);
+  const selectedGvpUsers = users.filter((item) => gvpIds.includes(item.id));
+
+  const summaryEntries = [
+    { label: "Nome", value: firstName },
+    { label: "Cognome", value: lastName },
+    { label: "Tipo di accesso", value: admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza" },
+    { label: "Data di accesso", value: admissionDate },
+    { label: "Patologia", value: pathology },
+    { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
+    { label: "Note", value: notes },
+    { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
+    { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => user.username).join(", ") : "Nessun GVP assegnato" },
+    ...DETAIL_SECTIONS.flatMap((section) =>
+      section.fields.map((field) => ({
+        label: `${section.title} — ${field[1]}`,
+        value: details[field[0]],
+      })),
+    ),
+  ];
+
+  const gvpSummaryEntries = [
+    { label: "Nome", value: firstName },
+    { label: "Cognome", value: lastName },
+    { label: "Congregazione", value: details.congregation },
+    { label: "Età", value: details.age },
+    { label: "Numero di cellulare del paziente", value: details.patientPhone },
+    { label: "Problemi di salute", value: details.healthProblems },
+    { label: "Condizione spirituale", value: details.spiritualCondition },
+    { label: "Familiari non Testimoni coinvolti", value: details.nonWitnessFamily },
+    { label: "DAT compilata?", value: details.datCompleted },
+    { label: "DAT registrata?", value: details.datRegistered },
+    { label: "Nome dell’anziano", value: details.elderName },
+    { label: "E-mail dell’anziano", value: details.elderEmail },
+    { label: "Cellulare dell’anziano", value: details.elderPhone },
+    { label: "Note per il CAS", value: details.simplifiedNotes },
+  ];
+
   return (
     <>
       <div className="app-content-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
             <h1 className="mb-0">Pazienti</h1>
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={openCreateModal}
-            >
-              Inserisci
-            </button>
+            <div className="d-flex align-items-center gap-2">
+              {isGvp && (
+                <select className="form-select" aria-label="Filtra pazienti del GVP" value={gvpPatientScope} onChange={(event) => setGvpPatientScope(event.target.value)}>
+                  <option value="mine">I miei pazienti</option>
+                  <option value="all">Tutti i pazienti</option>
+                </select>
+              )}
+              {!isGvp && currentUser.role === "CAS" && <select className="form-select" aria-label="Filtra pazienti per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
+                <option value={currentUser.id}>I miei pazienti</option>
+                <option value="all">Tutti i pazienti</option>
+                {visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{casUser.username}</option>)}
+              </select>}
+              {!isGvp && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="app-content">
         <div className="container-fluid">
+          {notePatient && <>
+            <button className="entity-modal-backdrop" type="button" aria-label="Chiudi note" onClick={closeNotes} />
+            <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="gvp-notes-title">
+              <section className="card entity-modal-card">
+                <div className="card-header d-flex align-items-center">
+                  <h2 className="card-title" id="gvp-notes-title">Note — {notePatient.lastName} {notePatient.firstName}</h2>
+                  <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeNotes} />
+                </div>
+                <div className="card-body">
+                  {noteError && <div className="alert alert-danger py-2" role="alert">{noteError}</div>}
+                  <h3 className="h6">Note esistenti</h3>
+                  {getGvpNotes(currentNotePatient).length === 0 ? <p className="text-secondary">Nessuna nota inserita.</p> : <div className="d-grid gap-2 mb-4">{getGvpNotes(currentNotePatient).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{note.authorId === currentUser.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteGvpNote(note)}>Elimina</button>}</div><div className="d-flex align-items-center gap-2"><span className={`badge ${getNoteRoleBadgeClass(note.authorRole)}`}>{note.authorRole || "GVP"}</span><small className="text-secondary">{note.author || "GVP"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></div></article>)}</div>}
+                  <label className="form-label" htmlFor="gvp-patient-notes">Aggiungi una nota</label>
+                  <textarea className="form-control" id="gvp-patient-notes" rows="5" value={newGvpNote} onChange={(event) => setNewGvpNote(event.target.value)} maxLength="4000" autoFocus />
+                </div>
+                <div className="card-footer d-flex justify-content-end gap-2">
+                  <button className="btn btn-outline-secondary" type="button" onClick={closeNotes}>Annulla</button>
+                  <button className="btn btn-primary" type="button" onClick={saveGvpNotes} disabled={noteSaving || !newGvpNote.trim()}>{noteSaving ? "Salvataggio…" : "Aggiungi nota"}</button>
+                </div>
+              </section>
+            </div>
+          </>}
           {modalOpen && (
             <button
               className="entity-modal-backdrop"
@@ -407,241 +602,322 @@ export const Patients = ({
             aria-labelledby="patient-modal-title"
           >
             <section className="card entity-modal-card patient-modal-card">
-              <div className="card-header d-flex align-items-center">
-                <h2 className="card-title" id="patient-modal-title">
-                  {isEditing ? "Modifica paziente" : "Inserisci paziente"}
-                </h2>
-                <button
-                  className="btn btn-outline-secondary btn-sm ms-auto me-2"
-                  type="button"
-                  onClick={handleOpenPdf}
-                >
-                  Salva e apri HLC-7-I
-                </button>
-                <button
-                  className="btn btn-outline-secondary btn-sm me-2"
-                  type="button"
-                  onClick={handleOpenSimplifiedPdf}
-                >
-                  Salva e apri HLC-7-I semplificato
-                </button>
-                <button
-                  className="btn-close"
-                  type="button"
-                  aria-label="Chiudi"
-                  onClick={resetForm}
-                />
+              <div className="card-header">
+                <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                  <h2 className="card-title mb-0" id="patient-modal-title">
+                    {isEditing ? "Modifica paziente" : "Inserisci paziente"}
+                  </h2>
+                  <button
+                    className="btn-close"
+                    type="button"
+                    aria-label="Chiudi"
+                    onClick={resetForm}
+                  />
+                </div>
+                {!isGvp && (
+                  <div className="d-flex flex-wrap gap-2 mt-2">
+                    <button
+                      className="btn btn-outline-secondary btn-sm"
+                      type="button"
+                      onClick={handleOpenPdf}
+                    >
+                      Salva e apri HLC-7-I
+                    </button>
+                    <button
+                      className="btn btn-outline-secondary btn-sm"
+                      type="button"
+                      onClick={handleOpenSimplifiedPdf}
+                    >
+                      Salva e apri HLC-7-I semplificato
+                    </button>
+                  </div>
+                )}
               </div>
               <form onSubmit={handleSubmit}>
-                <div className="card-body patient-form-grid">
-                  {error && (
-                    <div className="alert alert-danger py-2" role="alert">
-                      {error}
+                <div className="card-body">
+                  {!isGvp && (
+                    <div className="nav nav-tabs mb-3" role="tablist">
+                      <button
+                        className={`nav-link ${activeTab === "summary" ? "active" : ""}`}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === "summary"}
+                        onClick={() => setActiveTab("summary")}
+                      >
+                        Riepilogo
+                      </button>
+                      <button
+                        className={`nav-link ${activeTab === "insertion" ? "active" : ""}`}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === "insertion"}
+                        onClick={() => setActiveTab("insertion")}
+                      >
+                        Inserimento dati
+                      </button>
                     </div>
                   )}
 
-                  <div className="mb-3">
-                    <label className="form-label" htmlFor="patient-first-name">
-                      Nome
-                    </label>
-                    <input
-                      className="form-control"
-                      id="patient-first-name"
-                      type="text"
-                      value={firstName}
-                      onChange={(event) => {
-                        setFirstName(event.target.value);
-                        setError("");
-                      }}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label" htmlFor="patient-last-name">
-                      Cognome
-                    </label>
-                    <input
-                      className="form-control"
-                      id="patient-last-name"
-                      type="text"
-                      value={lastName}
-                      onChange={(event) => {
-                        setLastName(event.target.value);
-                        setError("");
-                      }}
-                      required
-                    />
-                  </div>
-
-                  <fieldset className="mt-3">
-                    <legend className="form-label">Tipo di accesso</legend>
-                    <div className="btn-group w-100" role="group">
-                      <input
-                        className="btn-check"
-                        id="patient-emergency"
-                        name="admission-type"
-                        type="radio"
-                        checked={admissionType === "emergency"}
-                        onChange={() => setAdmissionType("emergency")}
-                      />
-                      <label
-                        className="btn btn-outline-danger"
-                        htmlFor="patient-emergency"
-                      >
-                        Emergenza
-                      </label>
-                      <input
-                        className="btn-check"
-                        id="patient-scheduled"
-                        name="admission-type"
-                        type="radio"
-                        checked={admissionType === "scheduled"}
-                        onChange={() => setAdmissionType("scheduled")}
-                      />
-                      <label
-                        className="btn btn-outline-primary"
-                        htmlFor="patient-scheduled"
-                      >
-                        Ricovero programmato
-                      </label>
-                    </div>
-                  </fieldset>
-
-                  <div className="mt-3">
-                    <label
-                      className="form-label"
-                      htmlFor="patient-admission-date"
-                    >
-                      Data di accesso
-                    </label>
-                    <input
-                      className="form-control"
-                      id="patient-admission-date"
-                      type="date"
-                      value={admissionDate}
-                      onChange={(event) => {
-                        setAdmissionDate(event.target.value);
-                        setError("");
-                      }}
-                      required
-                    />
-                  </div>
-
-                  <div className="mt-3">
-                    <label className="form-label" htmlFor="patient-pathology">
-                      Patologia
-                    </label>
-                    <input
-                      className="form-control"
-                      id="patient-pathology"
-                      type="text"
-                      value={pathology}
-                      onChange={(event) => {
-                        setPathology(event.target.value);
-                        setError("");
-                      }}
-                      required
-                    />
-                  </div>
-
-                  <div className="mt-3">
-                    <label className="form-label" htmlFor="patient-doctor">
-                      Medico responsabile
-                    </label>
-                    <select
-                      className="form-select"
-                      id="patient-doctor"
-                      value={doctorId}
-                      onChange={(event) => {
-                        setDoctorId(event.target.value);
-                        setError("");
-                      }}
-                    >
-                      <option value="">Seleziona medico</option>
-                      {visibleDoctors.map((doctor) => (
-                        <option key={doctor.id} value={doctor.id}>
-                          {doctor.lastName} {doctor.firstName}
-                        </option>
-                      ))}
-                    </select>
-                    {visibleDoctors.length === 0 && (
-                      <div className="form-text">
-                        Inserisci prima almeno un medico.
+                  {isGvp ? (
+                    <div className="patient-form-grid">
+                      <div className="alert alert-light border mb-3" role="status">
+                        Riepilogo delle informazioni disponibili per il GVP.
                       </div>
-                    )}
-                  </div>
-
-                  <div className="mt-3">
-                    <label className="form-label" htmlFor="patient-notes">
-                      Note
-                    </label>
-                    <textarea
-                      className="form-control"
-                      id="patient-notes"
-                      rows="3"
-                      value={notes}
-                      onChange={(event) => {
-                        setNotes(event.target.value);
-                        setError("");
-                      }}
-                    />
-                  </div>
-
-                  <div className="mt-3">
-                    <label className="form-label" htmlFor="patient-cas">
-                      CAS
-                    </label>
-                    <select
-                      className="form-select"
-                      id="patient-cas"
-                      value={casId}
-                      onChange={(event) => {
-                        setCasId(event.target.value);
-                        setError("");
-                      }}
-                    >
-                      <option value="">Seleziona CAS</option>
-                      {visibleCasUsers.map((casUser) => (
-                        <option key={casUser.id} value={casUser.id}>
-                          {casUser.username}
-                          {casUser.id === currentUser.id ? " (io)" : ""}
-                        </option>
-                      ))}
-                    </select>
-                    {visibleCasUsers.length === 0 && (
-                      <div className="form-text">
-                        Inserisci prima almeno un CAS.
-                      </div>
-                    )}
-                  </div>
-
-                  <hr className="my-4" />
-                  <p className="text-secondary mb-3">
-                    Campi della scheda HLC-7-I. Compila solo le sezioni pertinenti al caso.
-                  </p>
-                  {DETAIL_SECTIONS.map((section) => (
-                    <fieldset className="patient-detail-section" key={section.title}>
-                      <legend>{section.title}</legend>
-                      <div className="row g-3">
-                        {section.fields.map((field) => (
-                          <PatientDetailField
-                            key={field[0]}
-                            field={field}
-                            value={details[field[0]]}
-                            onChange={(name, value) => {
-                              setDetails((current) => ({ ...current, [name]: value }));
-                              setError("");
-                            }}
-                          />
+                      <div className="patient-summary-grid">
+                        {gvpSummaryEntries.map((entry) => (
+                          <div className="patient-summary-item" key={`${entry.label}-${entry.value}`}>
+                            <div className="patient-summary-label">{entry.label}</div>
+                            <div className="patient-summary-value">{formatSummaryValue(entry.value) || "-"}</div>
+                          </div>
                         ))}
                       </div>
-                    </fieldset>
-                  ))}
+                    </div>
+                  ) : activeTab === "summary" ? (
+                    <div className="patient-form-grid">
+                      <div className="alert alert-light border mb-3" role="status">
+                        Riepilogo dei dati inseriti per il paziente.
+                      </div>
+                      <div className="patient-summary-grid">
+                        {summaryEntries.map((entry) => (
+                          <div className="patient-summary-item" key={`${entry.label}-${entry.value}`}>
+                            <div className="patient-summary-label">{entry.label}</div>
+                            <div className="patient-summary-value">{formatSummaryValue(entry.value) || "-"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="patient-form-grid">
+                      <div className="patient-form-actions">
+                        <button className="btn btn-primary" type="submit">
+                          {isEditing ? "Salva modifiche" : "Inserisci"}
+                        </button>
+                      </div>
+                      {error && (
+                        <div className="alert alert-danger py-2" role="alert">
+                          {error}
+                        </div>
+                      )}
+
+                      <div className="mb-3">
+                        <label className="form-label" htmlFor="patient-first-name">
+                          Nome
+                        </label>
+                        <input
+                          className="form-control"
+                          id="patient-first-name"
+                          type="text"
+                          value={firstName}
+                          onChange={(event) => {
+                            setFirstName(event.target.value);
+                            setError("");
+                          }}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="form-label" htmlFor="patient-last-name">
+                          Cognome
+                        </label>
+                        <input
+                          className="form-control"
+                          id="patient-last-name"
+                          type="text"
+                          value={lastName}
+                          onChange={(event) => {
+                            setLastName(event.target.value);
+                            setError("");
+                          }}
+                          required
+                        />
+                      </div>
+
+                      <fieldset className="mt-3 w-100">
+                        <legend className="form-label">Tipo di accesso</legend>
+                        <div className="btn-group w-100" role="group">
+                          <input
+                            className="btn-check"
+                            id="patient-emergency"
+                            name="admission-type"
+                            type="radio"
+                            checked={admissionType === "emergency"}
+                            onChange={() => setAdmissionType("emergency")}
+                          />
+                          <label
+                            className="btn btn-outline-danger"
+                            htmlFor="patient-emergency"
+                          >
+                            Emergenza
+                          </label>
+                          <input
+                            className="btn-check"
+                            id="patient-scheduled"
+                            name="admission-type"
+                            type="radio"
+                            checked={admissionType === "scheduled"}
+                            onChange={() => setAdmissionType("scheduled")}
+                          />
+                          <label
+                            className="btn btn-outline-primary"
+                            htmlFor="patient-scheduled"
+                          >
+                            Ricovero programmato
+                          </label>
+                        </div>
+                      </fieldset>
+
+                      <div className="mt-3">
+                        <label
+                          className="form-label"
+                          htmlFor="patient-admission-date"
+                        >
+                          Data di accesso
+                        </label>
+                        <input
+                          className="form-control"
+                          id="patient-admission-date"
+                          type="date"
+                          value={admissionDate}
+                          onChange={(event) => {
+                            setAdmissionDate(event.target.value);
+                            setError("");
+                          }}
+                          required
+                        />
+                      </div>
+
+                      <div className="mt-3">
+                        <label className="form-label" htmlFor="patient-pathology">
+                          Patologia
+                        </label>
+                        <input
+                          className="form-control"
+                          id="patient-pathology"
+                          type="text"
+                          value={pathology}
+                          onChange={(event) => {
+                            setPathology(event.target.value);
+                            setError("");
+                          }}
+                          required
+                        />
+                      </div>
+
+                      <div className="mt-3">
+                        <label className="form-label" htmlFor="patient-doctor">
+                          Medico responsabile
+                        </label>
+                        <select
+                          className="form-select"
+                          id="patient-doctor"
+                          value={doctorId}
+                          onChange={(event) => {
+                            setDoctorId(event.target.value);
+                            setError("");
+                          }}
+                        >
+                          <option value="">Seleziona medico</option>
+                          {visibleDoctors.map((doctor) => (
+                            <option key={doctor.id} value={doctor.id}>
+                              {doctor.lastName} {doctor.firstName}
+                            </option>
+                          ))}
+                        </select>
+                        {visibleDoctors.length === 0 && (
+                          <div className="form-text">
+                            Inserisci prima almeno un medico.
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-3">
+                        <label className="form-label" htmlFor="patient-notes">
+                          Note
+                        </label>
+                        <textarea
+                          className="form-control"
+                          id="patient-notes"
+                          rows="3"
+                          value={notes}
+                          onChange={(event) => {
+                            setNotes(event.target.value);
+                            setError("");
+                          }}
+                        />
+                      </div>
+
+                      {isEditing && editingPatientNotes.length > 0 && (
+                        <div className="mt-3">
+                          <div className="form-label">Note del GVP</div>
+                          <div className="d-grid gap-2">{editingPatientNotes.map((note) => <article className="border rounded p-3" key={note.id}><p className="mb-1">{note.text}</p><div className="d-flex align-items-center gap-2"><span className={`badge ${getNoteRoleBadgeClass(note.authorRole)}`}>{note.authorRole || "GVP"}</span><small className="text-secondary">{note.author || "GVP"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></div></article>)}</div>
+                        </div>
+                      )}
+
+                      <div className="mt-3">
+                        <label className="form-label" htmlFor="patient-cas">
+                          CAS
+                        </label>
+                        <select
+                          className="form-select"
+                          id="patient-cas"
+                          value={casId}
+                          onChange={(event) => {
+                            setCasId(event.target.value);
+                            setGvpIds([]);
+                            setError("");
+                          }}
+                        >
+                          <option value="">Seleziona CAS</option>
+                          {visibleCasUsers.map((casUser) => (
+                            <option key={casUser.id} value={casUser.id}>
+                              {casUser.username}
+                              {casUser.id === currentUser.id ? " (io)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                        {visibleCasUsers.length === 0 && (
+                          <div className="form-text">
+                            Inserisci prima almeno un CAS.
+                          </div>
+                        )}
+
+                        <div className="mt-2">
+                          <div className="form-label">GVP assegnati</div>
+                          {visibleGvpUsers.length > 0 && <div className="d-grid gap-2 border rounded p-3">{visibleGvpUsers.map((gvpUser) => <label className="form-check" key={gvpUser.id}><input className="form-check-input" type="checkbox" checked={gvpIds.includes(gvpUser.id)} onChange={() => { setGvpIds((current) => current.includes(gvpUser.id) ? current.filter((id) => id !== gvpUser.id) : [...current, gvpUser.id]); setError(""); }} /><span className="form-check-label">{gvpUser.username}</span></label>)}</div>}
+                          {casId && visibleGvpUsers.length === 0 && <div className="form-text">Nessun GVP associato al CAS selezionato.</div>}
+                          {!casId && <div className="form-text">Seleziona un CAS per vedere i GVP disponibili.</div>}
+                        </div>
+                      </div>
+
+                      <hr className="my-4" />
+                      <p className="text-secondary mb-3">
+                        Campi della scheda HLC-7-I. Compila solo le sezioni pertinenti al caso.
+                      </p>
+                      {DETAIL_SECTIONS.map((section) => (
+                        <fieldset className="patient-detail-section w-100" key={section.title}>
+                          <legend>{section.title}</legend>
+                          <div className="row g-3">
+                            {section.fields.map((field) => (
+                              <PatientDetailField
+                                key={field[0]}
+                                field={field}
+                                value={details[field[0]]}
+                                onChange={(name, value) => {
+                                  setDetails((current) => ({ ...current, [name]: value }));
+                                  setError("");
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </fieldset>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="card-footer d-flex align-items-center gap-2">
-                  {isEditing && (
+                  {!isGvp && isEditing && (
                     <button
                       className="btn btn-outline-danger me-auto"
                       type="button"
@@ -650,7 +926,7 @@ export const Patients = ({
                       Elimina
                     </button>
                   )}
-                  {isEditing && (
+                  {!isGvp && isEditing && (
                     <button
                       className="btn btn-outline-secondary"
                       type="button"
@@ -659,9 +935,9 @@ export const Patients = ({
                       Annulla
                     </button>
                   )}
-                  <button className="btn btn-primary" type="submit">
-                    {isEditing ? "Salva modifiche" : "Inserisci"}
-                  </button>
+                  {isGvp ? (
+                    <button className="btn btn-secondary ms-auto" type="button" onClick={resetForm}>Chiudi</button>
+                  ) : null}
                 </div>
               </form>
             </section>
@@ -675,21 +951,21 @@ export const Patients = ({
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0">
                   <thead>
-                    <tr>
+                    {isGvp ? <tr><th>Paziente</th><th className="text-end">Azioni</th></tr> : <tr>
                       <th>Paziente</th>
                       <th>Accesso</th>
                       <th>Data</th>
                       <th>Patologia</th>
                       <th>Medico responsabile</th>
                       <th>CAS</th>
-                      <th>Note</th>
+                      <th>GVP</th>
                       <th className="text-end">Azioni</th>
-                    </tr>
+                    </tr>}
                   </thead>
                   <tbody>
                     {visiblePatients.length === 0 ? (
                       <tr>
-                        <td className="text-center text-secondary py-4" colSpan="8">
+                        <td className="text-center text-secondary py-4" colSpan={isGvp ? 2 : 8}>
                           Nessun paziente inserito.
                         </td>
                       </tr>
@@ -699,11 +975,22 @@ export const Patients = ({
                           first.lastName.localeCompare(second.lastName),
                         )
                         .map((patient) => {
+                          if (isGvp) {
+                            return (
+                              <tr key={patient.id}>
+                                <td className="fw-medium">{patient.lastName} {patient.firstName}</td>
+                                <td className="text-end"><div className="d-inline-flex gap-2"><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(patient)}>Visualizza</button><button className="btn btn-primary btn-sm" type="button" onClick={() => openNotes(patient)}>Note</button></div></td>
+                              </tr>
+                            );
+                          }
                           const doctor = doctors.find(
                             (item) => item.id === patient.doctorId,
                           );
                           const casUser = users.find(
                             (item) => item.id === patient.casId,
+                          );
+                          const gvpUsers = users.filter((item) =>
+                            getPatientGvpIds(patient).includes(item.id),
                           );
 
                           return (
@@ -746,19 +1033,16 @@ export const Patients = ({
                                 </span>
                               )}
                             </td>
-                            <td className="doctor-notes-cell">
-                              {patient.notes || (
-                                <span className="text-secondary">-</span>
-                              )}
-                            </td>
+                            <td>{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{gvpUser.username}</span>)}</div> : <span className="text-secondary">-</span>}</td>
                             <td className="text-end">
                               <button
                                 className="btn btn-outline-primary btn-sm"
                                 type="button"
                                 onClick={() => handleEdit(patient)}
                               >
-                                Modifica
-                              </button>
+                                  Modifica
+                                </button>
+                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm ms-2" type="button" onClick={() => openNotes(patient)}>Note</button>}
                             </td>
                           </tr>
                           );

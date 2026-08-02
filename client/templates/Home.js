@@ -41,18 +41,31 @@ export const Home = ({
   presentations,
   setPresentations,
   supportRequests,
+  notifications = [],
+  theme,
+  onToggleTheme,
   onLogout,
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(
     () => globalThis.innerWidth >= 992,
   );
-  const [activeView, setActiveView] = useState("home");
+  const [activeView, setActiveView] = useState(
+    user.role === "GVP" ? "patients" : "home",
+  );
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const presidentId =
     user.role === "Presidente"
       ? user.id
-      : user.role === "CAS"
+      : user.role === "CAS" || user.role === "GVP"
         ? user.presidentId || user.associationId
         : "";
+  const closeMobileSidebar = () => {
+    if (globalThis.innerWidth < 992) setSidebarOpen(false);
+  };
+  const openView = (view) => {
+    setActiveView(view);
+    closeMobileSidebar();
+  };
 
   return (
     <div
@@ -78,6 +91,32 @@ export const Home = ({
           </ul>
 
           <ul className="navbar-nav ms-auto align-items-center">
+            <li className="nav-item me-2">
+              <button className="btn btn-outline-secondary btn-sm" type="button" onClick={onToggleTheme} aria-label={theme === "dark" ? "Attiva tema giorno" : "Attiva tema notte"} title={theme === "dark" ? "Tema giorno" : "Tema notte"}>
+                <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+                <span className="d-none d-md-inline ms-1">{theme === "dark" ? "Giorno" : "Notte"}</span>
+              </button>
+            </li>
+            {(user.role === "CAS" || user.role === "Presidente") && (
+              <li className="nav-item me-2 position-relative">
+                <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setNotificationsOpen((current) => !current)} aria-label="Mostra notifiche">
+                  🔔
+                  {notifications.length > 0 && <span className="badge text-bg-danger ms-2">{notifications.length}</span>}
+                </button>
+                {notificationsOpen && (
+                  <div className="dropdown-menu show p-2 shadow" style={{ position: "absolute", right: 0, top: "calc(100% + 0.35rem)", minWidth: "18rem", zIndex: 1100 }}>
+                    {notifications.length === 0 ? (
+                      <div className="small text-secondary">Nessuna notifica.</div>
+                    ) : notifications.map((notification) => (
+                      <div key={notification.id} className="border rounded p-2 mb-2 small">
+                        <div>{notification.message}</div>
+                        <div className="text-secondary mt-1">{new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(notification.createdAt))}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </li>
+            )}
             <li className="nav-item d-none d-sm-block">
               <span className="nav-link admin-user-email">
                 {user.username} · {user.role}
@@ -114,7 +153,7 @@ export const Home = ({
                 <button
                   className={`nav-link w-100 ${activeView === "calendar" ? "active" : ""}`}
                   type="button"
-                  onClick={() => setActiveView("calendar")}
+                  onClick={() => openView("calendar")}
                 >
                   <MenuIcon name="calendar" />
                   <p>Calendario</p>
@@ -124,36 +163,37 @@ export const Home = ({
                 <button
                   className={`nav-link w-100 ${activeView === "profile" ? "active" : ""}`}
                   type="button"
-                  onClick={() => setActiveView("profile")}
+                  onClick={() => openView("profile")}
                 >
                   <MenuIcon name="profile" />
                   <p>Profilo</p>
                 </button>
               </li>}
-              {user.role !== "Admin" && <li className="nav-item">
+              {user.role !== "Admin" && user.role !== "GVP" && <li className="nav-item">
                 <a
                   className="nav-link w-100"
                   href={SHAREPOINT_URL}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={closeMobileSidebar}
                 >
                   <MenuIcon name="sharepoint" />
                   <p>Share Point</p>
                 </a>
               </li>}
-              <li className="nav-item">
-                <button className={`nav-link w-100 ${activeView === "support" ? "active" : ""}`} type="button" onClick={() => setActiveView("support")}>
+              {user.role !== "GVP" && <li className="nav-item">
+                <button className={`nav-link w-100 ${activeView === "support" ? "active" : ""}`} type="button" onClick={() => openView("support")}>
                   <MenuIcon name="support" />
                   <p>Segnalazioni</p>
                 </button>
-              </li>
+              </li>}
               {user.role === "Admin" && (
               <>
               <li className="nav-item">
                 <button
                   className={`nav-link w-100 ${activeView === "users" ? "active" : ""}`}
                   type="button"
-                  onClick={() => setActiveView("users")}
+                  onClick={() => openView("users")}
                 >
                   <MenuIcon name="users" />
                   <p>Utenti</p>
@@ -166,7 +206,7 @@ export const Home = ({
                   <button
                     className={`nav-link w-100 ${activeView === "team" ? "active" : ""}`}
                     type="button"
-                    onClick={() => setActiveView("team")}
+                    onClick={() => openView("team")}
                   >
                     <MenuIcon name="team" />
                     <p>La mia squadra</p>
@@ -178,7 +218,7 @@ export const Home = ({
                   <button
                     className={`nav-link w-100 ${activeView === "team" ? "active" : ""}`}
                     type="button"
-                    onClick={() => setActiveView("team")}
+                    onClick={() => openView("team")}
                   >
                     <MenuIcon name="team" />
                     <p>I miei GVP</p>
@@ -191,7 +231,7 @@ export const Home = ({
                     <button
                       className={`nav-link w-100 ${activeView === "hospitals" ? "active" : ""}`}
                       type="button"
-                      onClick={() => setActiveView("hospitals")}
+                      onClick={() => openView("hospitals")}
                     >
                       <MenuIcon name="hospital" />
                       <p>Ospedali</p>
@@ -201,7 +241,7 @@ export const Home = ({
                     <button
                       className={`nav-link w-100 ${activeView === "presentations" ? "active" : ""}`}
                       type="button"
-                      onClick={() => setActiveView("presentations")}
+                      onClick={() => openView("presentations")}
                     >
                       <MenuIcon name="presentation" />
                       <p>Presentazioni</p>
@@ -211,7 +251,7 @@ export const Home = ({
                     <button
                       className={`nav-link w-100 ${activeView === "doctors" ? "active" : ""}`}
                       type="button"
-                      onClick={() => setActiveView("doctors")}
+                      onClick={() => openView("doctors")}
                     >
                       <MenuIcon name="doctor" />
                       <p>Medici</p>
@@ -221,13 +261,25 @@ export const Home = ({
                     <button
                       className={`nav-link w-100 ${activeView === "patients" ? "active" : ""}`}
                       type="button"
-                      onClick={() => setActiveView("patients")}
+                      onClick={() => openView("patients")}
                     >
                       <MenuIcon name="patient" />
                       <p>Pazienti</p>
                     </button>
                   </li>
                 </>
+              )}
+              {user.role === "GVP" && (
+                <li className="nav-item">
+                  <button
+                    className={`nav-link w-100 ${activeView === "patients" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => openView("patients")}
+                  >
+                    <MenuIcon name="patient" />
+                    <p>Pazienti</p>
+                  </button>
+                </li>
               )}
             </ul>
           </nav>

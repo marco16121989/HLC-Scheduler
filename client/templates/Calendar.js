@@ -16,7 +16,8 @@ export const Calendar = ({ presentations, patients, doctors, currentUser }) => {
   });
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [viewMode, setViewMode] = useState("month");
-  const [eventFilter, setEventFilter] = useState("all");
+  const isGvp = currentUser.role === "GVP";
+  const [eventFilter, setEventFilter] = useState(isGvp ? "patient" : "all");
 
   const events = useMemo(() => {
     const presentationEvents = presentations
@@ -39,13 +40,13 @@ export const Calendar = ({ presentations, patients, doctors, currentUser }) => {
           title: `${patient.lastName} ${patient.firstName}`,
           detail: [
             patient.admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza",
-            patient.pathology,
+            !isGvp ? patient.pathology : "",
             doctor ? `Dr. ${doctor.lastName}` : "",
           ].filter(Boolean).join(" · "),
         };
       });
     return [...presentationEvents, ...patientEvents].sort((a, b) => a.title.localeCompare(b.title));
-  }, [presentations, patients, doctors]);
+  }, [presentations, patients, doctors, isGvp]);
 
   const filteredEvents = eventFilter === "all"
     ? events
@@ -107,9 +108,9 @@ export const Calendar = ({ presentations, patients, doctors, currentUser }) => {
           <div className="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div><h1 className="mb-0">Calendario</h1><div className="text-secondary small">Eventi disponibili per {currentUser.username}</div></div>
             <div className="d-flex flex-wrap gap-2">
-              <div className="btn-group" role="group" aria-label="Filtro eventi">
+              {!isGvp && <div className="btn-group" role="group" aria-label="Filtro eventi">
                 {[['all', 'Tutti'], ['presentation', 'Presentazioni'], ['patient', 'Pazienti']].map(([filter, label]) => <button className={`btn ${eventFilter === filter ? "btn-secondary" : "btn-outline-secondary"}`} type="button" key={filter} onClick={() => setEventFilter(filter)}>{label}</button>)}
-              </div>
+              </div>}
               <div className="btn-group" role="group" aria-label="Tipo di vista">
                 {[['month', 'Mese'], ['week', 'Settimana'], ['day', 'Giorno']].map(([mode, label]) => <button className={`btn ${viewMode === mode ? "btn-primary" : "btn-outline-primary"}`} type="button" key={mode} onClick={() => selectView(mode)}>{label}</button>)}
               </div>
@@ -124,7 +125,7 @@ export const Calendar = ({ presentations, patients, doctors, currentUser }) => {
       </div>
       <div className="app-content"><div className="container-fluid"><div className="row g-3">
         <div className={viewMode === "month" ? "col-12 col-xl-9" : "col-12"}><section className="card calendar-card">
-          <div className="calendar-legend"><span><i className="calendar-dot presentation" /> Presentazioni (tutti)</span><span><i className="calendar-dot patient" /> Pazienti autorizzati</span></div>
+          <div className="calendar-legend">{!isGvp && <span><i className="calendar-dot presentation" /> Presentazioni (tutti)</span>}<span><i className="calendar-dot patient" /> {isGvp ? "Casi affidati" : "Pazienti autorizzati"}</span></div>
           {viewMode === "month" && <><div className="calendar-grid calendar-week-header">{WEEK_DAYS.map((day) => <div key={day}>{day}</div>)}</div>
           <div className="calendar-grid calendar-days">{cells.map((date, index) => {
             if (!date) return <div className="calendar-day empty" key={`empty-${index}`} />;

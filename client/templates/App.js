@@ -1,10 +1,12 @@
 import { Meteor } from "meteor/meteor";
 import { useTracker } from "meteor/react-meteor-data";
+import { useEffect, useState } from "react";
 import { Home } from "./Home.js";
 import { Login } from "./Login.js";
 import {
   DoctorsCollection,
   HospitalsCollection,
+  NotificationsCollection,
   PatientsCollection,
   PresentationsCollection,
   SupportRequestsCollection,
@@ -25,12 +27,29 @@ const callServer = (method, ...args) => {
 };
 
 export const App = () => {
-  const { ready, user, users, hospitals, doctors, patients, presentations, supportRequests } = useTracker(() => {
-    const subscription = Meteor.subscribe("hlc-data");
+  const [theme, setTheme] = useState(() => {
+    const savedTheme = globalThis.localStorage?.getItem("hlc-theme");
+    if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+    return globalThis.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-bs-theme", theme);
+    document.body.setAttribute("data-bs-theme", theme);
+    globalThis.localStorage?.setItem("hlc-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((current) => current === "dark" ? "light" : "dark");
+  };
+
+  const { ready, user, users, hospitals, doctors, patients, presentations, supportRequests, notifications } = useTracker(() => {
+    const dataSubscription = Meteor.subscribe("hlc-data");
+    const notificationSubscription = Meteor.subscribe("hlc-notifications");
     const account = Meteor.user();
 
     return {
-      ready: subscription.ready(),
+      ready: dataSubscription.ready() && notificationSubscription.ready(),
       user: account ? toClientRecord(account) : null,
       users: Meteor.users.find({}, { sort: { username: 1 } }).fetch().map(toClientRecord),
       hospitals: HospitalsCollection.find().fetch().map(toClientRecord),
@@ -38,6 +57,10 @@ export const App = () => {
       patients: PatientsCollection.find().fetch().map(toClientRecord),
       presentations: PresentationsCollection.find().fetch().map(toClientRecord),
       supportRequests: SupportRequestsCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
+      notifications: NotificationsCollection.find({}, { sort: { createdAt: -1 } }).fetch().map((item) => ({
+        ...item,
+        id: item._id,
+      })),
     };
   }, []);
 
@@ -83,9 +106,12 @@ export const App = () => {
       presentations={presentations}
       setPresentations={setPresentations}
       supportRequests={supportRequests}
+      notifications={notifications}
+      theme={theme}
+      onToggleTheme={toggleTheme}
       onLogout={() => Meteor.logout()}
     />
   ) : (
-    <Login />
+    <Login theme={theme} onToggleTheme={toggleTheme} />
   );
 };

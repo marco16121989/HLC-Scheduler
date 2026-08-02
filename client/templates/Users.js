@@ -23,6 +23,16 @@ const getPresidentId = (user, users) => {
   return "";
 };
 
+const getHospitalAssignments = (user) =>
+  Array.isArray(user.hospitalAssignments)
+    ? user.hospitalAssignments
+    : user.hospitalId
+      ? [{
+          hospitalId: user.hospitalId,
+          departmentIds: user.departmentId ? [user.departmentId] : [],
+        }]
+      : [];
+
 const createEmptyForm = (role, manager, users) => {
   const isPresident = manager?.role === "Presidente";
   const isCas = manager?.role === "CAS";
@@ -37,8 +47,7 @@ const createEmptyForm = (role, manager, users) => {
         ? getPresidentId(manager, users)
         : "",
     casId: isCas ? manager.id : "",
-    hospitalId: "",
-    departmentId: "",
+    hospitalAssignments: [],
   };
 };
 
@@ -58,6 +67,14 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
   );
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
+  const formHospitalAssignments = Array.isArray(form.hospitalAssignments)
+    ? form.hospitalAssignments
+    : form.hospitalId
+      ? [{
+          hospitalId: form.hospitalId,
+          departmentIds: form.departmentId ? [form.departmentId] : [],
+        }]
+      : [];
 
   const isEditing = editingId !== null;
   const editingUser = users.find((user) => user.id === editingId);
@@ -120,7 +137,6 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
         ...current,
         [name]: value,
         ...(name === "presidentId" ? { casId: "" } : {}),
-        ...(name === "hospitalId" ? { departmentId: "" } : {}),
       };
     });
     setError("");
@@ -150,19 +166,21 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       )
         ? form.casId
         : "";
-    const selectedHospital =
-      role === "CAS"
-        ? availableHospitals.find(
-            (hospital) => hospital.id === form.hospitalId,
-          )
-        : null;
-    const hospitalId = selectedHospital?.id || "";
-    const departmentId =
-      selectedHospital?.departments.some(
-        (department) => department.id === form.departmentId,
-      )
-        ? form.departmentId
-        : "";
+    const hospitalAssignments = role === "CAS"
+      ? formHospitalAssignments.flatMap((assignment) => {
+          const hospital = availableHospitals.find(
+            (item) => item.id === assignment.hospitalId,
+          );
+          if (!hospital) return [];
+          const departmentIds = assignment.departmentIds.filter((departmentId) =>
+            (hospital.departments || []).some(
+              (department) => department.id === departmentId,
+            ),
+          );
+          return [{ hospitalId: hospital.id, departmentIds }];
+        })
+      : [];
+    const firstAssignment = hospitalAssignments[0];
 
     if (!username) {
       setError("Inserisci un nome utente.");
@@ -195,8 +213,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       role,
       presidentId: validPresidentId,
       casId: validCasId,
-      hospitalId,
-      departmentId,
+      hospitalAssignments,
+      hospitalId: firstAssignment?.hospitalId || "",
+      departmentId: firstAssignment?.departmentIds[0] || "",
       associationId: role === "CAS" ? validPresidentId : validCasId,
     };
 
@@ -259,9 +278,43 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       role: availableRoles.includes(user.role) ? user.role : availableRoles[0],
       presidentId: getPresidentId(user, users),
       casId: getCasId(user),
-      hospitalId: user.hospitalId || "",
-      departmentId: user.departmentId || "",
+      hospitalAssignments: getHospitalAssignments(user),
     });
+    setError("");
+  };
+
+  const toggleHospital = (hospitalId) => {
+    setForm((current) => {
+      const currentAssignments = getHospitalAssignments(current);
+      const selected = currentAssignments.some(
+        (assignment) => assignment.hospitalId === hospitalId,
+      );
+      return {
+        ...current,
+        hospitalAssignments: selected
+          ? currentAssignments.filter(
+              (assignment) => assignment.hospitalId !== hospitalId,
+            )
+          : [...currentAssignments, { hospitalId, departmentIds: [] }],
+      };
+    });
+    setError("");
+  };
+
+  const toggleDepartment = (hospitalId, departmentId) => {
+    setForm((current) => ({
+      ...current,
+      hospitalAssignments: getHospitalAssignments(current).map((assignment) => {
+        if (assignment.hospitalId !== hospitalId) return assignment;
+        const selected = assignment.departmentIds.includes(departmentId);
+        return {
+          ...assignment,
+          departmentIds: selected
+            ? assignment.departmentIds.filter((id) => id !== departmentId)
+            : [...assignment.departmentIds, departmentId],
+        };
+      }),
+    }));
     setError("");
   };
 
@@ -335,24 +388,21 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
     return null;
   };
 
-  const getHospitalLabel = (user) => {
-    if (user.role !== "CAS" || !user.hospitalId) {
-      return "";
-    }
-
-    const hospital = hospitals.find(
-      (candidate) => candidate.id === user.hospitalId,
-    );
-    const department = hospital?.departments.find(
-      (candidate) => candidate.id === user.departmentId,
-    );
-
-    return hospital
-      ? department
-        ? `${hospital.name} / ${department.name}`
-        : `${hospital.name} / Intero ospedale`
-      : "";
-  };
+  const getHospitalLabels = (user) =>
+    user.role === "CAS"
+      ? getHospitalAssignments(user).flatMap((assignment) => {
+          const hospital = hospitals.find(
+            (candidate) => candidate.id === assignment.hospitalId,
+          );
+          if (!hospital) return [];
+          const departments = (hospital.departments || []).filter((department) =>
+            assignment.departmentIds.includes(department.id),
+          );
+          return departments.length > 0
+            ? departments.map((department) => `${hospital.name} / ${department.name}`)
+            : [`${hospital.name} / Intero ospedale`];
+        })
+      : [];
 
   const orderedUsers = [];
   const addedUserIds = new Set();
@@ -508,60 +558,43 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                     )}
 
                     {form.role === "CAS" && (
-                      <>
-                        <div className="mb-3">
-                          <label className="form-label" htmlFor="user-hospital">
-                            Ospedale
-                          </label>
-                          <select
-                            className="form-select"
-                            id="user-hospital"
-                            name="hospitalId"
-                            value={form.hospitalId}
-                            onChange={handleChange}
-                          >
-                            <option value="">Nessun ospedale</option>
-                            {availableHospitals.map((hospital) => (
-                              <option key={hospital.id} value={hospital.id}>
-                                {hospital.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {form.hospitalId && (
-                          <div className="mb-3">
-                            <label
-                              className="form-label"
-                              htmlFor="user-department"
-                            >
-                              Reparto
-                            </label>
-                            <select
-                              className="form-select"
-                              id="user-department"
-                              name="departmentId"
-                              value={form.departmentId}
-                              onChange={handleChange}
-                            >
-                              <option value="">Intero ospedale</option>
-                              {availableHospitals
-                                .find(
-                                  (hospital) =>
-                                    hospital.id === form.hospitalId,
-                                )
-                                ?.departments.map((department) => (
-                                  <option
-                                    key={department.id}
-                                    value={department.id}
-                                  >
-                                    {department.name}
-                                  </option>
-                                ))}
-                            </select>
+                      <fieldset className="mb-3">
+                        <legend className="form-label">Ospedali e reparti</legend>
+                        {availableHospitals.length === 0 ? (
+                          <p className="text-secondary small mb-0">
+                            Nessun ospedale disponibile.
+                          </p>
+                        ) : (
+                          <div className="profile-hospitals">
+                            {availableHospitals.map((hospital) => {
+                              const assignment = formHospitalAssignments.find(
+                                (item) => item.hospitalId === hospital.id,
+                              );
+                              return (
+                                <article className={`profile-hospital ${assignment ? "selected" : ""}`} key={hospital.id}>
+                                  <label className="form-check profile-hospital-title">
+                                    <input className="form-check-input" type="checkbox" checked={Boolean(assignment)} onChange={() => toggleHospital(hospital.id)} />
+                                    <span className="form-check-label"><strong>{hospital.name}</strong></span>
+                                  </label>
+                                  {assignment && (hospital.departments || []).length > 0 && (
+                                    <div className="profile-departments">
+                                      {hospital.departments.map((department) => (
+                                        <label className="form-check" key={department.id}>
+                                          <input className="form-check-input" type="checkbox" checked={assignment.departmentIds.includes(department.id)} onChange={() => toggleDepartment(hospital.id, department.id)} />
+                                          <span className="form-check-label">{department.name}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
+                                </article>
+                              );
+                            })}
                           </div>
                         )}
-                      </>
+                        <div className="form-text">
+                          Se non selezioni reparti, il CAS viene associato all'intero ospedale.
+                        </div>
+                      </fieldset>
                     )}
 
                     <div className="mb-0">
@@ -653,7 +686,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                         ) : (
                           orderedUsers.map((user) => {
                             const associationLabel = getAssociationLabel(user);
-                            const hospitalLabel = getHospitalLabel(user);
+                            const hospitalLabels = getHospitalLabels(user);
                             const casId = getCasId(user);
                             const depth =
                               user.role === "CAS" || (user.role === "GVP" && !casId)
@@ -721,10 +754,14 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                                 </td>
                                 <td>
                                   {user.role === "CAS" ? (
-                                    hospitalLabel ? (
-                                      <span className="badge text-bg-info association-badge">
-                                        {hospitalLabel}
-                                      </span>
+                                    hospitalLabels.length > 0 ? (
+                                      <div className="d-flex flex-wrap gap-1">
+                                        {hospitalLabels.map((label) => (
+                                          <span className="badge text-bg-info association-badge" key={label}>
+                                            {label}
+                                          </span>
+                                        ))}
+                                      </div>
                                     ) : (
                                       <span className="text-secondary">
                                         Nessuna sede

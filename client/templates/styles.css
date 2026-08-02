@@ -34,6 +34,16 @@
   --transition-slow: 250ms ease;
 }
 
+[data-bs-theme="dark"] {
+  --color-background: hsl(220, 18%, 10%);
+  --color-foreground: hsl(210, 20%, 92%);
+  --color-card: hsl(220, 16%, 15%);
+  --color-muted: hsl(215, 12%, 68%);
+  --color-border: hsl(218, 14%, 25%);
+  --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.3);
+  --shadow-card-hover: 0 10px 20px hsl(0 0% 0% / 0.35);
+}
+
 /* ============ Reset & Base Styles ============ */
 *,
 *::before,
@@ -53,6 +63,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
 a {
@@ -228,6 +239,13 @@ a {
   align-items: center;
   justify-content: center;
   padding: var(--spacing-lg);
+}
+
+.theme-toggle-login {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
 }
 
 .login-main {
@@ -599,23 +617,32 @@ svg.admin-nav-icon {
 }
 
 .patient-modal-card {
-  width: 99vw;
-  max-width: none;
+  width: min(100%, 1600px);
+  max-width: min(100%, 95vw);
+  min-height: calc(100vh - 1rem);
+  max-height: calc(100vh - 1rem);
 }
 
 .entity-modal-shell:has(.patient-modal-card) {
-  padding: 0.5vw;
+  padding: 0.35rem;
+  align-items: stretch;
 }
 
 .patient-form-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 1rem;
+  width: 100%;
 }
 
 .patient-form-grid > div {
   grid-column: span 6;
   margin: 0 !important;
+  width: 100%;
+}
+
+.patient-form-grid > .patient-summary-grid {
+  grid-column: 1 / -1;
 }
 
 .patient-form-grid > div:has(input[type="date"]),
@@ -639,6 +666,21 @@ svg.admin-nav-icon {
   margin-block: 0.5rem !important;
 }
 
+.patient-form-grid > .patient-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.35rem 0 0.5rem;
+  background: var(--bs-body-bg);
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+}
+
 @media (max-width: 767.98px) {
   .patient-form-grid > div,
   .patient-form-grid > div:has(input[type="date"]),
@@ -647,11 +689,39 @@ svg.admin-nav-icon {
   }
 }
 
-.patient-detail-section {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  border: 1px solid var(--bs-border-color);
+.patient-summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  width: 100%;
+}
+
+.patient-summary-item {
+  flex: 1 1 calc(25% - 1.25rem);
+  min-width: 220px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--bs-border-color-translucent);
   border-radius: var(--bs-border-radius);
+  background: var(--bs-tertiary-bg);
+}
+
+.patient-summary-label {
+  font-weight: 600;
+  color: var(--bs-emphasis-color);
+  margin-bottom: 0.2rem;
+}
+
+.patient-summary-value {
+  color: var(--bs-secondary-color);
+  white-space: pre-wrap;
+}
+
+.patient-detail-section {
+  margin-top: 1.25rem;
+  padding: 0 0 1rem;
+  border: 0;
+  border-top: 1px solid var(--bs-border-color-translucent);
+  border-radius: 0;
 }
 
 .patient-detail-section legend {
@@ -662,6 +732,12 @@ svg.admin-nav-icon {
   color: var(--bs-primary);
   font-size: 1rem;
   font-weight: 600;
+}
+
+@media (max-width: 767.98px) {
+  .patient-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .calendar-month-button {
