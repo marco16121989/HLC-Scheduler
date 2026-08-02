@@ -645,6 +645,13 @@ svg.admin-nav-icon {
   grid-column: 1 / -1;
 }
 
+.patient-form-grid > .patient-assignment-row,
+.patient-form-grid > .patient-assignment-row:has(select) {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+}
+
 .patient-form-grid > div:has(input[type="date"]),
 .patient-form-grid > div:has(select) {
   grid-column: span 3;

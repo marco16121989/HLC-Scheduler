@@ -238,6 +238,8 @@ export const Patients = ({
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [gvpSelectionModalOpen, setGvpSelectionModalOpen] = useState(false);
+  const [gvpSearch, setGvpSearch] = useState("");
   const [notePatient, setNotePatient] = useState(null);
   const [newGvpNote, setNewGvpNote] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
@@ -271,8 +273,25 @@ export const Patients = ({
   const visibleGvpUsers = users.filter(
     (user) =>
       user.role === "GVP" &&
-      (user.casId || user.associationId) === casId,
+      (user.presidentId || user.associationId) === presidentId,
   );
+  const getGvpDisplayName = (user) => {
+    const firstName = user.firstName?.trim();
+    const lastName = user.lastName?.trim();
+    if (firstName || lastName) {
+      return [firstName, lastName].filter(Boolean).join(" ");
+    }
+    return user.username || "";
+  };
+  const normalizedGvpSearch = gvpSearch.trim().toLowerCase();
+  const associatedGvpUsers = visibleGvpUsers.filter((user) => gvpIds.includes(user.id)).filter((user) => {
+    if (!normalizedGvpSearch) return true;
+    return `${getGvpDisplayName(user)}`.toLowerCase().includes(normalizedGvpSearch);
+  });
+  const unassociatedGvpUsers = visibleGvpUsers.filter((user) => !gvpIds.includes(user.id)).filter((user) => {
+    if (!normalizedGvpSearch) return true;
+    return `${getGvpDisplayName(user)}`.toLowerCase().includes(normalizedGvpSearch);
+  });
   const editingPatientNotes = getGvpNotes(
     patients.find((patient) => patient.id === editingId),
   );
@@ -300,6 +319,22 @@ export const Patients = ({
     setModalOpen(true);
   };
 
+  const openGvpSelectionModal = () => {
+    setError("");
+    setGvpSelectionModalOpen(true);
+  };
+
+  const closeGvpSelectionModal = () => {
+    setGvpSelectionModalOpen(false);
+  };
+
+  const toggleGvpSelection = (gvpUser) => {
+    setGvpIds((current) => current.includes(gvpUser.id)
+      ? current.filter((id) => id !== gvpUser.id)
+      : [...current, gvpUser.id]);
+    setError("");
+  };
+
   const savePatient = () => {
     const normalizedFirstName = firstName.trim();
     const normalizedLastName = lastName.trim();
@@ -317,7 +352,7 @@ export const Patients = ({
       (user) =>
         user.id === gvpUserId &&
         user.role === "GVP" &&
-        (user.casId || user.associationId) === validCasId,
+        (user.presidentId || user.associationId) === presidentId,
     ));
 
     if (
@@ -513,7 +548,7 @@ export const Patients = ({
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
     { label: "Note", value: notes },
     { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
-    { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => user.username).join(", ") : "Nessun GVP assegnato" },
+    { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map(getGvpDisplayName).join(", ") : "Nessun GVP assegnato" },
     ...DETAIL_SECTIONS.flatMap((section) =>
       section.fields.map((field) => ({
         label: `${section.title} — ${field[1]}`,
@@ -847,46 +882,132 @@ export const Patients = ({
                         />
                       </div>
 
-                      {isEditing && editingPatientNotes.length > 0 && (
-                        <div className="mt-3">
-                          <div className="form-label">Note del GVP</div>
-                          <div className="d-grid gap-2">{editingPatientNotes.map((note) => <article className="border rounded p-3" key={note.id}><p className="mb-1">{note.text}</p><div className="d-flex align-items-center gap-2"><span className={`badge ${getNoteRoleBadgeClass(note.authorRole)}`}>{note.authorRole || "GVP"}</span><small className="text-secondary">{note.author || "GVP"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></div></article>)}</div>
+                      <div className="patient-assignment-row row g-3 align-items-start">
+                        <div className="col-6">
+                          <label className="form-label" htmlFor="patient-cas">
+                            CAS
+                          </label>
+                          <select
+                            className="form-select"
+                            id="patient-cas"
+                            value={casId}
+                            onChange={(event) => {
+                              setCasId(event.target.value);
+                              setError("");
+                            }}
+                          >
+                            <option value="">Seleziona CAS</option>
+                            {visibleCasUsers.map((casUser) => (
+                              <option key={casUser.id} value={casUser.id}>
+                                {casUser.username}
+                                {casUser.id === currentUser.id ? " (io)" : ""}
+                              </option>
+                            ))}
+                          </select>
+                          {visibleCasUsers.length === 0 && (
+                            <div className="form-text">
+                              Inserisci prima almeno un CAS.
+                            </div>
+                          )}
                         </div>
-                      )}
 
-                      <div className="mt-3">
-                        <label className="form-label" htmlFor="patient-cas">
-                          CAS
-                        </label>
-                        <select
-                          className="form-select"
-                          id="patient-cas"
-                          value={casId}
-                          onChange={(event) => {
-                            setCasId(event.target.value);
-                            setGvpIds([]);
-                            setError("");
-                          }}
-                        >
-                          <option value="">Seleziona CAS</option>
-                          {visibleCasUsers.map((casUser) => (
-                            <option key={casUser.id} value={casUser.id}>
-                              {casUser.username}
-                              {casUser.id === currentUser.id ? " (io)" : ""}
-                            </option>
-                          ))}
-                        </select>
-                        {visibleCasUsers.length === 0 && (
-                          <div className="form-text">
-                            Inserisci prima almeno un CAS.
+                        <div className="col-6">
+                          <div className="d-flex align-items-center justify-content-between gap-2">
+                            <div className="form-label mb-0">GVP assegnati</div>
+                            <button
+                              className="btn btn-outline-primary btn-sm"
+                              type="button"
+                              onClick={openGvpSelectionModal}
+                              disabled={visibleGvpUsers.length === 0}
+                            >
+                              {gvpIds.length > 0 ? "Modifica" : "Seleziona GVP"}
+                            </button>
                           </div>
-                        )}
-
-                        <div className="mt-2">
-                          <div className="form-label">GVP assegnati</div>
-                          {visibleGvpUsers.length > 0 && <div className="d-grid gap-2 border rounded p-3">{visibleGvpUsers.map((gvpUser) => <label className="form-check" key={gvpUser.id}><input className="form-check-input" type="checkbox" checked={gvpIds.includes(gvpUser.id)} onChange={() => { setGvpIds((current) => current.includes(gvpUser.id) ? current.filter((id) => id !== gvpUser.id) : [...current, gvpUser.id]); setError(""); }} /><span className="form-check-label">{gvpUser.username}</span></label>)}</div>}
-                          {casId && visibleGvpUsers.length === 0 && <div className="form-text">Nessun GVP associato al CAS selezionato.</div>}
-                          {!casId && <div className="form-text">Seleziona un CAS per vedere i GVP disponibili.</div>}
+                          <div className="form-text mt-1">
+                            {selectedGvpUsers.length > 0
+                              ? selectedGvpUsers.map(getGvpDisplayName).join(", ")
+                              : "Nessun GVP associato."}
+                          </div>
+                          {gvpSelectionModalOpen && (
+                            <>
+                              <button
+                                className="entity-modal-backdrop"
+                                type="button"
+                                aria-label="Chiudi selezione GVP"
+                                onClick={closeGvpSelectionModal}
+                              />
+                              <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="gvp-selection-title">
+                                <section className="card entity-modal-card">
+                                  <div className="card-header d-flex align-items-center justify-content-between gap-2">
+                                    <h3 className="card-title mb-0" id="gvp-selection-title">Seleziona GVP</h3>
+                                    <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeGvpSelectionModal} />
+                                  </div>
+                                  <div className="card-body">
+                                    {visibleGvpUsers.length > 0 ? (
+                                      <>
+                                        <div className="mb-3">
+                                          <label className="form-label" htmlFor="gvp-search">Cerca per nome</label>
+                                          <input
+                                            className="form-control"
+                                            id="gvp-search"
+                                            type="text"
+                                            value={gvpSearch}
+                                            onChange={(event) => setGvpSearch(event.target.value)}
+                                            placeholder="Inserisci il nome"
+                                          />
+                                        </div>
+                                        <div className="mb-3">
+                                          <div className="small fw-semibold mb-2">Associati</div>
+                                          {associatedGvpUsers.length > 0 ? (
+                                            <div className="d-grid gap-2 border rounded p-3">
+                                              {associatedGvpUsers.map((gvpUser) => (
+                                                <label className="form-check" key={gvpUser.id}>
+                                                  <input
+                                                    className="form-check-input"
+                                                    type="checkbox"
+                                                    checked={gvpIds.includes(gvpUser.id)}
+                                                    onChange={() => toggleGvpSelection(gvpUser)}
+                                                  />
+                                                  <span className="form-check-label">{getGvpDisplayName(gvpUser)}</span>
+                                                </label>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="form-text">Nessun GVP associato.</div>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <div className="small fw-semibold mb-2">Non associati</div>
+                                          {unassociatedGvpUsers.length > 0 ? (
+                                            <div className="d-grid gap-2 border rounded p-3">
+                                              {unassociatedGvpUsers.map((gvpUser) => (
+                                                <label className="form-check" key={gvpUser.id}>
+                                                  <input
+                                                    className="form-check-input"
+                                                    type="checkbox"
+                                                    checked={gvpIds.includes(gvpUser.id)}
+                                                    onChange={() => toggleGvpSelection(gvpUser)}
+                                                  />
+                                                  <span className="form-check-label">{getGvpDisplayName(gvpUser)}</span>
+                                                </label>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="form-text">Tutti i GVP disponibili sono già associati.</div>
+                                          )}
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="form-text">Nessun GVP disponibile per questa presidenza.</div>
+                                    )}
+                                  </div>
+                                  <div className="card-footer d-flex justify-content-end">
+                                    <button className="btn btn-primary" type="button" onClick={closeGvpSelectionModal}>Chiudi</button>
+                                  </div>
+                                </section>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -1033,7 +1154,7 @@ export const Patients = ({
                                 </span>
                               )}
                             </td>
-                            <td>{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{gvpUser.username}</span>)}</div> : <span className="text-secondary">-</span>}</td>
+                            <td>{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{getGvpDisplayName(gvpUser)}</span>)}</div> : <span className="text-secondary">-</span>}</td>
                             <td className="text-end">
                               <button
                                 className="btn btn-outline-primary btn-sm"

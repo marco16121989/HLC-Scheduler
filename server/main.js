@@ -418,15 +418,22 @@ Meteor.methods({
         : actorRole === "CAS"
           ? actor.profile.presidentId || actor.profile.associationId
           : "";
-    const canManage = (record) =>
-      actorRole === "Admin" ||
-      (actorRole === "Presidente" &&
-        ["CAS", "GVP"].includes(record.role) &&
-        record.presidentId === actor._id) ||
-      (actorRole === "CAS" &&
-        record.role === "GVP" &&
-        record.casId === actor._id &&
-        record.presidentId === actorPresidentId);
+    const canManage = (record) => {
+      if (actorRole === "Admin") {
+        return true;
+      }
+
+      if (actorRole === "Presidente") {
+        return ["CAS", "GVP"].includes(record.role) && record.presidentId === actor._id;
+      }
+
+      if (actorRole === "CAS") {
+        const effectiveCasId = record.casId || record.associationId || "";
+        return record.role === "GVP" && effectiveCasId === actor._id;
+      }
+
+      return false;
+    };
 
     if (!["Admin", "Presidente", "CAS"].includes(actorRole)) {
       throw new Meteor.Error("not-authorized", "Non puoi gestire gli utenti.");

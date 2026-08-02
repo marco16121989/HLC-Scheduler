@@ -23,6 +23,34 @@ const getPresidentId = (user, users) => {
   return "";
 };
 
+export const getDefaultPresidentId = (role, manager, users) => {
+  if (!manager) {
+    return "";
+  }
+
+  if (manager.role === "Presidente") {
+    return manager.id;
+  }
+
+  if (manager.role === "CAS" && (role === "CAS" || role === "GVP")) {
+    const directPresidentId = manager.presidentId || manager.associationId || "";
+    if (directPresidentId) {
+      return directPresidentId;
+    }
+
+    const matchingPresident = users.find(
+      (candidate) => candidate.role === "Presidente" && candidate.id === manager.id,
+    );
+    if (matchingPresident) {
+      return matchingPresident.id;
+    }
+
+    return getPresidentId(manager, users);
+  }
+
+  return "";
+};
+
 const getHospitalAssignments = (user) =>
   Array.isArray(user.hospitalAssignments)
     ? user.hospitalAssignments
@@ -41,11 +69,7 @@ const createEmptyForm = (role, manager, users) => {
     username: "",
     password: "",
     role,
-    presidentId: isPresident
-      ? manager.id
-      : isCas
-        ? getPresidentId(manager, users)
-        : "",
+    presidentId: getDefaultPresidentId(role, manager, users),
     casId: isCas ? manager.id : "",
     hospitalAssignments: [],
   };
@@ -81,7 +105,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
   const managerPresidentId = isPresidentManager
     ? manager.id
     : isCasManager
-      ? getPresidentId(manager, users)
+      ? getDefaultPresidentId("GVP", manager, users)
       : "";
   const formPresidentId = isTeamManager
     ? managerPresidentId
@@ -147,9 +171,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
     const username = form.username.trim();
     const role = availableRoles.includes(form.role) ? form.role : availableRoles[0];
     const presidentId = isTeamManager
-      ? managerPresidentId
+      ? managerPresidentId || getDefaultPresidentId(role, manager, users)
       : role === "CAS" || role === "GVP"
-        ? form.presidentId
+        ? form.presidentId || getDefaultPresidentId(role, manager, users)
         : "";
     const validPresidentId = users.some(
       (user) => user.id === presidentId && user.role === "Presidente",
@@ -158,11 +182,16 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       : "";
     const validCasId =
       role === "GVP" &&
-      users.some(
-        (user) =>
-          user.id === form.casId &&
-          user.role === "CAS" &&
-          getPresidentId(user, users) === validPresidentId,
+      (
+        (manager?.role === "CAS" && form.casId === manager.id) ||
+        users.some(
+          (user) =>
+            user.id === form.casId &&
+            user.role === "CAS" &&
+            (manager?.role === "CAS"
+              ? user.id === manager.id
+              : getPresidentId(user, users) === validPresidentId),
+        )
       )
         ? form.casId
         : "";
@@ -187,9 +216,17 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       return;
     }
 
-    if ((role === "CAS" || role === "GVP") && !validPresidentId) {
-      setError("Seleziona un Presidente.");
+    if (role === "CAS" && !validPresidentId) {
+      setError("Impossibile determinare il presidente del CAS.");
       return;
+    }
+
+    if (role === "GVP" && !validPresidentId) {
+      const inheritedPresidentId = getDefaultPresidentId(role, manager, users);
+      if (!inheritedPresidentId) {
+        setError("Impossibile determinare il presidente del CAS.");
+        return;
+      }
     }
 
     const isDuplicate = users.some(
@@ -208,15 +245,18 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       return;
     }
 
+    const resolvedPresidentId = role === "GVP" && !validPresidentId
+      ? getDefaultPresidentId(role, manager, users)
+      : validPresidentId;
     const updatedUser = {
       username,
       role,
-      presidentId: validPresidentId,
+      presidentId: resolvedPresidentId,
       casId: validCasId,
       hospitalAssignments,
       hospitalId: firstAssignment?.hospitalId || "",
       departmentId: firstAssignment?.departmentIds[0] || "",
-      associationId: role === "CAS" ? validPresidentId : validCasId,
+      associationId: role === "CAS" ? resolvedPresidentId : validCasId,
     };
 
     if (isEditing) {
@@ -380,9 +420,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
 
     if (user.role === "GVP") {
       const casUser = users.find((candidate) => candidate.id === getCasId(user));
-      return casUser
-        ? `${casUser.username} / ${president?.username || "-"}`
-        : president?.username || "";
+      return casUser?.username || "";
     }
 
     return null;
