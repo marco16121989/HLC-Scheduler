@@ -6,6 +6,8 @@ import {
   DoctorsCollection,
   HospitalsCollection,
   PatientsCollection,
+  PresentationsCollection,
+  SupportRequestsCollection,
 } from "/imports/api/links";
 
 const toClientRecord = ({ _id, profile, ...record }) => ({
@@ -23,7 +25,7 @@ const callServer = (method, ...args) => {
 };
 
 export const App = () => {
-  const { ready, user, users, hospitals, doctors, patients } = useTracker(() => {
+  const { ready, user, users, hospitals, doctors, patients, presentations, supportRequests } = useTracker(() => {
     const subscription = Meteor.subscribe("hlc-data");
     const account = Meteor.user();
 
@@ -34,6 +36,8 @@ export const App = () => {
       hospitals: HospitalsCollection.find().fetch().map(toClientRecord),
       doctors: DoctorsCollection.find().fetch().map(toClientRecord),
       patients: PatientsCollection.find().fetch().map(toClientRecord),
+      presentations: PresentationsCollection.find().fetch().map(toClientRecord),
+      supportRequests: SupportRequestsCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
     };
   }, []);
 
@@ -44,6 +48,16 @@ export const App = () => {
   const setUsers = (update) => {
     const next = typeof update === "function" ? update(users) : update;
     callServer("hlc.syncUsers", next);
+  };
+  const setPresentations = (update) => {
+    const next = typeof update === "function" ? update(presentations) : update;
+    const organizationId = user?.role === "Presidente"
+      ? user.id
+      : user?.presidentId || user?.associationId || "";
+    const writableRecords = user?.role === "Admin"
+      ? next
+      : next.filter((record) => record.presidentId === organizationId);
+    callServer("hlc.replaceRecords", "presentations", writableRecords);
   };
 
   if (Meteor.loggingIn() || (Meteor.userId() && !ready)) {
@@ -61,6 +75,9 @@ export const App = () => {
       setDoctors={makeSetter("doctors", doctors)}
       patients={patients}
       setPatients={makeSetter("patients", patients)}
+      presentations={presentations}
+      setPresentations={setPresentations}
+      supportRequests={supportRequests}
       onLogout={() => Meteor.logout()}
     />
   ) : (

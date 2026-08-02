@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
+import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPdf.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 
@@ -52,6 +53,21 @@ const DETAIL_SECTIONS = [
     fields: [
       ["specificProblem", "Problema specifico / diagnosi attuale e relazione con il sangue", "textarea"],
       ["medicalHistory", "Anamnesi rilevante / causa della crisi attuale", "textarea"],
+    ],
+  },
+  {
+    title: "Informazioni per CAS — HLC-7-I semplificato",
+    fields: [
+      ["patientPhone", "Numero di cellulare del paziente", "tel"],
+      ["healthProblems", "Problemi di salute", "textarea"],
+      ["spiritualCondition", "Condizione spirituale", "textarea"],
+      ["nonWitnessFamily", "Familiari non Testimoni coinvolti", "textarea"],
+      ["datCompleted", "DAT compilata?", "yesno"],
+      ["datRegistered", "DAT registrata?", "yesno"],
+      ["elderName", "Nome dell’anziano"],
+      ["elderEmail", "E-mail dell’anziano", "email"],
+      ["elderPhone", "Cellulare dell’anziano", "tel"],
+      ["simplifiedNotes", "Note per il CAS", "textarea"],
     ],
   },
   ...[1, 2, 3].map((index) => ({
@@ -123,9 +139,14 @@ const PatientDetailField = ({ field, value, onChange }) => {
     value: value || "",
     onChange: (event) => onChange(name, event.target.value),
   };
+  const columnClass = type === "textarea"
+    ? "col-12"
+    : ["date", "datetime-local", "number", "number-step", "yesno", "select"].includes(type)
+      ? "col-12 col-sm-6 col-lg-3"
+      : "col-12 col-md-6";
 
   return (
-    <div className="col-12 col-md-6">
+    <div className={columnClass}>
       <label className="form-label" htmlFor={common.id}>{label}</label>
       {type === "textarea" ? (
         <textarea {...common} rows="3" />
@@ -299,6 +320,24 @@ export const Patients = ({
     }
   };
 
+  const handleOpenSimplifiedPdf = async () => {
+    const savedPatient = savePatient();
+    if (!savedPatient) return;
+    const pdfWindow = globalThis.open("", "_blank");
+    try {
+      const pdfUrl = await createSimplifiedPatientPdf(savedPatient);
+      if (pdfWindow) {
+        pdfWindow.location.href = pdfUrl;
+      } else {
+        globalThis.location.href = pdfUrl;
+      }
+      globalThis.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
+    } catch (pdfError) {
+      pdfWindow?.close();
+      globalThis.alert(pdfError.message || "Impossibile generare il PDF semplificato.");
+    }
+  };
+
   const handleEdit = (patient) => {
     setEditingId(patient.id);
     setFirstName(patient.firstName);
@@ -367,7 +406,7 @@ export const Patients = ({
             aria-modal="true"
             aria-labelledby="patient-modal-title"
           >
-            <section className="card entity-modal-card">
+            <section className="card entity-modal-card patient-modal-card">
               <div className="card-header d-flex align-items-center">
                 <h2 className="card-title" id="patient-modal-title">
                   {isEditing ? "Modifica paziente" : "Inserisci paziente"}
@@ -380,6 +419,13 @@ export const Patients = ({
                   Salva e apri HLC-7-I
                 </button>
                 <button
+                  className="btn btn-outline-secondary btn-sm me-2"
+                  type="button"
+                  onClick={handleOpenSimplifiedPdf}
+                >
+                  Salva e apri HLC-7-I semplificato
+                </button>
+                <button
                   className="btn-close"
                   type="button"
                   aria-label="Chiudi"
@@ -387,7 +433,7 @@ export const Patients = ({
                 />
               </div>
               <form onSubmit={handleSubmit}>
-                <div className="card-body">
+                <div className="card-body patient-form-grid">
                   {error && (
                     <div className="alert alert-danger py-2" role="alert">
                       {error}

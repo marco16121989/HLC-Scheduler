@@ -49,7 +49,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
     ? ["CAS", "GVP"]
     : isCasManager
       ? ["GVP"]
-      : roles;
+      : manager?.role === "Admin"
+        ? ["Presidente"]
+        : roles;
   const [form, setForm] = useState(() =>
     createEmptyForm(availableRoles[0], manager, users),
   );
@@ -89,7 +91,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       ? users.filter(
           (user) => user.role === "GVP" && getCasId(user) === manager.id,
         )
-      : users;
+      : manager?.role === "Admin"
+        ? users.filter((user) => user.role === "Presidente")
+        : users;
 
   const resetForm = () => {
     setForm(createEmptyForm(availableRoles[0], manager, users));
@@ -388,7 +392,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
               ? "La mia squadra"
               : isCasManager
                 ? "I miei GVP"
-                : "Utenti"}
+                : manager?.role === "Admin"
+                  ? "Presidenti"
+                  : "Utenti"}
           </h1>
         </div>
       </div>
@@ -601,7 +607,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
             <div className="col-12 col-lg-7">
               <section className="card">
                 <div className="card-header">
-                  <h2 className="card-title">Elenco utenti</h2>
+                  <h2 className="card-title">
+                    {manager?.role === "Admin" ? "Elenco presidenti" : "Elenco utenti"}
+                  </h2>
                 </div>
                 <div className="card-body p-0">
                   <div className="table-responsive">

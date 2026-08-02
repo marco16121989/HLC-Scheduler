@@ -5,6 +5,8 @@ import {
   DoctorsCollection,
   HospitalsCollection,
   PatientsCollection,
+  PresentationsCollection,
+  SupportRequestsCollection,
 } from "/imports/api/links";
 
 const publicUserFields = {
@@ -57,7 +59,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
   const presidentId =
     role === "Presidente"
       ? actor._id
-      : role === "CAS"
+      : role === "CAS" || role === "GVP"
         ? actor.profile.presidentId || actor.profile.associationId
         : null;
   const dataSelector = presidentId ? { presidentId } : role === "Admin" ? {} : { _id: null };
@@ -79,13 +81,104 @@ Meteor.publish("hlc-data", async function publishHlcData() {
     HospitalsCollection.find(dataSelector),
     DoctorsCollection.find(dataSelector),
     PatientsCollection.find(dataSelector),
+    // Le presentazioni sono eventi condivisi e visibili a tutti gli utenti autenticati.
+    PresentationsCollection.find({}),
+    SupportRequestsCollection.find(role === "Admin" ? {} : { createdBy: actor._id }),
   ];
 });
 
 Meteor.methods({
+  async "hlc.createSupportRequest"(data) {
+    requireUser(this);
+    check(data, { type: String, subject: String, priority: String, message: String });
+    const type = ["Segnalazione", "Richiesta"].includes(data.type) ? data.type : "Richiesta";
+    const priority = ["Bassa", "Normale", "Alta", "Urgente"].includes(data.priority) ? data.priority : "Normale";
+    const subject = data.subject.trim();
+    const message = data.message.trim();
+    if (!subject || !message) throw new Meteor.Error("invalid-request", "Oggetto e descrizione sono obbligatori.");
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    await SupportRequestsCollection.insertAsync({
+      type, subject, priority, message, status: "Inviata",
+      createdBy: this.userId, createdByUsername: actor.username, createdAt: new Date(),
+    });
+  },
+
+  async "hlc.updateSupportRequestStatus"(requestId, status) {
+    requireUser(this);
+    check(requestId, String);
+    check(status, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    if (actor.profile?.role !== "Admin") throw new Meteor.Error("not-authorized", "Operazione riservata agli amministratori.");
+    const validStatus = ["Inviata", "In lavorazione", "Risolta", "Chiusa"].includes(status) ? status : "Inviata";
+    await SupportRequestsCollection.updateAsync(requestId, { $set: { status: validStatus } });
+  },
+
+  async "hlc.updateMyProfile"(data) {
+    requireUser(this);
+    check(data, {
+      username: String,
+      firstName: String,
+      lastName: String,
+      email: String,
+      phone: String,
+      password: String,
+      hospitalAssignments: [Object],
+    });
+    const username = data.username.trim().toLowerCase();
+    if (!username) {
+      throw new Meteor.Error("username-required", "Il nome utente è obbligatorio.");
+    }
+    const duplicate = await Meteor.users.findOneAsync({
+      username,
+      _id: { $ne: this.userId },
+    });
+    if (duplicate) {
+      throw new Meteor.Error("username-exists", "Il nome utente è già in uso.");
+    }
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const actorPresidentId = actor.profile?.role === "Presidente"
+      ? actor._id
+      : actor.profile?.presidentId || actor.profile?.associationId || "";
+    const allowedHospitalSelector = actor.profile?.role === "Admin"
+      ? {}
+      : { presidentId: actorPresidentId };
+    const allowedHospitals = await HospitalsCollection.find(allowedHospitalSelector).fetchAsync();
+    const hospitalAssignments = data.hospitalAssignments.map((assignment) => {
+      check(assignment.hospitalId, String);
+      check(assignment.departmentIds, [String]);
+      const hospital = allowedHospitals.find((item) => item._id === assignment.hospitalId);
+      if (!hospital) {
+        throw new Meteor.Error("invalid-hospital", "Ospedale non disponibile per il tuo profilo.");
+      }
+      const validDepartmentIds = assignment.departmentIds.filter((departmentId) =>
+        hospital.departments?.some((department) => department.id === departmentId),
+      );
+      return { hospitalId: assignment.hospitalId, departmentIds: validDepartmentIds };
+    });
+    const firstAssignment = hospitalAssignments[0];
+    await Meteor.users.updateAsync(this.userId, {
+      $set: {
+        username,
+        "profile.firstName": data.firstName.trim(),
+        "profile.lastName": data.lastName.trim(),
+        "profile.email": data.email.trim(),
+        "profile.phone": data.phone.trim(),
+        "profile.hospitalAssignments": hospitalAssignments,
+        "profile.hospitalId": firstAssignment?.hospitalId || "",
+        "profile.departmentId": firstAssignment?.departmentIds[0] || "",
+      },
+    });
+    if (data.password) {
+      if (data.password.length < 4) {
+        throw new Meteor.Error("password-too-short", "La password deve contenere almeno 4 caratteri.");
+      }
+      await Accounts.setPasswordAsync(this.userId, data.password, { logout: false });
+    }
+  },
+
   async "hlc.replaceRecords"(kind, records) {
     requireUser(this);
-    check(kind, Match.OneOf("hospitals", "doctors", "patients"));
+    check(kind, Match.OneOf("hospitals", "doctors", "patients", "presentations"));
     const actor = await Meteor.users.findOneAsync(this.userId);
     const role = actor?.profile?.role;
     const presidentId =
@@ -109,6 +202,7 @@ Meteor.methods({
       hospitals: HospitalsCollection,
       doctors: DoctorsCollection,
       patients: PatientsCollection,
+      presentations: PresentationsCollection,
     };
     await replaceRecords(collections[kind], records, { presidentId });
   },
@@ -143,6 +237,9 @@ Meteor.methods({
     for (const record of records) {
       check(record.username, String);
       const username = record.username.trim().toLowerCase();
+      let account = record.id
+        ? await Meteor.users.findOneAsync(record.id)
+        : null;
       const profile = {
         role: record.role,
         presidentId: record.presidentId || "",
@@ -150,10 +247,13 @@ Meteor.methods({
         associationId: record.associationId || "",
         hospitalId: record.hospitalId || "",
         departmentId: record.departmentId || "",
+        firstName: record.firstName ?? account?.profile?.firstName ?? "",
+        lastName: record.lastName ?? account?.profile?.lastName ?? "",
+        email: record.email ?? account?.profile?.email ?? "",
+        phone: record.phone ?? account?.profile?.phone ?? "",
+        hospitalAssignments:
+          record.hospitalAssignments ?? account?.profile?.hospitalAssignments ?? [],
       };
-      let account = record.id
-        ? await Meteor.users.findOneAsync(record.id)
-        : null;
 
       if (!account) {
         if (!canManage(record)) {
