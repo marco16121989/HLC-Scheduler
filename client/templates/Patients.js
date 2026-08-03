@@ -29,7 +29,7 @@ const getNoteRoleBadgeClass = (role) =>
 
 export const DETAIL_SECTIONS = [
   {
-    title: "Notifica emergenza sanitaria",
+    title: "NOTIFICA",
     fields: [
       ["callDateTime", "Data e ora della chiamata", "datetime-local"],
       ["callAuthor", "Autore della chiamata"],
@@ -39,7 +39,7 @@ export const DETAIL_SECTIONS = [
     ],
   },
   {
-    title: "Informazioni sul paziente e sull’ospedale",
+    title: "INFORMAZIONI SUL PAZIENTE/OSPEDALE",
     fields: [
       ["sex", "Sesso", "select", ["Maschile", "Femminile", "Altro / non specificato"]],
       ["age", "Età", "number"],
@@ -58,11 +58,6 @@ export const DETAIL_SECTIONS = [
       ["congregation", "Congregazione"],
       ["localElders", "Anziani locali contattati"],
       ["localEldersPhones", "Numeri di telefono degli anziani", "tel"],
-    ],
-  },
-  {
-    title: "Dati del neonato",
-    fields: [
       ["birthWeight", "Peso alla nascita"],
       ["apgarScore", "Punteggio APGAR"],
       ["gestationalAge", "Età gestazionale (settimane)", "number"],
@@ -72,14 +67,14 @@ export const DETAIL_SECTIONS = [
     ],
   },
   {
-    title: "Quadro clinico",
+    title: "INFORMAZIONI SUL QUADRO CLINICO",
     fields: [
       ["specificProblem", "Problema specifico / diagnosi attuale e relazione con il sangue", "textarea"],
       ["medicalHistory", "Anamnesi rilevante / causa della crisi attuale", "textarea"],
     ],
   },
   {
-    title: "Informazioni per CAS — HLC-7-I semplificato",
+    title: "COMPILAZIONE DEL PDF SEMPLIFICATO",
     fields: [
       ["patientPhone", "Numero di cellulare del paziente", "tel"],
       ["healthProblems", "Problemi di salute", "textarea"],
@@ -93,38 +88,52 @@ export const DETAIL_SECTIONS = [
       ["simplifiedNotes", "Note per il CAS", "textarea"],
     ],
   },
-  ...[1, 2, 3].map((index) => ({
-    title: `Valori di laboratorio — analisi ${index}`,
-    fields: [
-      [`lab${index}DateTime`, "Data e ora dell’analisi", "datetime-local"],
-      [`lab${index}Hemoglobin`, "Emoglobina (Hb g/dL)", "number-step"],
-      [`lab${index}Hematocrit`, "Ematocrito (Hct %)", "number-step"],
-      [`lab${index}Platelets`, "Numero piastrine (Plts/μL)", "number"],
-      [`lab${index}Other`, "Altri valori"],
-    ],
-  })),
   {
-    title: "Informazioni sui medici e programma terapeutico",
+    title: "VALORI DI LABORATORIO",
+    fields: [1, 2, 3].flatMap((index) => [
+      [`lab${index}DateTime`, `Analisi ${index} — Data e ora`, "datetime-local"],
+      [`lab${index}Hemoglobin`, `Analisi ${index} — Emoglobina (Hb g/dL)`, "number-step"],
+      [`lab${index}Hematocrit`, `Analisi ${index} — Ematocrito (Hct %)`, "number-step"],
+      [`lab${index}Platelets`, `Analisi ${index} — Numero piastrine (Plts/μL)`, "number"],
+      [`lab${index}Other`, `Analisi ${index} — Altri valori`],
+    ]),
+  },
+  {
+    title: "INFORMAZIONI SUL MEDICO",
     fields: [
       ["attendingDoctor", "Medico curante"],
       ["attendingDoctorSpecialization", "Specializzazione del medico curante"],
       ["otherAttendingDoctor", "Altro medico curante"],
       ["otherDoctorSpecialization", "Specializzazione dell’altro medico"],
+    ],
+  },
+  {
+    title: "PROGRAMMA TERAPEUTICO DEL MEDICO",
+    description: "Esami, procedure o trattamenti proposti.",
+    fields: [
       ["treatmentPlan", "Esami, procedure o trattamenti proposti", "textarea"],
       ["staffInformed", "Personale informato della richiesta di assistenza del comitato sanitario?", "yesno"],
       ["legalActionThreatened", "È stata minacciata un’azione legale?", "yesno"],
     ],
   },
   {
-    title: "Strategie, alternative e articoli medici",
+    title: "STRATEGIE/ALTERNATIVE",
+    description: "Specificare le modalità, le procedure o le tecniche da proporre ai medici.",
     fields: [
       ["strategies", "Modalità, procedure o tecniche da proporre ai medici", "textarea"],
+    ],
+  },
+  {
+    title: "ARTICOLI MEDICI",
+    description: "Specificare articoli e documentazione per il personale medico in supporto alle strategie/alternative suggerite.",
+    fields: [
       ["medicalArticles", "Articoli e documentazione a supporto", "textarea"],
       ["doctorWillCooperate", "Il medico è disposto a cooperare?", "yesno"],
     ],
   },
   {
-    title: "Consulto da medico a medico",
+    title: "CONSULTO DA MEDICO A MEDICO",
+    description: "Il medico curante è disposto a consultare uno specialista esperto in terapie alternative all’uso di sangue?",
     fields: [
       ["consultAvailable", "Il medico curante accetta il consulto con uno specialista?", "yesno"],
       ["consultDoctorName", "Nome del medico da consultare"],
@@ -134,7 +143,8 @@ export const DETAIL_SECTIONS = [
     ],
   },
   {
-    title: "Richiesta di trasferimento",
+    title: "RICHIESTA DI TRASFERIMENTO",
+    description: "Questa decisione spetta al paziente e/o alla sua famiglia. Descrivere il metodo di trasferimento.",
     fields: [
       ["transferMethod", "Metodo di trasferimento", "textarea"],
       ["transferArrangementsConfirmed", "Accordi relativi al trasferimento confermati?", "yesno"],
@@ -146,13 +156,17 @@ export const DETAIL_SECTIONS = [
     ],
   },
   {
-    title: "Risultato e interventi successivi",
+    title: "RISULTATO/INTERVENTI SUCCESSIVI",
+    description: "Descrivere il risultato e gli eventuali interventi successivi.",
     fields: [
       ["outcome", "Risultato ed eventuali interventi successivi", "textarea"],
       ["followUpElders", "Anziani locali contattati per interventi successivi", "textarea"],
     ],
   },
-];
+].sort((first, second) =>
+  Number(first.title === "COMPILAZIONE DEL PDF SEMPLIFICATO") -
+  Number(second.title === "COMPILAZIONE DEL PDF SEMPLIFICATO"),
+);
 
 export const SIMPLIFIED_FIELDS = [
   ["congregation", "Congregazione"],
@@ -167,6 +181,11 @@ export const SIMPLIFIED_FIELDS = [
   ["elderEmail", "E-mail dell’anziano", "email"],
   ["elderPhone", "Cellulare dell’anziano", "tel"],
   ["simplifiedNotes", "Note per il CAS", "textarea"],
+];
+
+const PATIENT_FORM_TABS = [
+  ["summary", "Riepilogo"],
+  ["insertion", "Inserimento dati"],
 ];
 
 const PatientDetailField = ({ field, value, onChange, disabled = false }) => {
@@ -362,6 +381,7 @@ export const Patients = ({
       !normalizedPathology
     ) {
       setError("Completa nome, cognome, patologia e data di ingresso.");
+      setActiveTab("insertion");
       return false;
     }
 
@@ -375,6 +395,7 @@ export const Patients = ({
 
     if (isDuplicate) {
       setError("Il paziente e gia presente.");
+      setActiveTab("insertion");
       return false;
     }
 
@@ -671,25 +692,17 @@ export const Patients = ({
               <form onSubmit={handleSubmit}>
                 <div className="card-body">
                   {!isGvp && (
-                    <div className="nav nav-tabs mb-3" role="tablist">
-                      <button
-                        className={`nav-link ${activeTab === "summary" ? "active" : ""}`}
+                    <div className="nav nav-tabs patient-form-tabs mb-3" role="tablist" aria-label="Sezioni scheda paziente">
+                      {PATIENT_FORM_TABS.map(([tabId, label]) => <button
+                        className={`nav-link ${activeTab === tabId ? "active" : ""}`}
                         type="button"
                         role="tab"
-                        aria-selected={activeTab === "summary"}
-                        onClick={() => setActiveTab("summary")}
+                        aria-selected={activeTab === tabId}
+                        onClick={() => setActiveTab(tabId)}
+                        key={tabId}
                       >
-                        Riepilogo
-                      </button>
-                      <button
-                        className={`nav-link ${activeTab === "insertion" ? "active" : ""}`}
-                        type="button"
-                        role="tab"
-                        aria-selected={activeTab === "insertion"}
-                        onClick={() => setActiveTab("insertion")}
-                      >
-                        Inserimento dati
-                      </button>
+                        {label}
+                      </button>)}
                     </div>
                   )}
 
@@ -733,6 +746,27 @@ export const Patients = ({
                           {error}
                         </div>
                       )}
+
+                      <details className="patient-detail-section w-100" open>
+                        <summary>NOTIFICA</summary>
+                        <div className="patient-notification-grid pt-3">
+                          {DETAIL_SECTIONS.find((section) => section.title === "NOTIFICA")?.fields.map((field) => (
+                            <PatientDetailField
+                              key={field[0]}
+                              field={field}
+                              value={details[field[0]]}
+                              onChange={(name, value) => {
+                                setDetails((current) => ({ ...current, [name]: value }));
+                                setError("");
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </details>
+
+                      <details className="patient-detail-section patient-core-section w-100" open>
+                        <summary>INFORMAZIONI SUL PAZIENTE/OSPEDALE</summary>
+                        <div className="patient-hospital-grid pt-3">
 
                       <div className="mb-3">
                         <label className="form-label" htmlFor="patient-first-name">
@@ -1011,14 +1045,28 @@ export const Patients = ({
                         </div>
                       </div>
 
-                      <hr className="my-4" />
-                      <p className="text-secondary mb-3">
-                        Campi della scheda HLC-7-I. Compila solo le sezioni pertinenti al caso.
-                      </p>
-                      {DETAIL_SECTIONS.map((section) => (
-                        <fieldset className="patient-detail-section w-100" key={section.title}>
-                          <legend>{section.title}</legend>
-                          <div className="row g-3">
+                          <div className="patient-hospital-fields-grid mt-1">
+                            {DETAIL_SECTIONS.find((section) => section.title === "INFORMAZIONI SUL PAZIENTE/OSPEDALE")?.fields.map((field) => (
+                              <PatientDetailField
+                                key={field[0]}
+                                field={field}
+                                value={details[field[0]]}
+                                onChange={(name, value) => {
+                                  setDetails((current) => ({ ...current, [name]: value }));
+                                  setError("");
+                                }}
+                              />
+                            ))}
+                          </div>
+
+                        </div>
+                      </details>
+
+                      {DETAIL_SECTIONS.filter((section) => !["NOTIFICA", "INFORMAZIONI SUL PAZIENTE/OSPEDALE"].includes(section.title)).map((section) => (
+                        <details className="patient-detail-section w-100" key={section.title}>
+                          <summary>{section.title}</summary>
+                          {section.description && <p className="text-secondary small mb-0 pt-2">{section.description}</p>}
+                          <div className="row g-2 pt-3">
                             {section.fields.map((field) => (
                               <PatientDetailField
                                 key={field[0]}
@@ -1031,7 +1079,7 @@ export const Patients = ({
                               />
                             ))}
                           </div>
-                        </fieldset>
+                        </details>
                       ))}
                     </div>
                   )}

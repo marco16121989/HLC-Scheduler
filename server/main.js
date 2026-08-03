@@ -8,8 +8,24 @@ import {
   PatientsCollection,
   PresentationsCollection,
   SupportRequestsCollection,
+  UsefulFilesCollection,
 } from "/imports/api/links";
 import { formatUserName } from "/imports/utils/formatUserName";
+
+const usefulFileExtensions = new Set([
+  "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
+  "xls", "xlsx", "ods", "csv", "ppt", "pptx", "odp", "zip",
+]);
+const usefulFileMimeTypes = new Set([
+  "application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp",
+  "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.oasis.opendocument.text", "application/rtf", "text/rtf", "text/plain",
+  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.oasis.opendocument.spreadsheet", "text/csv", "application/csv",
+  "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.oasis.opendocument.presentation", "application/zip", "application/x-zip-compressed",
+  "application/octet-stream",
+]);
 
 const publicUserFields = {
   username: 1,
@@ -128,6 +144,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
           "details.simplifiedNotes": 1,
         } },
       ),
+      UsefulFilesCollection.find({ presidentId }, { sort: { createdAt: -1 } }),
     ];
   }
 
@@ -139,6 +156,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
     // Le presentazioni sono eventi condivisi e visibili a tutti gli utenti autenticati.
     PresentationsCollection.find({}),
     SupportRequestsCollection.find(role === "Admin" ? {} : { createdBy: actor._id }),
+    UsefulFilesCollection.find(dataSelector, { sort: { createdAt: -1 } }),
   ];
 });
 
@@ -151,6 +169,74 @@ Meteor.publish("hlc-notifications", function publishHlcNotifications() {
 });
 
 Meteor.methods({
+  async "hlc.uploadUsefulFile"(file) {
+    requireUser(this);
+    check(file, { name: String, displayName: String, type: String, size: Number, dataUrl: String });
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    if (!["Presidente", "CAS"].includes(role)) {
+      throw new Meteor.Error("not-authorized", "Non puoi caricare file utili.");
+    }
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : actor.profile?.presidentId || actor.profile?.associationId || "";
+    const name = file.name.trim();
+    const displayName = file.displayName.trim().slice(0, 120);
+    const maxSize = 6 * 1024 * 1024;
+    const extension = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
+    if (!presidentId || !displayName || !usefulFileExtensions.has(extension) || !usefulFileMimeTypes.has(file.type)) {
+      throw new Meteor.Error("invalid-file", "Formato file non supportato.");
+    }
+    if (file.size <= 0 || file.size > maxSize) {
+      throw new Meteor.Error("file-too-large", "Il file non può superare 6 MB.");
+    }
+    if (!/^data:[a-z0-9.+/-]+;base64,/i.test(file.dataUrl)) {
+      throw new Meteor.Error("invalid-file", "Contenuto file non valido.");
+    }
+    const encodedData = file.dataUrl.slice(file.dataUrl.indexOf(",") + 1);
+    const decodedSize = Math.floor((encodedData.length * 3) / 4);
+    const hasExpectedSignature = extension === "pdf"
+      ? encodedData.startsWith("JVBERi0")
+      : ["jpg", "jpeg"].includes(extension)
+        ? encodedData.startsWith("/9j/")
+        : extension === "png"
+          ? encodedData.startsWith("iVBOR")
+          : extension === "gif"
+            ? encodedData.startsWith("R0lGOD")
+            : true;
+    if (!hasExpectedSignature || decodedSize <= 0 || decodedSize > maxSize + 2) {
+      throw new Meteor.Error("invalid-file", "Contenuto file non valido o troppo grande.");
+    }
+    await UsefulFilesCollection.insertAsync({
+      name,
+      displayName,
+      type: file.type,
+      size: file.size,
+      dataUrl: file.dataUrl,
+      presidentId,
+      createdBy: actor._id,
+      createdByUsername: actor.username,
+      createdAt: new Date(),
+    });
+  },
+
+  async "hlc.deleteUsefulFile"(fileId) {
+    requireUser(this);
+    check(fileId, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : role === "CAS"
+        ? actor.profile?.presidentId || actor.profile?.associationId || ""
+        : "";
+    const file = await UsefulFilesCollection.findOneAsync(fileId);
+    const canDelete = file && file.presidentId === presidentId &&
+      (role === "Presidente" || (role === "CAS" && file.createdBy === actor._id));
+    if (!canDelete) throw new Meteor.Error("not-authorized", "Non puoi eliminare questo file.");
+    await UsefulFilesCollection.removeAsync(fileId);
+  },
+
   async "hlc.addPatientNote"(patientId, noteText) {
     requireUser(this);
     check(patientId, String);
@@ -257,6 +343,30 @@ Meteor.methods({
     await NotificationsCollection.updateAsync(notificationId, {
       $set: { readAt: new Date() },
     });
+  },
+
+  async "hlc.markNotificationAsUnread"(notificationId) {
+    requireUser(this);
+    check(notificationId, String);
+    const notification = await NotificationsCollection.findOneAsync({
+      _id: notificationId,
+      recipientId: this.userId,
+    });
+    if (!notification) {
+      throw new Meteor.Error("not-authorized", "Notifica non disponibile.");
+    }
+    await NotificationsCollection.updateAsync(notificationId, {
+      $set: { readAt: null },
+    });
+  },
+
+  async "hlc.markAllNotificationsAsRead"() {
+    requireUser(this);
+    await NotificationsCollection.updateAsync(
+      { recipientId: this.userId, readAt: null },
+      { $set: { readAt: new Date() } },
+      { multi: true },
+    );
   },
 
   async "hlc.setPresidentActive"(presidentId, active) {

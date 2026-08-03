@@ -20,6 +20,7 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [departmentListHospital, setDepartmentListHospital] = useState(null);
 
   const isEditing = editingId !== null;
   const visibleHospitals = hospitals.filter(
@@ -32,6 +33,7 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
     setEditingId(null);
     setError("");
     setModalOpen(false);
+    setDepartmentListHospital(null);
   };
 
   const openCreateModal = () => {
@@ -47,6 +49,32 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
       return selected
         ? current.filter((department) => department.id !== selected.id)
         : [...current, { id: crypto.randomUUID(), name: departmentName, head: "" }];
+    });
+    setError("");
+  };
+
+  const allDefaultDepartmentsSelected = DEFAULT_DEPARTMENTS.every((departmentName) =>
+    departments.some(
+      (department) => department.name.toLowerCase() === departmentName.toLowerCase(),
+    ),
+  );
+
+  const toggleAllDepartments = () => {
+    setDepartments((current) => {
+      if (allDefaultDepartmentsSelected) {
+        return current.filter(
+          (department) => !DEFAULT_DEPARTMENTS.some(
+            (name) => name.toLowerCase() === department.name.toLowerCase(),
+          ),
+        );
+      }
+
+      const missingDepartments = DEFAULT_DEPARTMENTS
+        .filter((name) => !current.some(
+          (department) => department.name.toLowerCase() === name.toLowerCase(),
+        ))
+        .map((name) => ({ id: crypto.randomUUID(), name, head: "" }));
+      return [...current, ...missingDepartments];
     });
     setError("");
   };
@@ -127,6 +155,7 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
 
   const handleEdit = (hospital) => {
     const normalizedHospital = normalizeHospital(hospital);
+    setDepartmentListHospital(null);
     setEditingId(normalizedHospital.id);
     setName(normalizedHospital.name);
     setDirector(normalizedHospital.director);
@@ -168,6 +197,28 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
       <div className="app-content">
         <div className="container-fluid">
           <div className="row g-3">
+            {departmentListHospital && <>
+              <button className="entity-modal-backdrop" type="button" aria-label="Chiudi elenco reparti" onClick={() => setDepartmentListHospital(null)} />
+              <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="hospital-department-list-title">
+                <section className="card entity-modal-card">
+                  <div className="card-header d-flex align-items-center gap-3">
+                    <h2 className="card-title mb-0" id="hospital-department-list-title">Reparti — {departmentListHospital.name}</h2>
+                    <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setDepartmentListHospital(null)} />
+                  </div>
+                  <div className="card-body">
+                    {departmentListHospital.departments.length > 0 ? <div className="list-group">
+                      {departmentListHospital.departments.map((department) => <div className="list-group-item d-flex align-items-start justify-content-between gap-3" key={department.id}>
+                        <strong>{department.name}</strong>
+                        <span className="text-secondary text-end">{department.head ? `Primario: ${department.head}` : "Primario non indicato"}</span>
+                      </div>)}
+                    </div> : <p className="text-secondary mb-0">Nessun reparto inserito.</p>}
+                  </div>
+                  <div className="card-footer text-end">
+                    <button className="btn btn-outline-secondary" type="button" onClick={() => setDepartmentListHospital(null)}>Chiudi</button>
+                  </div>
+                </section>
+              </div>
+            </>}
             {modalOpen && (
               <button
                 className="entity-modal-backdrop"
@@ -240,6 +291,10 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
 
                     <fieldset className="hospital-departments-fieldset">
                       <legend className="form-label">Reparti</legend>
+                      <label className="form-check hospital-select-all-departments mb-3">
+                        <input className="form-check-input" type="checkbox" checked={allDefaultDepartmentsSelected} onChange={toggleAllDepartments} />
+                        <span className="form-check-label fw-semibold">Seleziona tutti i reparti</span>
+                      </label>
                       <div className="hospital-default-departments">
                         {DEFAULT_DEPARTMENTS.map((departmentName) => {
                           const selectedDepartment = departments.find(
@@ -308,7 +363,7 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
                         <tr>
                           <th>Ospedale</th>
                           <th>Direttore sanitario</th>
-                          <th>Reparti e primari</th>
+                          <th>Reparti</th>
                           <th className="text-end">Azioni</th>
                         </tr>
                       </thead>
@@ -322,21 +377,17 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
                         ) : (
                           visibleHospitals.map((hospital) => (
                             <tr key={hospital.id}>
-                              <td className="fw-medium">{hospital.name}</td>
+                              <td className="fw-medium">
+                                <div className="d-flex align-items-center gap-2 flex-wrap">
+                                  <span>{hospital.name}</span>
+                                  <button className="badge text-bg-primary border-0" type="button" onClick={() => setDepartmentListHospital(normalizeHospital(hospital))}>{hospital.departments.length} reparti</button>
+                                </div>
+                              </td>
                               <td>{hospital.director || "-"}</td>
                               <td>
-                                {hospital.departments.length > 0 ? (
-                                  <div className="hospital-department-summary">
-                                    {hospital.departments.map((department) => (
-                                      <div key={department.id}>
-                                        <strong>{department.name}</strong>
-                                        <span>Primario: {department.head || "-"}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-secondary">Nessun reparto</span>
-                                )}
+                                <button className="btn btn-outline-secondary btn-sm" type="button" onClick={() => setDepartmentListHospital(normalizeHospital(hospital))}>
+                                  Visualizza reparti
+                                </button>
                               </td>
                               <td className="text-end">
                                 <button

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Meteor } from "meteor/meteor";
 import { Users } from "./Users.js";
 import { Hospitals } from "./Hospitals.js";
 import { Doctors } from "./Doctors.js";
@@ -8,6 +9,10 @@ import { Calendar } from "./Calendar.js";
 import { SHAREPOINT_URL } from "./SharePoint.js";
 import { Profile } from "./Profile.js";
 import { SupportRequests } from "./SupportRequests.js";
+import { UsefulFiles } from "./UsefulFiles.js";
+import { Notifications } from "./Notifications.js";
+import { Info } from "./Info.js";
+import { Settings } from "./Settings.js";
 
 const ICON_PATHS = {
   calendar: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18"],
@@ -20,6 +25,9 @@ const ICON_PATHS = {
   doctor: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", "M12 7v10M7 12h10"],
   patient: ["M4 21v-7a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v7", "M12 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M9 16h6M12 13v6"],
   support: ["M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z", "M8 9h8M8 13h5"],
+  files: ["M4 3h10l6 6v12H4z", "M14 3v6h6", "M8 14h8M8 18h6"],
+  info: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 10v7M12 7h.01"],
+  settings: ["M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z", "M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.12 3.67-.08-.02a1.7 1.7 0 0 0-1.8-.48l-.64.26a1.7 1.7 0 0 0-1.04 1.42V22H9.88v-.21a1.7 1.7 0 0 0-1.04-1.42l-.64-.26a1.7 1.7 0 0 0-1.8.48l-.08.02-2.12-3.67.06-.06A1.7 1.7 0 0 0 4.6 15l-.1-.66a1.7 1.7 0 0 0-1.3-1.3L3 13V9l.2-.04a1.7 1.7 0 0 0 1.3-1.3L4.6 7a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.12-3.67.08.02a1.7 1.7 0 0 0 1.8.48l.64-.26A1.7 1.7 0 0 0 9.88.21V0h4.24v.21a1.7 1.7 0 0 0 1.04 1.42l.64.26a1.7 1.7 0 0 0 1.8-.48l.08-.02 2.12 3.67-.06.06A1.7 1.7 0 0 0 19.4 7l.1.66a1.7 1.7 0 0 0 1.3 1.3L21 9v4l-.2.04a1.7 1.7 0 0 0-1.3 1.3z"],
 };
 
 const MenuIcon = ({ name }) => (
@@ -42,6 +50,7 @@ export const Home = ({
   setPresentations,
   supportRequests,
   notifications = [],
+  usefulFiles = [],
   theme,
   onToggleTheme,
   onLogout,
@@ -53,6 +62,9 @@ export const Home = ({
     user.role === "GVP" ? "patients" : "home",
   );
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const unreadNotifications = notifications.filter((notification) => !notification.readAt);
+  const markNotificationRead = (notificationId) => Meteor.call("hlc.markNotificationAsRead", notificationId);
+  const markAllNotificationsRead = () => Meteor.call("hlc.markAllNotificationsAsRead");
   const presidentId =
     user.role === "Presidente"
       ? user.id
@@ -91,28 +103,27 @@ export const Home = ({
           </ul>
 
           <ul className="navbar-nav ms-auto align-items-center">
-            <li className="nav-item me-2">
-              <button className="btn btn-outline-secondary btn-sm" type="button" onClick={onToggleTheme} aria-label={theme === "dark" ? "Attiva tema giorno" : "Attiva tema notte"} title={theme === "dark" ? "Tema giorno" : "Tema notte"}>
-                <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
-                <span className="d-none d-md-inline ms-1">{theme === "dark" ? "Giorno" : "Notte"}</span>
-              </button>
-            </li>
             {(user.role === "CAS" || user.role === "Presidente") && (
               <li className="nav-item me-2 position-relative">
                 <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setNotificationsOpen((current) => !current)} aria-label="Mostra notifiche">
                   🔔
-                  {notifications.length > 0 && <span className="badge text-bg-danger ms-2">{notifications.length}</span>}
+                  {unreadNotifications.length > 0 && <span className="badge text-bg-danger ms-2">{unreadNotifications.length}</span>}
                 </button>
                 {notificationsOpen && (
                   <div className="dropdown-menu show p-2 shadow" style={{ position: "absolute", right: 0, top: "calc(100% + 0.35rem)", minWidth: "18rem", zIndex: 1100 }}>
-                    {notifications.length === 0 ? (
-                      <div className="small text-secondary">Nessuna notifica.</div>
-                    ) : notifications.map((notification) => (
-                      <div key={notification.id} className="border rounded p-2 mb-2 small">
+                    {unreadNotifications.length === 0 ? (
+                      <div className="small text-secondary">Nessuna nuova notifica.</div>
+                    ) : unreadNotifications.slice(0, 5).map((notification) => (
+                      <div key={notification.id} className="border rounded p-2 mb-2 small bg-primary-subtle">
                         <div>{notification.message}</div>
                         <div className="text-secondary mt-1">{new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(notification.createdAt))}</div>
+                        <button className="btn btn-link btn-sm p-0 mt-1" type="button" onClick={() => markNotificationRead(notification.id)}>Segna come letta</button>
                       </div>
                     ))}
+                    <div className="d-grid gap-2 mt-2">
+                      <button className="btn btn-outline-secondary btn-sm" type="button" disabled={unreadNotifications.length === 0} onClick={markAllNotificationsRead}>Segna tutte come lette</button>
+                      <button className="btn btn-primary btn-sm" type="button" onClick={() => { setNotificationsOpen(false); openView("notifications"); }}>Vai alle notifiche</button>
+                    </div>
                   </div>
                 )}
               </li>
@@ -149,7 +160,8 @@ export const Home = ({
         <div className="sidebar-wrapper">
           <nav className="mt-2">
             <ul className="nav sidebar-menu flex-column" role="menu">
-              {user.role !== "Admin" && <li className="nav-item">
+              <li className="sidebar-section-label menu-order-tools">Strumenti</li>
+              {user.role !== "Admin" && <li className="nav-item menu-order-tools">
                 <button
                   className={`nav-link w-100 ${activeView === "calendar" ? "active" : ""}`}
                   type="button"
@@ -159,7 +171,25 @@ export const Home = ({
                   <p>Calendario</p>
                 </button>
               </li>}
-              {user.role !== "Admin" && <li className="nav-item">
+              {user.role !== "Admin" && <li className="nav-item menu-order-tools">
+                <button className={`nav-link w-100 ${activeView === "useful-files" ? "active" : ""}`} type="button" onClick={() => openView("useful-files")}>
+                  <MenuIcon name="files" />
+                  <p>File Utili</p>
+                </button>
+              </li>}
+              <li className="nav-item menu-order-tools">
+                <button className={`nav-link w-100 ${activeView === "settings" ? "active" : ""}`} type="button" onClick={() => openView("settings")}>
+                  <MenuIcon name="settings" />
+                  <p>Impostazioni</p>
+                </button>
+              </li>
+              <li className="nav-item menu-order-info">
+                <button className={`nav-link w-100 ${activeView === "info" ? "active" : ""}`} type="button" onClick={() => openView("info")}>
+                  <MenuIcon name="info" />
+                  <p>Info</p>
+                </button>
+              </li>
+              {user.role === "GVP" && <li className="nav-item menu-order-tools">
                 <button
                   className={`nav-link w-100 ${activeView === "profile" ? "active" : ""}`}
                   type="button"
@@ -169,7 +199,8 @@ export const Home = ({
                   <p>Profilo</p>
                 </button>
               </li>}
-              {user.role !== "Admin" && user.role !== "GVP" && <li className="nav-item">
+              {user.role !== "Admin" && user.role !== "GVP" && <li className="sidebar-section-label menu-order-links">Collegamenti</li>}
+              {user.role !== "Admin" && user.role !== "GVP" && <li className="nav-item menu-order-links">
                 <a
                   className="nav-link w-100"
                   href={SHAREPOINT_URL}
@@ -181,7 +212,8 @@ export const Home = ({
                   <p>Share Point</p>
                 </a>
               </li>}
-              {user.role !== "GVP" && <li className="nav-item">
+              <li className="sidebar-section-label menu-order-support">Assistenza</li>
+              {user.role !== "GVP" && <li className="nav-item menu-order-support-item">
                 <button className={`nav-link w-100 ${activeView === "support" ? "active" : ""}`} type="button" onClick={() => openView("support")}>
                   <MenuIcon name="support" />
                   <p>Segnalazioni</p>
@@ -189,7 +221,8 @@ export const Home = ({
               </li>}
               {user.role === "Admin" && (
               <>
-              <li className="nav-item">
+              <li className="sidebar-section-label menu-order-admin">Amministrazione</li>
+              <li className="nav-item menu-order-admin">
                 <button
                   className={`nav-link w-100 ${activeView === "users" ? "active" : ""}`}
                   type="button"
@@ -201,8 +234,9 @@ export const Home = ({
               </li>
               </>
               )}
+              {(user.role === "Presidente" || user.role === "CAS") && <li className="sidebar-section-label menu-order-team">Squadra</li>}
               {user.role === "Presidente" && (
-                <li className="nav-item">
+                <li className="nav-item menu-order-team">
                   <button
                     className={`nav-link w-100 ${activeView === "team" ? "active" : ""}`}
                     type="button"
@@ -214,7 +248,7 @@ export const Home = ({
                 </li>
               )}
               {user.role === "CAS" && (
-                <li className="nav-item">
+                <li className="nav-item menu-order-team">
                   <button
                     className={`nav-link w-100 ${activeView === "team" ? "active" : ""}`}
                     type="button"
@@ -225,9 +259,20 @@ export const Home = ({
                   </button>
                 </li>
               )}
+              {(user.role === "Presidente" || user.role === "CAS") && <li className="nav-item menu-order-team">
+                <button
+                  className={`nav-link w-100 ${activeView === "profile" ? "active" : ""}`}
+                  type="button"
+                  onClick={() => openView("profile")}
+                >
+                  <MenuIcon name="profile" />
+                  <p>Profilo</p>
+                </button>
+              </li>}
               {(user.role === "Presidente" || user.role === "CAS") && (
                 <>
-                  <li className="nav-item">
+                  <li className="sidebar-section-label menu-order-health">Gestione sanitaria</li>
+                  <li className="nav-item menu-order-health">
                     <button
                       className={`nav-link w-100 ${activeView === "hospitals" ? "active" : ""}`}
                       type="button"
@@ -237,7 +282,7 @@ export const Home = ({
                       <p>Ospedali</p>
                     </button>
                   </li>
-                  <li className="nav-item">
+                  <li className="nav-item menu-order-health">
                     <button
                       className={`nav-link w-100 ${activeView === "presentations" ? "active" : ""}`}
                       type="button"
@@ -247,7 +292,7 @@ export const Home = ({
                       <p>Presentazioni</p>
                     </button>
                   </li>
-                  <li className="nav-item">
+                  <li className="nav-item menu-order-health">
                     <button
                       className={`nav-link w-100 ${activeView === "doctors" ? "active" : ""}`}
                       type="button"
@@ -257,7 +302,7 @@ export const Home = ({
                       <p>Medici</p>
                     </button>
                   </li>
-                  <li className="nav-item">
+                  <li className="nav-item menu-order-health">
                     <button
                       className={`nav-link w-100 ${activeView === "patients" ? "active" : ""}`}
                       type="button"
@@ -270,7 +315,9 @@ export const Home = ({
                 </>
               )}
               {user.role === "GVP" && (
-                <li className="nav-item">
+                <>
+                <li className="sidebar-section-label menu-order-health">Gestione sanitaria</li>
+                <li className="nav-item menu-order-health">
                   <button
                     className={`nav-link w-100 ${activeView === "patients" ? "active" : ""}`}
                     type="button"
@@ -280,6 +327,7 @@ export const Home = ({
                     <p>Pazienti</p>
                   </button>
                 </li>
+                </>
               )}
             </ul>
           </nav>
@@ -295,6 +343,14 @@ export const Home = ({
       <main className="app-main" aria-label="Contenuto principale">
         {activeView === "support" ? (
           <SupportRequests requests={supportRequests} currentUser={user} />
+        ) : activeView === "settings" ? (
+          <Settings theme={theme} onToggleTheme={onToggleTheme} />
+        ) : activeView === "info" ? (
+          <Info />
+        ) : activeView === "notifications" ? (
+          <Notifications notifications={notifications} />
+        ) : activeView === "useful-files" && presidentId ? (
+          <UsefulFiles files={usefulFiles} currentUser={user} />
         ) : activeView === "profile" ? (
           <Profile currentUser={user} hospitals={hospitals} />
         ) : activeView === "calendar" ? (

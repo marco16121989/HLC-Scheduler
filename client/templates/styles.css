@@ -402,6 +402,46 @@ a {
   white-space: nowrap;
 }
 
+.sidebar-section-label {
+  margin: 0.9rem 0.75rem 0.35rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  color: rgb(255 255 255 / 55%);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.sidebar-section-label:first-child {
+  margin-top: 0.25rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sidebar-menu > .menu-order-health { order: 10; }
+.sidebar-menu > .menu-order-tools { order: 20; }
+.sidebar-menu > .menu-order-team { order: 30; }
+.sidebar-menu > .menu-order-links { order: 40; }
+.sidebar-menu > .menu-order-support { order: 50; }
+.sidebar-menu > .menu-order-info { order: 51; }
+.sidebar-menu > .menu-order-support-item { order: 52; }
+.sidebar-menu > .menu-order-admin { order: 10; }
+
+.sidebar-menu > .sidebar-section-label.menu-order-health,
+.sidebar-menu > .sidebar-section-label.menu-order-admin {
+  margin-top: 0.25rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sidebar-menu > .sidebar-section-label.menu-order-tools:first-child {
+  margin: 0.9rem 0.75rem 0.35rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+}
+
 .brand-link {
   display: flex;
   align-items: center;
@@ -653,8 +693,27 @@ svg.admin-nav-icon {
 .patient-form-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 0.65rem;
   width: 100%;
+}
+
+.patient-form-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.patient-form-tabs .nav-link {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.patient-modal-card .form-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .patient-form-grid > div {
@@ -788,11 +847,82 @@ svg.admin-nav-icon {
 }
 
 .patient-detail-section {
-  margin-top: 1.25rem;
-  padding: 0 0 1rem;
-  border: 0;
-  border-top: 1px solid var(--bs-border-color-translucent);
-  border-radius: 0;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: var(--bs-border-radius);
+  background: var(--bs-tertiary-bg);
+}
+
+.patient-detail-section summary {
+  cursor: pointer;
+  color: var(--bs-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.patient-detail-section[open] summary {
+  padding-bottom: 0.15rem;
+}
+
+.patient-notification-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.patient-notification-grid > div {
+  flex: 1 1 18rem;
+  width: auto;
+  max-width: none;
+}
+
+.patient-notification-grid > div:has(textarea) {
+  flex-basis: 100%;
+}
+
+.patient-hospital-grid,
+.patient-hospital-fields-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.patient-hospital-grid > div,
+.patient-hospital-grid > fieldset,
+.patient-hospital-fields-grid > div {
+  flex: 1 1 18rem;
+  width: auto;
+  max-width: none;
+  margin: 0 !important;
+}
+
+.patient-hospital-grid > div:has(textarea),
+.patient-hospital-grid > .patient-assignment-row,
+.patient-hospital-grid > fieldset,
+.patient-hospital-fields-grid > div:has(textarea) {
+  flex-basis: 100%;
+}
+
+.patient-detail-section > .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0;
+  width: 100%;
+}
+
+.patient-detail-section > .row > div {
+  flex: 1 1 18rem;
+  width: auto;
+  max-width: none;
+  padding: 0;
+}
+
+.patient-detail-section > .row > div:has(textarea) {
+  flex-basis: 100%;
 }
 
 .patient-detail-section legend {

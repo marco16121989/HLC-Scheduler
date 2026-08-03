@@ -10,6 +10,7 @@ import {
   PatientsCollection,
   PresentationsCollection,
   SupportRequestsCollection,
+  UsefulFilesCollection,
 } from "/imports/api/links";
 import { formatUserName } from "/imports/utils/formatUserName";
 
@@ -45,7 +46,7 @@ export const App = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
   };
 
-  const { ready, user, users, hospitals, doctors, patients, presentations, supportRequests, notifications } = useTracker(() => {
+  const { ready, user, users, hospitals, doctors, patients, presentations, supportRequests, notifications, usefulFiles } = useTracker(() => {
     const dataSubscription = Meteor.subscribe("hlc-data");
     const notificationSubscription = Meteor.subscribe("hlc-notifications");
     const account = Meteor.user();
@@ -63,6 +64,7 @@ export const App = () => {
         ...item,
         id: item._id,
       })),
+      usefulFiles: UsefulFilesCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
     };
   }, []);
 
@@ -109,6 +111,7 @@ export const App = () => {
       setPresentations={setPresentations}
       supportRequests={supportRequests}
       notifications={notifications}
+      usefulFiles={usefulFiles}
       theme={theme}
       onToggleTheme={toggleTheme}
       onLogout={() => Meteor.logout()}
