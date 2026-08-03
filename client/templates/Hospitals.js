@@ -1,11 +1,21 @@
 import { useState } from "react";
 import { normalizeHospital } from "../utils/hospitals.js";
 
+const DEFAULT_DEPARTMENTS = [
+  "Anestesiologia", "Cardiochirurgia", "Centro ustioni", "Chirurgia colorettale",
+  "Chirurgia dei trapianti", "Chirurgia generale", "Chirurgia orale e maxillo-facciale",
+  "Chirurgia ortopedica", "Chirurgia toracica", "Chirurgia traumatologica",
+  "Chirurgia vascolare", "Ematologia", "Gastroenterologia", "Ginecologia",
+  "Medicina d’urgenza", "Medicina interna", "Medicina ospedaliera", "Medico notturno",
+  "Nefrologia", "Neonatologia", "Neurochirurgia", "Oncologia", "Oncologia ginecologica",
+  "Ostetricia", "Medico del travaglio", "Perinatologia (gravidanze ad alto rischio)",
+  "Otorinolaringoiatria — Chirurgia cervico-facciale", "Pneumologia",
+  "Radiologia interventistica", "Terapia intensiva/Rianimazione", "Urologia",
+];
+
 export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
   const [name, setName] = useState("");
   const [director, setDirector] = useState("");
-  const [departmentName, setDepartmentName] = useState("");
-  const [departmentHead, setDepartmentHead] = useState("");
   const [departments, setDepartments] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
@@ -18,8 +28,6 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
   const resetForm = () => {
     setName("");
     setDirector("");
-    setDepartmentName("");
-    setDepartmentHead("");
     setDepartments([]);
     setEditingId(null);
     setError("");
@@ -31,35 +39,15 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
     setModalOpen(true);
   };
 
-  const addDepartment = () => {
-    const normalizedName = departmentName.trim();
-    const normalizedHead = departmentHead.trim();
-
-    if (!normalizedName || !normalizedHead) {
-      setError("Inserisci nome del reparto e Primario.");
-      return;
-    }
-
-    const isDuplicate = departments.some(
-      (department) =>
-        department.name.toLowerCase() === normalizedName.toLowerCase(),
-    );
-
-    if (isDuplicate) {
-      setError("Il reparto e gia presente.");
-      return;
-    }
-
-    setDepartments((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        name: normalizedName,
-        head: normalizedHead,
-      },
-    ]);
-    setDepartmentName("");
-    setDepartmentHead("");
+  const toggleDepartment = (departmentName) => {
+    setDepartments((current) => {
+      const selected = current.find(
+        (department) => department.name.toLowerCase() === departmentName.toLowerCase(),
+      );
+      return selected
+        ? current.filter((department) => department.id !== selected.id)
+        : [...current, { id: crypto.randomUUID(), name: departmentName, head: "" }];
+    });
     setError("");
   };
 
@@ -89,11 +77,11 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
     }
 
     const incompleteDepartment = departments.some(
-      (department) => !department.name.trim() || !department.head.trim(),
+      (department) => !department.name.trim(),
     );
 
     if (incompleteDepartment) {
-      setError("Completa nome e Primario di ogni reparto.");
+      setError("Completa il nome di ogni reparto.");
       return;
     }
 
@@ -115,7 +103,7 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
       departments: departments.map((department) => ({
         ...department,
         name: department.name.trim(),
-        head: department.head.trim(),
+        head: (department.head || "").trim(),
       })),
     };
 
@@ -143,8 +131,6 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
     setName(normalizedHospital.name);
     setDirector(normalizedHospital.director);
     setDepartments(normalizedHospital.departments);
-    setDepartmentName("");
-    setDepartmentHead("");
     setError("");
     setModalOpen(true);
   };
@@ -254,89 +240,31 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
 
                     <fieldset className="hospital-departments-fieldset">
                       <legend className="form-label">Reparti</legend>
-                      <div className="row g-2">
-                        <div className="col-12 col-sm-5">
-                          <input
-                            className="form-control"
-                            type="text"
-                            value={departmentName}
-                            onChange={(event) => {
-                              setDepartmentName(event.target.value);
-                              setError("");
-                            }}
-                            placeholder="Nome reparto"
-                          />
-                        </div>
-                        <div className="col-12 col-sm-5">
-                          <input
-                            className="form-control"
-                            type="text"
-                            value={departmentHead}
-                            onChange={(event) => {
-                              setDepartmentHead(event.target.value);
-                              setError("");
-                            }}
-                            placeholder="Primario"
-                          />
-                        </div>
-                        <div className="col-12 col-sm-2 d-grid">
-                          <button
-                            className="btn btn-outline-primary"
-                            type="button"
-                            onClick={addDepartment}
-                            title="Aggiungi reparto"
-                          >
-                            +
-                          </button>
-                        </div>
+                      <div className="hospital-default-departments">
+                        {DEFAULT_DEPARTMENTS.map((departmentName) => {
+                          const selectedDepartment = departments.find(
+                            (department) => department.name.toLowerCase() === departmentName.toLowerCase(),
+                          );
+                          return <div className={`hospital-default-department ${selectedDepartment ? "selected" : ""}`} key={departmentName}>
+                            <label className="form-check mb-0">
+                              <input className="form-check-input" type="checkbox" checked={Boolean(selectedDepartment)} onChange={() => toggleDepartment(departmentName)} />
+                              <span className="form-check-label">{departmentName}</span>
+                            </label>
+                            {selectedDepartment && <input className="form-control form-control-sm mt-2" type="text" value={selectedDepartment.head || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "head", event.target.value)} aria-label={`Primario di ${departmentName}`} placeholder="Primario (facoltativo)" />}
+                          </div>;
+                        })}
                       </div>
 
-                      {departments.length > 0 && (
+                      {departments.filter((department) => !DEFAULT_DEPARTMENTS.some((name) => name.toLowerCase() === department.name.toLowerCase())).length > 0 && <div className="mt-3">
+                        <div className="form-label">Altri reparti già salvati</div>
                         <div className="hospital-department-list">
-                          {departments.map((department) => (
-                            <div className="hospital-department-row" key={department.id}>
-                              <input
-                                className="form-control form-control-sm"
-                                type="text"
-                                value={department.name}
-                                onChange={(event) =>
-                                  updateDepartment(
-                                    department.id,
-                                    "name",
-                                    event.target.value,
-                                  )
-                                }
-                                aria-label="Nome reparto"
-                                required
-                              />
-                              <input
-                                className="form-control form-control-sm"
-                                type="text"
-                                value={department.head}
-                                onChange={(event) =>
-                                  updateDepartment(
-                                    department.id,
-                                    "head",
-                                    event.target.value,
-                                  )
-                                }
-                                aria-label={`Primario di ${department.name}`}
-                                placeholder="Primario"
-                                required
-                              />
-                              <button
-                                className="btn btn-outline-danger btn-sm"
-                                type="button"
-                                aria-label={`Rimuovi ${department.name}`}
-                                title="Rimuovi reparto"
-                                onClick={() => removeDepartment(department.id)}
-                              >
-                                &times;
-                              </button>
-                            </div>
-                          ))}
+                          {departments.filter((department) => !DEFAULT_DEPARTMENTS.some((name) => name.toLowerCase() === department.name.toLowerCase())).map((department) => <div className="hospital-department-row" key={department.id}>
+                            <input className="form-control form-control-sm" type="text" value={department.name} onChange={(event) => updateDepartment(department.id, "name", event.target.value)} aria-label="Nome reparto" required />
+                            <input className="form-control form-control-sm" type="text" value={department.head || ""} onChange={(event) => updateDepartment(department.id, "head", event.target.value)} aria-label={`Primario di ${department.name}`} placeholder="Primario (facoltativo)" />
+                            <button className="btn btn-outline-danger btn-sm" type="button" aria-label={`Rimuovi ${department.name}`} onClick={() => removeDepartment(department.id)}>&times;</button>
+                          </div>)}
                         </div>
-                      )}
+                      </div>}
                     </fieldset>
 
                   </div>

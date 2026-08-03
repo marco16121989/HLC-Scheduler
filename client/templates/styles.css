@@ -535,6 +535,23 @@ svg.admin-nav-icon {
   gap: 0.5rem;
 }
 
+.hospital-default-departments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.65rem;
+}
+
+.hospital-default-department {
+  padding: 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}
+
+.hospital-default-department.selected {
+  border-color: var(--bs-primary-border-subtle);
+  background: var(--bs-primary-bg-subtle);
+}
+
 .hospital-department-summary {
   display: grid;
   gap: 0.35rem;
