@@ -27,7 +27,7 @@ const getNoteRoleBadgeClass = (role) =>
       ? "text-bg-success"
       : "text-bg-warning";
 
-const DETAIL_SECTIONS = [
+export const DETAIL_SECTIONS = [
   {
     title: "Notifica emergenza sanitaria",
     fields: [
@@ -154,7 +154,7 @@ const DETAIL_SECTIONS = [
   },
 ];
 
-const SIMPLIFIED_FIELDS = [
+export const SIMPLIFIED_FIELDS = [
   ["congregation", "Congregazione"],
   ["age", "Età", "number"],
   ["patientPhone", "Numero di cellulare del paziente", "tel"],
@@ -203,7 +203,7 @@ const PatientDetailField = ({ field, value, onChange, disabled = false }) => {
   );
 };
 
-const formatSummaryValue = (value) => {
+export const formatSummaryValue = (value) => {
   if (value === null || value === undefined || value === "") return "Non compilato";
   if (Array.isArray(value)) return value.filter(Boolean).join(", ");
   if (typeof value === "boolean") return value ? "Sì" : "No";

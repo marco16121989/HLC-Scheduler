@@ -9,6 +9,7 @@ import {
   PresentationsCollection,
   SupportRequestsCollection,
 } from "/imports/api/links";
+import { formatUserName } from "/imports/utils/formatUserName";
 
 const publicUserFields = {
   username: 1,
@@ -320,12 +321,12 @@ Meteor.methods({
       password: String,
       hospitalAssignments: [Object],
     });
-    const username = data.username.trim().toLowerCase();
+    const username = formatUserName(data.username);
     if (!username) {
       throw new Meteor.Error("username-required", "Il nome utente è obbligatorio.");
     }
     const duplicate = await Meteor.users.findOneAsync({
-      username,
+      username: { $regex: `^${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
       _id: { $ne: this.userId },
     });
     if (duplicate) {
@@ -429,7 +430,11 @@ Meteor.methods({
 
       if (actorRole === "CAS") {
         const effectiveCasId = record.casId || record.associationId || "";
-        return record.role === "GVP" && effectiveCasId === actor._id;
+        return (
+          record.role === "GVP" &&
+          record.presidentId === actorPresidentId &&
+          (!effectiveCasId || effectiveCasId === actor._id)
+        );
       }
 
       return false;
@@ -442,7 +447,7 @@ Meteor.methods({
     const retainedIds = [];
     for (const record of records) {
       check(record.username, String);
-      const username = record.username.trim().toLowerCase();
+      const username = formatUserName(record.username);
       let account = record.id
         ? await Meteor.users.findOneAsync(record.id)
         : null;
@@ -518,9 +523,9 @@ Meteor.methods({
 });
 
 Meteor.startup(async () => {
-  const adminUsername = (
-    process.env.HLC_ADMIN_USERNAME || "marco.mattiazzo"
-  ).toLowerCase();
+  const adminUsername = formatUserName(
+    process.env.HLC_ADMIN_USERNAME || "marco.mattiazzo",
+  );
   const existingAdmin = await Accounts.findUserByUsername(adminUsername);
 
   if (!existingAdmin) {
@@ -547,6 +552,14 @@ Meteor.startup(async () => {
       console.warn(
         "HLC_ADMIN_PASSWORD non configurata: viene usata la password di sviluppo predefinita.",
       );
+    }
+  }
+
+  const users = await Meteor.users.find({}, { fields: { username: 1 } }).fetchAsync();
+  for (const user of users) {
+    const formattedUsername = formatUserName(user.username);
+    if (formattedUsername && formattedUsername !== user.username) {
+      await Meteor.users.updateAsync(user._id, { $set: { username: formattedUsername } });
     }
   }
 

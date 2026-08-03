@@ -11,10 +11,12 @@ import {
   PresentationsCollection,
   SupportRequestsCollection,
 } from "/imports/api/links";
+import { formatUserName } from "/imports/utils/formatUserName";
 
 const toClientRecord = ({ _id, profile, ...record }) => ({
   id: _id,
   ...record,
+  ...(record.username ? { username: formatUserName(record.username) } : {}),
   ...(profile || {}),
 });
 

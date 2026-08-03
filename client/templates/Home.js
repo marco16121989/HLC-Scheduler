@@ -221,7 +221,7 @@ export const Home = ({
                     onClick={() => openView("team")}
                   >
                     <MenuIcon name="team" />
-                    <p>I miei GVP</p>
+                    <p>GVP assegnati e liberi</p>
                   </button>
                 </li>
               )}
@@ -302,6 +302,7 @@ export const Home = ({
             presentations={presentations}
             patients={patients}
             doctors={doctors}
+            users={users}
             currentUser={user}
           />
         ) : activeView === "users" && user.role === "Admin" ? (

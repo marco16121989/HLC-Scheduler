@@ -1,4 +1,9 @@
 import { useMemo, useState } from "react";
+import {
+  DETAIL_SECTIONS,
+  SIMPLIFIED_FIELDS,
+  formatSummaryValue,
+} from "./Patients.js";
 
 const WEEK_DAYS = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
 const dateKey = (date) => {
@@ -9,7 +14,7 @@ const dateKey = (date) => {
 };
 const parseDate = (value) => value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null;
 
-export const Calendar = ({ presentations, patients, doctors, currentUser }) => {
+export const Calendar = ({ presentations, patients, doctors, users = [], currentUser }) => {
   const [displayedMonth, setDisplayedMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -18,6 +23,8 @@ export const Calendar = ({ presentations, patients, doctors, currentUser }) => {
   const [viewMode, setViewMode] = useState("month");
   const isGvp = currentUser.role === "GVP";
   const [eventFilter, setEventFilter] = useState(isGvp ? "patient" : "all");
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [patientModalTab, setPatientModalTab] = useState("info");
 
   const events = useMemo(() => {
     const presentationEvents = presentations
@@ -37,6 +44,7 @@ export const Calendar = ({ presentations, patients, doctors, currentUser }) => {
           id: `patient-${patient.id}`,
           date: patient.admissionDate.slice(0, 10),
           type: "patient",
+          patient,
           title: `${patient.lastName} ${patient.firstName}`,
           detail: [
             patient.admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza",
@@ -93,16 +101,127 @@ export const Calendar = ({ presentations, patients, doctors, currentUser }) => {
     setDisplayedMonth(new Date(selected.getFullYear(), selected.getMonth(), 1));
   };
 
+  const openEvent = (event) => {
+    if (event.type === "patient" && event.patient) {
+      setPatientModalTab("info");
+      setSelectedPatient(event.patient);
+    }
+  };
+
   const renderEvent = (event) => (
-    <article className={`calendar-agenda-item ${event.type}`} key={event.id}>
+    <article
+      className={`calendar-agenda-item ${event.type} ${event.type === "patient" ? "is-clickable" : ""}`}
+      key={event.id}
+      role={event.type === "patient" ? "button" : undefined}
+      tabIndex={event.type === "patient" ? 0 : undefined}
+      onClick={() => openEvent(event)}
+      onKeyDown={(keyboardEvent) => {
+        if (event.type === "patient" && (keyboardEvent.key === "Enter" || keyboardEvent.key === " ")) {
+          keyboardEvent.preventDefault();
+          openEvent(event);
+        }
+      }}
+    >
       <span className="badge">{event.type === "presentation" ? "Presentazione" : "Paziente"}</span>
       <h3>{event.title}</h3>
       {event.detail && <p>{event.detail}</p>}
     </article>
   );
 
+  const selectedDoctor = selectedPatient
+    ? doctors.find((doctor) => doctor.id === selectedPatient.doctorId)
+    : null;
+  const patientDetails = selectedPatient?.details || {};
+  const selectedCas = selectedPatient
+    ? users.find((user) => user.id === selectedPatient.casId)
+    : null;
+  const selectedGvpIds = selectedPatient
+    ? (Array.isArray(selectedPatient.gvpIds)
+        ? selectedPatient.gvpIds
+        : selectedPatient.gvpId
+          ? [selectedPatient.gvpId]
+          : [])
+    : [];
+  const selectedGvps = users.filter((user) => selectedGvpIds.includes(user.id));
+  const selectedGvpNotes = Array.isArray(selectedPatient?.gvpNotes)
+    ? selectedPatient.gvpNotes
+    : selectedPatient?.gvpNotes
+      ? [{ text: selectedPatient.gvpNotes }]
+      : [];
+  const patientBaseEntries = selectedPatient ? [
+    ["Nome", selectedPatient.firstName],
+    ["Cognome", selectedPatient.lastName],
+    ...(!isGvp ? [
+      ["Tipo di accesso", selectedPatient.admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza"],
+      ["Data di accesso", selectedPatient.admissionDate],
+      ["Patologia", selectedPatient.pathology],
+      ["Medico responsabile", selectedDoctor ? `${selectedDoctor.lastName} ${selectedDoctor.firstName}` : "Non assegnato"],
+      ["CAS", selectedCas?.username || "Non assegnato"],
+      ["GVP assegnati", selectedGvps.length ? selectedGvps.map((user) => user.username).join(", ") : "Nessun GVP assegnato"],
+    ] : []),
+  ] : [];
+  const detailSections = isGvp
+    ? [{ title: "Informazioni semplificate", fields: SIMPLIFIED_FIELDS }]
+    : DETAIL_SECTIONS;
+  const isNotesField = (field) => /notes|comments/i.test(field[0]);
+  const informationSections = detailSections.map((section) => ({
+    ...section,
+    fields: section.fields.filter((field) => !isNotesField(field)),
+  })).filter((section) => section.fields.length > 0);
+
   return (
     <>
+      {selectedPatient && <>
+        <button className="entity-modal-backdrop" type="button" aria-label="Chiudi dettaglio paziente" onClick={() => setSelectedPatient(null)} />
+        <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="calendar-patient-title">
+          <section className="card entity-modal-card patient-modal-card">
+            <div className="card-header d-flex align-items-center gap-3">
+              <h2 className="card-title mb-0" id="calendar-patient-title">
+                Paziente — {selectedPatient.lastName} {selectedPatient.firstName}
+              </h2>
+              <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setSelectedPatient(null)} />
+            </div>
+            <div className="card-body">
+              {isGvp && <div className="alert alert-light border" role="status">Sono mostrate soltanto le informazioni semplificate disponibili per il GVP.</div>}
+              <div className="nav nav-tabs mb-4" role="tablist" aria-label="Dettaglio paziente">
+                <button className={`nav-link ${patientModalTab === "info" ? "active" : ""}`} type="button" role="tab" aria-selected={patientModalTab === "info"} onClick={() => setPatientModalTab("info")}>Informazioni</button>
+                <button className={`nav-link ${patientModalTab === "notes" ? "active" : ""}`} type="button" role="tab" aria-selected={patientModalTab === "notes"} onClick={() => setPatientModalTab("notes")}>Note</button>
+              </div>
+              {patientModalTab === "info" ? <>
+                <section className="mb-4">
+                  <h3 className="h5 mb-3">Dati principali</h3>
+                  <div className="patient-summary-grid">
+                    {patientBaseEntries.map(([label, value]) => <div className="patient-summary-item" key={label}><div className="patient-summary-label">{label}</div><div className="patient-summary-value">{formatSummaryValue(value)}</div></div>)}
+                  </div>
+                </section>
+                {informationSections.map((section) => <section className="mb-4" key={section.title}>
+                  <h3 className="h5 mb-3">{section.title}</h3>
+                  <div className="patient-summary-grid">
+                    {section.fields.map((field) => <div className="patient-summary-item" key={field[0]}><div className="patient-summary-label">{field[1]}</div><div className="patient-summary-value">{formatSummaryValue(patientDetails[field[0]])}</div></div>)}
+                  </div>
+                </section>)}
+              </> : selectedGvpNotes.length > 0 ? <div className="patient-notes-chat">
+                {selectedGvpNotes.map((note, index) => {
+                  const isOwnNote = note.authorId === currentUser.id;
+                  return <article className={`patient-chat-message ${isOwnNote ? "is-own" : ""}`} key={note.id || `${note.authorId || "gvp"}-${index}`}>
+                    <div className="patient-chat-bubble">
+                      <p>{note.text}</p>
+                      <div className="patient-chat-meta">
+                        <strong>{note.author || "GVP"}</strong>
+                        <span>{note.authorRole || "GVP"}</span>
+                        {note.createdAt && <time dateTime={new Date(note.createdAt).toISOString()}>{new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}</time>}
+                      </div>
+                    </div>
+                  </article>;
+                })}
+              </div> : <p className="text-secondary mb-0">Nessuna nota GVP presente.</p>}
+            </div>
+            <div className="card-footer text-end">
+              <button className="btn btn-outline-secondary" type="button" onClick={() => setSelectedPatient(null)}>Chiudi</button>
+            </div>
+          </section>
+        </div>
+      </>}
       <div className="app-content-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3 flex-wrap">
@@ -131,10 +250,10 @@ export const Calendar = ({ presentations, patients, doctors, currentUser }) => {
             if (!date) return <div className="calendar-day empty" key={`empty-${index}`} />;
             const key = dateKey(date);
             const dayEvents = filteredEvents.filter((event) => event.date === key);
-            return <button className={`calendar-day ${key === selectedDate ? "selected" : ""} ${key === todayKey ? "today" : ""}`} type="button" key={key} onClick={() => setSelectedDate(key)} aria-label={`${date.getDate()}, ${dayEvents.length} eventi`}>
+            return <div className={`calendar-day ${key === selectedDate ? "selected" : ""} ${key === todayKey ? "today" : ""}`} key={key} role="button" tabIndex="0" onClick={() => setSelectedDate(key)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedDate(key); }} aria-label={`${date.getDate()}, ${dayEvents.length} eventi`}>
               <span className="calendar-day-number">{date.getDate()}</span>
-              <span className="calendar-day-events">{dayEvents.slice(0, 3).map((event) => <span className={`calendar-event ${event.type}`} key={event.id} title={event.title}>{event.title}</span>)}{dayEvents.length > 3 && <span className="calendar-more">+{dayEvents.length - 3}</span>}</span>
-            </button>;
+              <span className="calendar-day-events">{dayEvents.slice(0, 3).map((event) => event.type === "patient" ? <button className={`calendar-event ${event.type}`} type="button" key={event.id} title={event.title} onClick={(clickEvent) => { clickEvent.stopPropagation(); openEvent(event); }}>{event.title}</button> : <span className={`calendar-event ${event.type}`} key={event.id} title={event.title}>{event.title}</span>)}{dayEvents.length > 3 && <span className="calendar-more">+{dayEvents.length - 3}</span>}</span>
+            </div>;
           })}</div></>}
           {viewMode === "week" && <div className="calendar-week-view">{weekDates.map((date) => {
             const key = dateKey(date);

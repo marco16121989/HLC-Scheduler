@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Meteor } from "meteor/meteor";
+import { formatUserName } from "/imports/utils/formatUserName";
 
 const formFromUser = (user) => ({
   username: user.username || "",
@@ -101,7 +102,7 @@ export const Profile = ({ currentUser, hospitals = [] }) => {
     }
     setSaving(true);
     Meteor.call("hlc.updateMyProfile", {
-      username: form.username,
+      username: formatUserName(form.username),
       firstName: form.firstName,
       lastName: form.lastName,
       email: form.email,

@@ -17,6 +17,12 @@ describe("hlcScheduler", function () {
     assert.strictEqual(getDefaultPresidentId("GVP", manager, users), "pres-1");
   });
 
+  it("defaults the president of a free GVP to the managing president", function () {
+    const manager = { id: "pres-1", role: "Presidente" };
+
+    assert.strictEqual(getDefaultPresidentId("GVP", manager, []), "pres-1");
+  });
+
   if (Meteor.isClient) {
     it("client is not server", function () {
       assert.strictEqual(Meteor.isServer, false);

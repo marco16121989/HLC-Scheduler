@@ -1,5 +1,11 @@
 import { useState } from "react";
 
+const doctorTypes = [
+  "Consulente",
+  "Collaborazione storica",
+  "Nuova collaborazione",
+];
+
 export const Doctors = ({
   doctors,
   setDoctors,
@@ -10,11 +16,15 @@ export const Doctors = ({
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [doctorType, setDoctorType] = useState(doctorTypes[0]);
   const [notes, setNotes] = useState("");
   const [departmentIds, setDepartmentIds] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [nameFilter, setNameFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [hospitalFilter, setHospitalFilter] = useState("all");
 
   const isEditing = editingId !== null;
   const visibleDoctors = doctors.filter(
@@ -23,6 +33,34 @@ export const Doctors = ({
   const visibleHospitals = hospitals.filter(
     (hospital) => hospital.presidentId === presidentId,
   );
+  const normalizedNameFilter = nameFilter.trim().toLowerCase().replace(/\s+/g, " ");
+  const filteredDoctors = visibleDoctors.filter((doctor) => {
+    const normalizedFirstName = (doctor.firstName || "").trim().toLowerCase();
+    const normalizedLastName = (doctor.lastName || "").trim().toLowerCase();
+    const searchableNames = [
+      normalizedFirstName,
+      normalizedLastName,
+      `${normalizedFirstName} ${normalizedLastName}`,
+      `${normalizedLastName} ${normalizedFirstName}`,
+    ];
+    const matchesName = !normalizedNameFilter || searchableNames.some(
+      (value) => value.includes(normalizedNameFilter),
+    );
+    const matchesType = typeFilter === "all" || doctor.doctorType === typeFilter;
+    const selectedHospital = visibleHospitals.find(
+      (hospital) => hospital.id === hospitalFilter,
+    );
+    const hospitalDepartmentIds = new Set(
+      (selectedHospital?.departments || []).map((department) => department.id),
+    );
+    const matchesHospital = hospitalFilter === "all" ||
+      (doctor.departmentIds || []).some((departmentId) =>
+        hospitalDepartmentIds.has(departmentId),
+      );
+    return matchesName && matchesType && matchesHospital;
+  });
+  const hasActiveFilters = Boolean(normalizedNameFilter) ||
+    typeFilter !== "all" || hospitalFilter !== "all";
   const availableDepartmentIds = new Set(
     visibleHospitals.flatMap((hospital) =>
       hospital.departments.map((department) => department.id),
@@ -34,6 +72,7 @@ export const Doctors = ({
     setLastName("");
     setPhone("");
     setEmail("");
+    setDoctorType(doctorTypes[0]);
     setNotes("");
     setDepartmentIds([]);
     setEditingId(null);
@@ -101,6 +140,7 @@ export const Doctors = ({
       lastName: normalizedLastName,
       phone: normalizedPhone,
       email: normalizedEmail,
+      doctorType: doctorTypes.includes(doctorType) ? doctorType : doctorTypes[0],
       notes: normalizedNotes,
       presidentId,
       departmentIds: validDepartmentIds,
@@ -128,6 +168,11 @@ export const Doctors = ({
     setLastName(doctor.lastName);
     setPhone(doctor.phone || "");
     setEmail(doctor.email || "");
+    setDoctorType(
+      doctorTypes.includes(doctor.doctorType)
+        ? doctor.doctorType
+        : doctorTypes[0],
+    );
     setNotes(doctor.notes || "");
     setDepartmentIds(
       (doctor.departmentIds || []).filter((departmentId) =>
@@ -301,6 +346,26 @@ export const Doctors = ({
                     </div>
 
                     <div className="mt-3">
+                      <label className="form-label" htmlFor="doctor-type">
+                        Tipologia
+                      </label>
+                      <select
+                        className="form-select"
+                        id="doctor-type"
+                        value={doctorType}
+                        onChange={(event) => {
+                          setDoctorType(event.target.value);
+                          setError("");
+                        }}
+                        required
+                      >
+                        {doctorTypes.map((type) => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="mt-3">
                       <label className="form-label" htmlFor="doctor-notes">
                         Note
                       </label>
@@ -389,12 +454,60 @@ export const Doctors = ({
                   <h2 className="card-title">Elenco medici</h2>
                 </div>
                 <div className="card-body p-0">
+                  <div className="row g-3 p-3 border-bottom">
+                    <div className="col-12 col-lg-4">
+                      <label className="form-label" htmlFor="doctor-name-filter">
+                        Cerca medico
+                      </label>
+                      <input
+                        className="form-control"
+                        id="doctor-name-filter"
+                        type="search"
+                        value={nameFilter}
+                        onChange={(event) => setNameFilter(event.target.value)}
+                        placeholder="Nome, cognome o nome completo"
+                      />
+                    </div>
+                    <div className="col-12 col-md-6 col-lg-4">
+                      <label className="form-label" htmlFor="doctor-type-filter">
+                        Tipologia
+                      </label>
+                      <select
+                        className="form-select"
+                        id="doctor-type-filter"
+                        value={typeFilter}
+                        onChange={(event) => setTypeFilter(event.target.value)}
+                      >
+                        <option value="all">Tutte le tipologie</option>
+                        {doctorTypes.map((type) => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-12 col-md-6 col-lg-4">
+                      <label className="form-label" htmlFor="doctor-hospital-filter">
+                        Ospedale
+                      </label>
+                      <select
+                        className="form-select"
+                        id="doctor-hospital-filter"
+                        value={hospitalFilter}
+                        onChange={(event) => setHospitalFilter(event.target.value)}
+                      >
+                        <option value="all">Tutti gli ospedali</option>
+                        {visibleHospitals.map((hospital) => (
+                          <option key={hospital.id} value={hospital.id}>{hospital.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0">
                       <thead>
                         <tr>
                           <th>Cognome</th>
                           <th>Nome</th>
+                          <th>Tipologia</th>
                           <th>Contatti</th>
                           <th>Reparti</th>
                           <th>Note</th>
@@ -402,14 +515,16 @@ export const Doctors = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {visibleDoctors.length === 0 ? (
+                        {filteredDoctors.length === 0 ? (
                           <tr>
-                            <td className="text-center text-secondary py-4" colSpan="6">
-                              Nessun medico inserito.
+                            <td className="text-center text-secondary py-4" colSpan="7">
+                              {hasActiveFilters
+                                ? "Nessun medico corrisponde ai filtri selezionati."
+                                : "Nessun medico inserito."}
                             </td>
                           </tr>
                         ) : (
-                          [...visibleDoctors]
+                          [...filteredDoctors]
                             .sort((first, second) =>
                               first.lastName.localeCompare(second.lastName),
                             )
@@ -421,6 +536,11 @@ export const Doctors = ({
                               <tr key={doctor.id}>
                                 <td className="fw-medium">{doctor.lastName}</td>
                                 <td>{doctor.firstName}</td>
+                                <td>
+                                  <span className="badge text-bg-info">
+                                    {doctor.doctorType || "Non specificata"}
+                                  </span>
+                                </td>
                                 <td>
                                   <div className="doctor-contact">
                                     <a href={`tel:${doctor.phone}`}>
