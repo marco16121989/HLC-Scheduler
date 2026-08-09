@@ -236,6 +236,7 @@ export const Patients = ({
   users,
   currentUser,
   presidentId,
+  absences = [],
 }) => {
   const isGvp = currentUser.role === "GVP";
   const [firstName, setFirstName] = useState("");
@@ -294,6 +295,27 @@ export const Patients = ({
       user.role === "GVP" &&
       (user.presidentId || user.associationId) === presidentId,
   );
+  const getAbsenceOnAdmissionDate = (userId) => Boolean(admissionDate) && absences.find(
+    (absence) => absence.userId === userId &&
+      absence.startDate <= admissionDate && absence.endDate >= admissionDate,
+  );
+  const isAbsentOnAdmissionDate = (userId) => Boolean(getAbsenceOnAdmissionDate(userId));
+  const formatAbsenceDate = (value) => new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+  const getAbsenceLabel = (userId) => {
+    const absence = getAbsenceOnAdmissionDate(userId);
+    return absence
+      ? `Assente dal ${formatAbsenceDate(absence.startDate)} al ${formatAbsenceDate(absence.endDate)}`
+      : "";
+  };
+  const availableFirst = (first, second) =>
+    Number(isAbsentOnAdmissionDate(first.id)) - Number(isAbsentOnAdmissionDate(second.id)) ||
+    (first.username || "").localeCompare(second.username || "", "it-IT");
+  const orderedCasUsers = [...visibleCasUsers].sort(availableFirst);
   const getGvpDisplayName = (user) => {
     const firstName = user.firstName?.trim();
     const lastName = user.lastName?.trim();
@@ -306,11 +328,11 @@ export const Patients = ({
   const associatedGvpUsers = visibleGvpUsers.filter((user) => gvpIds.includes(user.id)).filter((user) => {
     if (!normalizedGvpSearch) return true;
     return `${getGvpDisplayName(user)}`.toLowerCase().includes(normalizedGvpSearch);
-  });
+  }).sort(availableFirst);
   const unassociatedGvpUsers = visibleGvpUsers.filter((user) => !gvpIds.includes(user.id)).filter((user) => {
     if (!normalizedGvpSearch) return true;
     return `${getGvpDisplayName(user)}`.toLowerCase().includes(normalizedGvpSearch);
-  });
+  }).sort(availableFirst);
   const editingPatientNotes = getGvpNotes(
     patients.find((patient) => patient.id === editingId),
   );
@@ -931,13 +953,21 @@ export const Patients = ({
                             }}
                           >
                             <option value="">Seleziona CAS</option>
-                            {visibleCasUsers.map((casUser) => (
+                            {orderedCasUsers.map((casUser) => (
                               <option key={casUser.id} value={casUser.id}>
                                 {casUser.username}
                                 {casUser.id === currentUser.id ? " (io)" : ""}
+                                {isAbsentOnAdmissionDate(casUser.id) ? ` — ${getAbsenceLabel(casUser.id)}` : ""}
                               </option>
                             ))}
                           </select>
+                          {casId && isAbsentOnAdmissionDate(casId) && (
+                            <div className="mt-2">
+                              <span className="badge text-bg-danger">
+                                {selectedCasUser?.username || "CAS"} — {getAbsenceLabel(casId)}
+                              </span>
+                            </div>
+                          )}
                           {visibleCasUsers.length === 0 && (
                             <div className="form-text">
                               Inserisci prima almeno un CAS.
@@ -958,9 +988,16 @@ export const Patients = ({
                             </button>
                           </div>
                           <div className="form-text mt-1">
-                            {selectedGvpUsers.length > 0
-                              ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ")
-                              : "Nessun GVP associato."}
+                            {selectedGvpUsers.length > 0 ? (
+                              <span className="d-flex flex-wrap gap-1">
+                                {selectedGvpUsers.map((user) => (
+                                  <span className={`badge ${isAbsentOnAdmissionDate(user.id) ? "text-bg-danger" : "text-bg-secondary"}`} key={user.id}>
+                                    {getGvpDisplayName(user)}
+                                    {isAbsentOnAdmissionDate(user.id) ? ` — ${getAbsenceLabel(user.id)}` : ""}
+                                  </span>
+                                ))}
+                              </span>
+                            ) : "Nessun GVP associato."}
                           </div>
                           {gvpSelectionModalOpen && (
                             <>
@@ -1002,7 +1039,7 @@ export const Patients = ({
                                                     checked={gvpIds.includes(gvpUser.id)}
                                                     onChange={() => toggleGvpSelection(gvpUser)}
                                                   />
-                                                  <span className="form-check-label">{getGvpDisplayName(gvpUser)}</span>
+                                                  <span className="form-check-label">{getGvpDisplayName(gvpUser)} {isAbsentOnAdmissionDate(gvpUser.id) && <span className="badge text-bg-warning ms-2">{getAbsenceLabel(gvpUser.id)}</span>}</span>
                                                 </label>
                                               ))}
                                             </div>
@@ -1022,7 +1059,7 @@ export const Patients = ({
                                                     checked={gvpIds.includes(gvpUser.id)}
                                                     onChange={() => toggleGvpSelection(gvpUser)}
                                                   />
-                                                  <span className="form-check-label">{getGvpDisplayName(gvpUser)}</span>
+                                                  <span className="form-check-label">{getGvpDisplayName(gvpUser)} {isAbsentOnAdmissionDate(gvpUser.id) && <span className="badge text-bg-warning ms-2">{getAbsenceLabel(gvpUser.id)}</span>}</span>
                                                 </label>
                                               ))}
                                             </div>

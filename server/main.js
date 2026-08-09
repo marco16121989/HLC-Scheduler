@@ -2,6 +2,7 @@ import { Meteor } from "meteor/meteor";
 import { Accounts } from "meteor/accounts-base";
 import { check, Match } from "meteor/check";
 import {
+  AbsencesCollection,
   DoctorsCollection,
   HospitalsCollection,
   NotificationsCollection,
@@ -93,17 +94,25 @@ Meteor.publish("hlc-data", async function publishHlcData() {
 
   const actor = await Meteor.users.findOneAsync(this.userId);
   const role = actor?.profile?.role;
+  const linkedCasId = role === "GVP"
+    ? actor.profile?.casIds?.[0] || actor.profile?.casId || actor.profile?.associationId || ""
+    : "";
+  const linkedCas = linkedCasId ? await Meteor.users.findOneAsync(linkedCasId) : null;
   const presidentId =
     role === "Presidente"
       ? actor._id
       : role === "CAS" || role === "GVP"
-        ? actor.profile.presidentId || actor.profile.associationId
+        ? actor.profile.presidentId ||
+          (role === "GVP"
+            ? linkedCas?.profile?.presidentId || linkedCas?.profile?.associationId ||
+              (linkedCas?.profile?.role === "Presidente" ? linkedCas._id : "")
+            : actor.profile.associationId)
         : null;
   const dataSelector = presidentId ? { presidentId } : role === "Admin" ? {} : { _id: null };
   const userSelector =
     role === "Admin"
       ? {}
-      : role === "GVP"
+      : role === "GVP" && !actor.profile?.canInsertGvp
         ? { _id: actor._id }
       : presidentId
         ? {
@@ -145,8 +154,13 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         } },
       ),
       UsefulFilesCollection.find({ presidentId }, { sort: { createdAt: -1 } }),
+      AbsencesCollection.find({ userId: actor._id }, { sort: { startDate: 1 } }),
     ];
   }
+
+  const absenceUserIds = ["Presidente", "CAS"].includes(role)
+    ? (await Meteor.users.find(userSelector, { fields: { _id: 1 } }).fetchAsync()).map((user) => user._id)
+    : [actor._id];
 
   return [
     Meteor.users.find(userSelector, { fields: publicUserFields }),
@@ -157,6 +171,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
     PresentationsCollection.find({}),
     SupportRequestsCollection.find(role === "Admin" ? {} : { createdBy: actor._id }),
     UsefulFilesCollection.find(dataSelector, { sort: { createdAt: -1 } }),
+    AbsencesCollection.find({ userId: { $in: absenceUserIds } }, { sort: { startDate: 1 } }),
   ];
 });
 
@@ -169,6 +184,37 @@ Meteor.publish("hlc-notifications", function publishHlcNotifications() {
 });
 
 Meteor.methods({
+  async "hlc.saveAbsence"(record) {
+    requireUser(this);
+    check(record, { id: String, startDate: String, endDate: String, note: String });
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    if (!["Presidente", "CAS", "GVP"].includes(actor?.profile?.role)) {
+      throw new Meteor.Error("not-authorized", "Operazione non autorizzata.");
+    }
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(record.startDate) || !datePattern.test(record.endDate) || record.endDate < record.startDate) {
+      throw new Meteor.Error("invalid-period", "Il periodo di assenza non è valido.");
+    }
+    const existing = await AbsencesCollection.findOneAsync(record.id);
+    if (existing && existing.userId !== this.userId) {
+      throw new Meteor.Error("not-authorized", "Non puoi modificare questo periodo.");
+    }
+    await AbsencesCollection.upsertAsync(record.id, { $set: {
+      userId: this.userId,
+      username: actor.username,
+      startDate: record.startDate,
+      endDate: record.endDate,
+      note: record.note.trim().slice(0, 500),
+      updatedAt: new Date(),
+      ...(!existing ? { createdAt: new Date() } : {}),
+    } });
+  },
+
+  async "hlc.deleteAbsence"(absenceId) {
+    requireUser(this);
+    check(absenceId, String);
+    await AbsencesCollection.removeAsync({ _id: absenceId, userId: this.userId });
+  },
   async "hlc.uploadUsefulFile"(file) {
     requireUser(this);
     check(file, { name: String, displayName: String, type: String, size: Number, dataUrl: String });
@@ -523,12 +569,24 @@ Meteor.methods({
 
     const actor = await Meteor.users.findOneAsync(this.userId);
     const actorRole = actor?.profile?.role;
+    const actorLinkedCasId = actorRole === "GVP"
+      ? actor.profile?.casIds?.[0] || actor.profile?.casId || actor.profile?.associationId || ""
+      : "";
+    const actorLinkedCas = actorLinkedCasId
+      ? await Meteor.users.findOneAsync(actorLinkedCasId)
+      : null;
     const actorPresidentId =
       actorRole === "Presidente"
         ? actor._id
         : actorRole === "CAS"
           ? actor.profile.presidentId || actor.profile.associationId
+          : actorRole === "GVP"
+            ? actor.profile.presidentId || actorLinkedCas?.profile?.presidentId || actorLinkedCas?.profile?.associationId ||
+              (actorLinkedCas?.profile?.role === "Presidente" ? actorLinkedCas._id : "")
           : "";
+    const casCanCreateCas = actorRole === "CAS" && actor.profile?.canInsertCas === true;
+    const casCanCreateGvp = actorRole === "CAS" && actor.profile?.canInsertGvp === true;
+    const gvpCanCreateGvp = actorRole === "GVP" && actor.profile?.canInsertGvp === true;
     const canManage = (record) => {
       if (actorRole === "Admin") {
         return true;
@@ -539,18 +597,26 @@ Meteor.methods({
       }
 
       if (actorRole === "CAS") {
-        const effectiveCasId = record.casId || record.associationId || "";
         return (
-          record.role === "GVP" &&
-          record.presidentId === actorPresidentId &&
-          (!effectiveCasId || effectiveCasId === actor._id)
+          (casCanCreateGvp &&
+            record.role === "GVP" &&
+            record.presidentId === actorPresidentId) ||
+          (casCanCreateCas &&
+            record.role === "CAS" &&
+            record.id !== actor._id &&
+            record.presidentId === actorPresidentId)
         );
+      }
+
+      if (actorRole === "GVP") {
+        return gvpCanCreateGvp && record.role === "GVP" &&
+          record.presidentId === actorPresidentId;
       }
 
       return false;
     };
 
-    if (!["Admin", "Presidente", "CAS"].includes(actorRole)) {
+    if (!["Admin", "Presidente", "CAS", "GVP"].includes(actorRole)) {
       throw new Meteor.Error("not-authorized", "Non puoi gestire gli utenti.");
     }
 
@@ -561,6 +627,24 @@ Meteor.methods({
       let account = record.id
         ? await Meteor.users.findOneAsync(record.id)
         : null;
+      const isDelegatedCasRecord = actorRole === "CAS" &&
+        (account ? account.profile?.role === "CAS" : record.role === "CAS");
+      const isDelegatedGvpRecord = ["Presidente", "CAS", "GVP"].includes(actorRole) &&
+        (account ? account.profile?.role === "GVP" : record.role === "GVP");
+      const requestedGvpCasIds = Array.isArray(record.casIds)
+        ? record.casIds
+        : record.casId || record.associationId ? [record.casId || record.associationId] : [];
+      const delegatedGvpCasIds = [];
+      if (isDelegatedGvpRecord) {
+        for (const casId of [...new Set(requestedGvpCasIds.filter(Boolean))]) {
+          const delegatedCas = await Meteor.users.findOneAsync(casId);
+          const delegatedCasPresidentId = delegatedCas?.profile?.presidentId || delegatedCas?.profile?.associationId || "";
+          if (delegatedCas?.profile?.role === "CAS" && delegatedCasPresidentId === actorPresidentId) {
+            delegatedGvpCasIds.push(casId);
+          }
+        }
+      }
+      const delegatedGvpCasId = delegatedGvpCasIds[0] || "";
 
       // La pubblicazione include anche il gestore e altri utenti di contesto.
       // Non devono essere riscritti durante la sincronizzazione della squadra.
@@ -570,10 +654,17 @@ Meteor.methods({
       }
 
       const profile = {
-        role: record.role,
-        presidentId: record.presidentId || "",
-        casId: record.casId || "",
-        associationId: record.associationId || "",
+        role: isDelegatedCasRecord ? "CAS" : isDelegatedGvpRecord ? "GVP" : record.role,
+        presidentId: isDelegatedCasRecord || isDelegatedGvpRecord ? actorPresidentId : record.presidentId || "",
+        casId: isDelegatedCasRecord ? "" : isDelegatedGvpRecord ? delegatedGvpCasId : record.casId || "",
+        casIds: isDelegatedCasRecord ? [] : isDelegatedGvpRecord
+          ? delegatedGvpCasIds
+          : record.casIds ?? account?.profile?.casIds ?? [],
+        associationId: isDelegatedCasRecord
+          ? actorPresidentId
+          : isDelegatedGvpRecord
+            ? delegatedGvpCasId
+          : record.associationId || "",
         hospitalId: record.hospitalId || "",
         departmentId: record.departmentId || "",
         firstName: record.firstName ?? account?.profile?.firstName ?? "",
@@ -583,10 +674,17 @@ Meteor.methods({
         hospitalAssignments:
           record.hospitalAssignments ?? account?.profile?.hospitalAssignments ?? [],
         disabled: record.disabled ?? account?.profile?.disabled ?? false,
+        canInsertCas: actorRole === "CAS"
+          ? account?.profile?.canInsertCas ?? false
+          : record.canInsertCas ?? account?.profile?.canInsertCas ?? false,
+        canInsertGvp: actorRole === "GVP" || isDelegatedCasRecord
+          ? account?.profile?.canInsertGvp ?? false
+          : record.canInsertGvp ?? account?.profile?.canInsertGvp ?? false,
       };
 
       if (!account) {
-        if (!canManage(record)) {
+        const canCreateCas = casCanCreateCas && record.role === "CAS" && record.presidentId === actorPresidentId;
+        if (!canManage(record) && !canCreateCas) {
           throw new Meteor.Error("not-authorized", "Utente fuori dalla tua squadra.");
         }
         if (!record.password) {

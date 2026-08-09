@@ -13,6 +13,7 @@ import { UsefulFiles } from "./UsefulFiles.js";
 import { Notifications } from "./Notifications.js";
 import { Info } from "./Info.js";
 import { Settings } from "./Settings.js";
+import { Absences } from "./Absences.js";
 
 const ICON_PATHS = {
   calendar: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18"],
@@ -51,6 +52,7 @@ export const Home = ({
   supportRequests,
   notifications = [],
   usefulFiles = [],
+  absences = [],
   theme,
   onToggleTheme,
   onLogout,
@@ -171,6 +173,12 @@ export const Home = ({
                   <p>Calendario</p>
                 </button>
               </li>}
+              {["Presidente", "CAS", "GVP"].includes(user.role) && <li className="nav-item menu-order-tools">
+                <button className={`nav-link w-100 ${activeView === "absences" ? "active" : ""}`} type="button" onClick={() => openView("absences")}>
+                  <MenuIcon name="calendar" />
+                  <p>Periodi di assenza</p>
+                </button>
+              </li>}
               {user.role !== "Admin" && <li className="nav-item menu-order-tools">
                 <button className={`nav-link w-100 ${activeView === "useful-files" ? "active" : ""}`} type="button" onClick={() => openView("useful-files")}>
                   <MenuIcon name="files" />
@@ -234,28 +242,40 @@ export const Home = ({
               </li>
               </>
               )}
-              {(user.role === "Presidente" || user.role === "CAS") && <li className="sidebar-section-label menu-order-team">Squadra</li>}
-              {user.role === "Presidente" && (
+              {(user.role === "Presidente" || user.role === "CAS" || (user.role === "GVP" && user.canInsertGvp)) && <li className="sidebar-section-label menu-order-team">Squadra</li>}
+              {(user.role === "Presidente" || user.role === "CAS") && (
                 <li className="nav-item menu-order-team">
                   <button
-                    className={`nav-link w-100 ${activeView === "team" ? "active" : ""}`}
+                    className={`nav-link w-100 ${activeView === "cas" ? "active" : ""}`}
                     type="button"
-                    onClick={() => openView("team")}
+                    onClick={() => openView("cas")}
                   >
                     <MenuIcon name="team" />
-                    <p>La mia squadra</p>
+                    <p>CAS</p>
                   </button>
                 </li>
               )}
-              {user.role === "CAS" && (
+              {user.role === "GVP" && user.canInsertGvp && (
                 <li className="nav-item menu-order-team">
                   <button
-                    className={`nav-link w-100 ${activeView === "team" ? "active" : ""}`}
+                    className={`nav-link w-100 ${activeView === "gvp" ? "active" : ""}`}
                     type="button"
-                    onClick={() => openView("team")}
+                    onClick={() => openView("gvp")}
                   >
                     <MenuIcon name="team" />
-                    <p>GVP assegnati e liberi</p>
+                    <p>GVP</p>
+                  </button>
+                </li>
+              )}
+              {(user.role === "Presidente" || user.role === "CAS") && (
+                <li className="nav-item menu-order-team">
+                  <button
+                    className={`nav-link w-100 ${activeView === "gvp" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => openView("gvp")}
+                  >
+                    <MenuIcon name="team" />
+                    <p>GVP</p>
                   </button>
                 </li>
               )}
@@ -343,6 +363,8 @@ export const Home = ({
       <main className="app-main" aria-label="Contenuto principale">
         {activeView === "support" ? (
           <SupportRequests requests={supportRequests} currentUser={user} />
+        ) : activeView === "absences" && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
+          <Absences absences={absences} users={users} currentUser={user} />
         ) : activeView === "settings" ? (
           <Settings theme={theme} onToggleTheme={onToggleTheme} />
         ) : activeView === "info" ? (
@@ -389,6 +411,7 @@ export const Home = ({
             users={users}
             currentUser={user}
             presidentId={presidentId}
+            absences={absences}
           />
         ) : activeView === "presentations" && presidentId ? (
           <Presentations
@@ -397,19 +420,21 @@ export const Home = ({
             currentUser={user}
             presidentId={presidentId}
           />
-        ) : activeView === "team" && user.role === "Presidente" ? (
+        ) : activeView === "cas" && (user.role === "Presidente" || user.role === "CAS") ? (
           <Users
             users={users}
             setUsers={setUsers}
             hospitals={hospitals}
             manager={user}
+            managedRole="CAS"
           />
-        ) : activeView === "team" && user.role === "CAS" ? (
+        ) : activeView === "gvp" && (user.role === "Presidente" || user.role === "CAS" || (user.role === "GVP" && user.canInsertGvp)) ? (
           <Users
             users={users}
             setUsers={setUsers}
             hospitals={hospitals}
             manager={user}
+            managedRole="GVP"
           />
         ) : (
           <div className="app-content home-welcome">

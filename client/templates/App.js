@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Home } from "./Home.js";
 import { Login } from "./Login.js";
 import {
+  AbsencesCollection,
   DoctorsCollection,
   HospitalsCollection,
   NotificationsCollection,
@@ -46,7 +47,7 @@ export const App = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
   };
 
-  const { ready, user, users, hospitals, doctors, patients, presentations, supportRequests, notifications, usefulFiles } = useTracker(() => {
+  const { ready, user, users, hospitals, doctors, patients, presentations, supportRequests, notifications, usefulFiles, absences } = useTracker(() => {
     const dataSubscription = Meteor.subscribe("hlc-data");
     const notificationSubscription = Meteor.subscribe("hlc-notifications");
     const account = Meteor.user();
@@ -65,6 +66,7 @@ export const App = () => {
         id: item._id,
       })),
       usefulFiles: UsefulFilesCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
+      absences: AbsencesCollection.find({}, { sort: { startDate: 1 } }).fetch().map(toClientRecord),
     };
   }, []);
 
@@ -112,6 +114,7 @@ export const App = () => {
       supportRequests={supportRequests}
       notifications={notifications}
       usefulFiles={usefulFiles}
+      absences={absences}
       theme={theme}
       onToggleTheme={toggleTheme}
       onLogout={() => Meteor.logout()}

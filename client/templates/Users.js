@@ -1,11 +1,92 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { formatUserName } from "/imports/utils/formatUserName";
 
 const roles = ["Admin", "Presidente", "CAS", "GVP"];
 
-const getCasId = (user) =>
-  user.role === "GVP" ? user.casId || user.associationId || "" : "";
+const CasMultiSelect = ({ options, value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const rootRef = useRef(null);
+  const selectedIds = Array.isArray(value) ? value : [];
+  const selectedOptions = options.filter((option) => selectedIds.includes(option.id));
+  const filteredOptions = options.filter((option) =>
+    option.username.toLocaleLowerCase("it-IT").includes(search.trim().toLocaleLowerCase("it-IT")),
+  );
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event) => {
+      if (!rootRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, []);
+
+  const toggleOption = (optionId) => {
+    onChange(selectedIds.includes(optionId)
+      ? selectedIds.filter((id) => id !== optionId)
+      : [...selectedIds, optionId]);
+  };
+
+  return (
+    <div className="position-relative" ref={rootRef}>
+      <button
+        className="form-select text-start h-auto"
+        id="user-cas"
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {selectedOptions.length > 0 ? (
+          <span className="d-flex flex-wrap gap-1 pe-3">
+            {selectedOptions.map((option) => (
+              <span className="badge text-bg-primary" key={option.id}>{option.username}</span>
+            ))}
+          </span>
+        ) : <span className="text-secondary">Seleziona uno o più CAS</span>}
+      </button>
+      {open && (
+        <div className="dropdown-menu show w-100 p-2 shadow" style={{ maxHeight: "18rem", overflowY: "auto", zIndex: 1050 }}>
+          <input
+            className="form-control mb-2"
+            type="search"
+            placeholder="Cerca CAS..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            autoFocus
+          />
+          {filteredOptions.length === 0 ? (
+            <div className="small text-secondary p-2">Nessun CAS trovato.</div>
+          ) : filteredOptions.map((option) => (
+            <label className="dropdown-item d-flex align-items-center gap-2" key={option.id}>
+              <input
+                className="form-check-input mt-0"
+                type="checkbox"
+                checked={selectedIds.includes(option.id)}
+                onChange={() => toggleOption(option.id)}
+              />
+              <span>{option.username}</span>
+            </label>
+          ))}
+          {selectedIds.length > 0 && (
+            <button className="btn btn-link btn-sm px-2 mt-1" type="button" onClick={() => onChange([])}>
+              Rimuovi tutte le selezioni
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const getCasIds = (user) => {
+  if (user.role !== "GVP") return [];
+  if (Array.isArray(user.casIds)) return [...new Set(user.casIds.filter(Boolean))];
+  const legacyCasId = user.casId || user.associationId || "";
+  return legacyCasId ? [legacyCasId] : [];
+};
+
+const getCasId = (user) => getCasIds(user)[0] || "";
 
 const getPresidentId = (user, users) => {
   if (user.presidentId) {
@@ -65,25 +146,38 @@ const getHospitalAssignments = (user) =>
 const createEmptyForm = (role, manager, users) => {
   const isPresident = manager?.role === "Presidente";
   const isCas = manager?.role === "CAS";
+  const isGvp = manager?.role === "GVP";
 
   return {
     username: "",
     password: "",
     role,
     presidentId: getDefaultPresidentId(role, manager, users),
-    casId: isCas ? manager.id : "",
+    casId: isCas ? manager.id : isGvp ? getCasId(manager) : "",
+    casIds: isCas ? [manager.id] : isGvp ? getCasIds(manager) : [],
     hospitalAssignments: [],
+    canInsertCas: false,
+    canInsertGvp: false,
   };
 };
 
-export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
+export const Users = ({ users, setUsers, hospitals = [], manager = null, managedRole = null }) => {
   const isPresidentManager = manager?.role === "Presidente";
   const isCasManager = manager?.role === "CAS";
-  const isTeamManager = isPresidentManager || isCasManager;
-  const availableRoles = isPresidentManager
+  const isGvpManager = manager?.role === "GVP";
+  const isTeamManager = isPresidentManager || isCasManager || isGvpManager;
+  const canCreateManagedRole = isPresidentManager ||
+    (managedRole === "CAS" && Boolean(manager?.canInsertCas)) ||
+    (managedRole === "GVP" && Boolean(manager?.canInsertGvp)) ||
+    !managedRole;
+  const availableRoles = managedRole
+    ? [managedRole]
+    : isPresidentManager
     ? ["CAS", "GVP"]
     : isCasManager
       ? ["GVP"]
+      : isGvpManager
+        ? ["GVP"]
       : manager?.role === "Admin"
         ? ["Presidente"]
         : roles;
@@ -109,6 +203,8 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
     ? manager.id
     : isCasManager
       ? getDefaultPresidentId("GVP", manager, users)
+      : isGvpManager
+        ? getPresidentId(manager, users)
       : "";
   const formPresidentId = isTeamManager
     ? managerPresidentId
@@ -123,10 +219,19 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
     (user) =>
       user.role === "CAS" &&
       user.id !== editingId &&
-      getPresidentId(user, users) === form.presidentId,
+      getPresidentId(user, users) === formPresidentId,
   );
 
-  const visibleUsers = isPresidentManager
+  const organizationUsers = isTeamManager
+    ? users.filter((user) =>
+        (user.role === "CAS" || user.role === "GVP") &&
+        getPresidentId(user, users) === managerPresidentId)
+    : [];
+  const visibleUsers = managedRole && isTeamManager
+    ? managedRole === "GVP"
+      ? organizationUsers
+      : organizationUsers.filter((user) => user.role === managedRole)
+    : isPresidentManager
     ? users.filter(
         (user) =>
           (user.role === "CAS" || user.role === "GVP") &&
@@ -149,6 +254,14 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
     setError("");
   };
 
+  const canEditUser = (user) =>
+    isPresidentManager ||
+    (isCasManager && manager.canInsertCas && user.role === "CAS" && user.id !== manager.id) ||
+    (isCasManager && manager.canInsertGvp && user.role === "GVP" && getPresidentId(user, users) === managerPresidentId);
+  const canEditManagedUser = (user) =>
+    canEditUser(user) ||
+    (isGvpManager && manager.canInsertGvp && user.role === "GVP");
+
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -167,6 +280,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
         ...current,
         [name]: value,
         ...(name === "presidentId" ? { casId: "" } : {}),
+        ...(name === "presidentId" ? { casIds: [] } : {}),
       };
     });
     setError("");
@@ -181,26 +295,22 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       : role === "CAS" || role === "GVP"
         ? form.presidentId || getDefaultPresidentId(role, manager, users)
         : "";
-    const validPresidentId = users.some(
-      (user) => user.id === presidentId && user.role === "Presidente",
+    const validPresidentId = (
+      (isTeamManager && presidentId === managerPresidentId) ||
+      users.some((user) => user.id === presidentId && user.role === "Presidente")
     )
       ? presidentId
       : "";
-    const validCasId =
-      role === "GVP" &&
-      (
-        (manager?.role === "CAS" && form.casId === manager.id) ||
-        users.some(
-          (user) =>
-            user.id === form.casId &&
-            user.role === "CAS" &&
-            (manager?.role === "CAS"
-              ? user.id === manager.id
-              : getPresidentId(user, users) === validPresidentId),
-        )
-      )
-        ? form.casId
-        : "";
+    const requestedCasIds = Array.isArray(form.casIds)
+      ? form.casIds
+      : form.casId ? [form.casId] : [];
+    const validCasIds = role === "GVP"
+      ? [...new Set(requestedCasIds)].filter((casId) => users.some(
+          (user) => user.id === casId && user.role === "CAS" &&
+            getPresidentId(user, users) === (manager?.role === "CAS" ? managerPresidentId : validPresidentId),
+        ))
+      : [];
+    const validCasId = validCasIds[0] || "";
     const hospitalAssignments = role === "CAS"
       ? formHospitalAssignments.flatMap((assignment) => {
           const hospital = availableHospitals.find(
@@ -259,10 +369,26 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       role,
       presidentId: resolvedPresidentId,
       casId: validCasId,
+      casIds: validCasIds,
       hospitalAssignments,
       hospitalId: firstAssignment?.hospitalId || "",
       departmentId: firstAssignment?.departmentIds[0] || "",
       associationId: role === "CAS" ? resolvedPresidentId : validCasId,
+      canInsertCas: role === "CAS"
+        ? isPresidentManager
+          ? Boolean(form.canInsertCas)
+          : Boolean(editingUser?.canInsertCas)
+        : false,
+      canInsertGvp: role === "CAS"
+        ? isPresidentManager
+          ? Boolean(form.canInsertGvp)
+          : Boolean(editingUser?.canInsertGvp)
+        : false,
+      ...(role === "GVP" ? {
+        canInsertGvp: (isPresidentManager || isCasManager)
+          ? Boolean(form.canInsertGvp)
+          : Boolean(editingUser?.canInsertGvp),
+      } : {}),
     };
 
     if (isEditing) {
@@ -279,19 +405,21 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
           if (
             editingUser?.role === "CAS" &&
             user.role === "GVP" &&
-            getCasId(user) === editingId
+            getCasIds(user).includes(editingId)
           ) {
             return role === "CAS"
               ? {
                   ...user,
                   presidentId: validPresidentId,
                   casId: editingId,
+                  casIds: [...new Set([...getCasIds(user).filter((id) => id !== editingId), editingId])],
                   associationId: editingId,
                 }
               : {
                   ...user,
-                  casId: "",
-                  associationId: "",
+                  casId: getCasIds(user).filter((id) => id !== editingId)[0] || "",
+                  casIds: getCasIds(user).filter((id) => id !== editingId),
+                  associationId: getCasIds(user).filter((id) => id !== editingId)[0] || "",
                 };
           }
 
@@ -324,7 +452,10 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       role: availableRoles.includes(user.role) ? user.role : availableRoles[0],
       presidentId: getPresidentId(user, users),
       casId: getCasId(user),
+      casIds: getCasIds(user),
       hospitalAssignments: getHospitalAssignments(user),
+      canInsertCas: Boolean(user.canInsertCas),
+      canInsertGvp: Boolean(user.canInsertGvp),
     });
     setError("");
   };
@@ -385,7 +516,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       users
         .filter(
           (candidate) =>
-            candidate.role === "GVP" && getCasId(candidate) === user.id,
+            candidate.role === "GVP" && getCasIds(candidate).includes(user.id),
         )
         .forEach((candidate) => userIdsToDelete.add(candidate.id));
     }
@@ -425,8 +556,10 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
     }
 
     if (user.role === "GVP") {
-      const casUser = users.find((candidate) => candidate.id === getCasId(user));
-      return casUser?.username || "";
+      return users
+        .filter((candidate) => getCasIds(user).includes(candidate.id))
+        .map((candidate) => candidate.username)
+        .join(", ");
     }
 
     return null;
@@ -458,6 +591,25 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
   };
 
   const presidents = users.filter((user) => user.role === "Presidente");
+  if (managedRole === "GVP") {
+    visibleUsers
+      .filter((user) => user.role === "CAS")
+      .forEach((casUser) => {
+        addUser(casUser);
+        visibleUsers
+          .filter((user) => user.role === "GVP" && getCasIds(user).includes(casUser.id))
+          .forEach((user) => {
+            orderedUsers.push({ ...user, _rowKey: `${casUser.id}-${user.id}` });
+            addedUserIds.add(user.id);
+          });
+      });
+    visibleUsers
+      .filter((user) => user.role === "GVP" && !getCasId(user))
+      .forEach((user) => {
+        orderedUsers.push({ ...user, _rowKey: `free-${user.id}` });
+        addedUserIds.add(user.id);
+      });
+  }
   presidents.forEach((president) => {
     if (visibleUsers.some((user) => user.id === president.id)) {
       addUser(president);
@@ -471,7 +623,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       addUser(casUser);
       visibleUsers
         .filter(
-          (user) => user.role === "GVP" && getCasId(user) === casUser.id,
+          (user) => user.role === "GVP" && getCasIds(user).includes(casUser.id),
         )
         .forEach(addUser);
     });
@@ -488,16 +640,15 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
   visibleUsers.filter((user) => !addedUserIds.has(user.id)).forEach(addUser);
 
   const canFilterTeam = manager?.role === "Admin" || isPresidentManager || isCasManager;
-  const filterPresidentId = isPresidentManager ? manager.id : "";
-  const filterCasUsers = isCasManager
-    ? [manager]
-    : users.filter(
-        (user) =>
-          user.role === "CAS" &&
-          (!filterPresidentId || getPresidentId(user, users) === filterPresidentId),
-      );
+  const filterPresidentId = isTeamManager ? managerPresidentId : "";
+  const filterCasUsers = users.filter(
+    (user) =>
+      user.role === "CAS" &&
+      (!filterPresidentId || getPresidentId(user, users) === filterPresidentId),
+  );
   const selectedFilterCas = filterCasUsers.find((user) => user.id === casFilter);
-  const tabbedOrderedUsers = isTeamManager
+  const hasGvpTabs = isTeamManager && (managedRole === "GVP" || !managedRole);
+  const tabbedOrderedUsers = hasGvpTabs
     ? orderedUsers.filter((user) =>
         teamTab === "free"
           ? user.role === "GVP" && !getCasId(user)
@@ -517,7 +668,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
             return casFilter !== "all" && user.id === casFilter;
           }
           if (user.role !== "GVP") return false;
-          return casFilter === "all" || getCasId(user) === casFilter;
+          return casFilter === "none" ? getCasIds(user).length === 0 : getCasIds(user).includes(casFilter);
         });
 
   return (
@@ -525,7 +676,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       <div className="app-content-header">
         <div className="container-fluid">
           <h1 className="mb-0">
-            {isPresidentManager
+            {managedRole
+              ? managedRole
+              : isPresidentManager
               ? "La mia squadra"
               : isCasManager
                 ? "GVP assegnati e liberi"
@@ -539,7 +692,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
       <div className="app-content">
         <div className="container-fluid">
           <div className="row g-3">
-            <div className="col-12 col-lg-5">
+            {canCreateManagedRole && <div className="col-12 col-lg-5">
               <section className="card">
                 <div className="card-header">
                   <h2 className="card-title">
@@ -570,21 +723,23 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                       />
                     </div>
 
-                    <div className="mb-3">
-                      <label className="form-label" htmlFor="user-role">Ruolo</label>
-                      <select
-                        className="form-select"
-                        id="user-role"
-                        name="role"
-                        value={form.role}
-                        onChange={handleChange}
-                        required
-                      >
-                        {availableRoles.map((role) => (
-                          <option key={role} value={role}>{role}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {!managedRole && (
+                      <div className="mb-3">
+                        <label className="form-label" htmlFor="user-role">Ruolo</label>
+                        <select
+                          className="form-select"
+                          id="user-role"
+                          name="role"
+                          value={form.role}
+                          onChange={handleChange}
+                          required
+                        >
+                          {availableRoles.map((role) => (
+                            <option key={role} value={role}>{role}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     {!isTeamManager &&
                       (form.role === "CAS" || form.role === "GVP") && (
@@ -615,22 +770,15 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                         <label className="form-label" htmlFor="user-cas">
                           CAS associato
                         </label>
-                        <select
-                          className="form-select"
-                          id="user-cas"
-                          name="casId"
-                          value={form.casId}
-                          onChange={handleChange}
-                        >
-                          <option value="">Nessun CAS</option>
-                          {casCandidates.map((casUser) => (
-                            <option key={casUser.id} value={casUser.id}>
-                              {casUser.id === manager?.id
-                                ? `${casUser.username} (io)`
-                                : casUser.username}
-                            </option>
-                          ))}
-                        </select>
+                        <CasMultiSelect
+                          options={casCandidates.map((casUser) => ({
+                            ...casUser,
+                            username: casUser.id === manager?.id ? `${casUser.username} (io)` : casUser.username,
+                          }))}
+                          value={form.casIds}
+                          onChange={(casIds) => setForm((current) => ({ ...current, casIds }))}
+                        />
+                        <div className="form-text">Puoi selezionare più CAS. Non selezionarne alcuno per lasciare il GVP libero.</div>
                       </div>
                     )}
 
@@ -672,6 +820,66 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                           Se non selezioni reparti, il CAS viene associato all'intero ospedale.
                         </div>
                       </fieldset>
+                    )}
+
+                    {form.role === "CAS" && isPresidentManager && (
+                      <div className="mb-3">
+                        <div className="form-check form-switch">
+                          <input
+                            className="form-check-input"
+                            id="user-can-insert-cas"
+                            type="checkbox"
+                            checked={Boolean(form.canInsertCas)}
+                            onChange={(event) => setForm((current) => ({
+                              ...current,
+                              canInsertCas: event.target.checked,
+                            }))}
+                          />
+                          <label className="form-check-label" htmlFor="user-can-insert-cas">
+                            Inserimento CAS
+                          </label>
+                          <div className="form-text">
+                            Permette a questo CAS di inserire e modificare altri CAS.
+                          </div>
+                        </div>
+                        <div className="form-check form-switch mt-3">
+                          <input
+                            className="form-check-input"
+                            id="user-can-insert-gvp"
+                            type="checkbox"
+                            checked={Boolean(form.canInsertGvp)}
+                            onChange={(event) => setForm((current) => ({
+                              ...current,
+                              canInsertGvp: event.target.checked,
+                            }))}
+                          />
+                          <label className="form-check-label" htmlFor="user-can-insert-gvp">
+                            Inserimento GVP
+                          </label>
+                          <div className="form-text">
+                            Permette a questo CAS di inserire e modificare i GVP assegnati o liberi.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {form.role === "GVP" && (isPresidentManager || (isCasManager && manager.canInsertGvp)) && (
+                      <div className="form-check form-switch mb-3">
+                        <input
+                          className="form-check-input"
+                          id="user-gvp-can-insert-gvp"
+                          type="checkbox"
+                          checked={Boolean(form.canInsertGvp)}
+                          onChange={(event) => setForm((current) => ({
+                            ...current,
+                            canInsertGvp: event.target.checked,
+                          }))}
+                        />
+                        <label className="form-check-label" htmlFor="user-gvp-can-insert-gvp">
+                          Inserimento GVP
+                        </label>
+                        <div className="form-text">Permette a questo GVP di inserire e modificare altri GVP.</div>
+                      </div>
                     )}
 
                     <div className="mb-0">
@@ -722,17 +930,17 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                   </div>
                 </form>
               </section>
-            </div>
+            </div>}
 
-            <div className="col-12 col-lg-7">
+            <div className={canCreateManagedRole ? "col-12 col-lg-7" : "col-12"}>
               <section className="card">
                 <div className="card-header">
                   <h2 className="card-title">
-                    {manager?.role === "Admin" ? "Elenco presidenti" : "Elenco utenti"}
+                    {manager?.role === "Admin" ? "Elenco presidenti" : managedRole ? `Elenco ${managedRole}` : "Elenco utenti"}
                   </h2>
                 </div>
                 <div className="card-body p-0">
-                  {isTeamManager && (
+                  {hasGvpTabs && (
                     <ul className="nav nav-tabs px-3 pt-3" role="tablist" aria-label="Visualizzazione squadra">
                       <li className="nav-item" role="presentation">
                         <button
@@ -745,7 +953,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                             setCasFilter("all");
                           }}
                         >
-                          {isPresidentManager ? "CAS e GVP associati" : "GVP associati"}
+                          {managedRole === "GVP" ? "GVP associati" : isPresidentManager ? "CAS e GVP associati" : "GVP associati"}
                         </button>
                       </li>
                       <li className="nav-item" role="presentation">
@@ -759,12 +967,12 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                             setCasFilter("all");
                           }}
                         >
-                          GVP liberi
+                          GVP non associati
                         </button>
                       </li>
                     </ul>
                   )}
-                  {canFilterTeam && (!isTeamManager || teamTab === "associated") && (
+                  {canFilterTeam && managedRole !== "CAS" && (!hasGvpTabs || teamTab === "associated") && (
                     <div className="row g-3 p-3 border-bottom">
                       <div className="col-12 col-md-6">
                         <label className="form-label" htmlFor="users-cas-filter">Filtra per CAS</label>
@@ -795,10 +1003,15 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                         ) : (
                         <tr>
                           <th className="user-name-column">Nome utente</th>
-                          <th>Ruolo</th>
-                          <th>Associato a</th>
+                          {!managedRole && <th>Ruolo</th>}
+                          {managedRole !== "CAS" && <th>Associato a</th>}
                           <th>Sede</th>
-                          <th>Password</th>
+                          {managedRole ? (
+                            <>
+                              {managedRole === "CAS" && <th className="text-center">Inserimento CAS</th>}
+                              <th className="text-center">Inserimento GVP</th>
+                            </>
+                          ) : <th>Password</th>}
                           <th className="text-end">Azioni</th>
                         </tr>
                         )}
@@ -806,7 +1019,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                       <tbody>
                         {filteredOrderedUsers.length === 0 ? (
                           <tr>
-                            <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "4" : "6"}>
+                            <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "4" : managedRole ? "5" : "6"}>
                               {casFilter !== "all"
                                 ? "Nessun utente corrisponde ai filtri selezionati."
                                 : isTeamManager && teamTab === "free"
@@ -836,6 +1049,16 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                               (candidate) => candidate.role === "GVP" && getPresidentId(candidate, users) === user.id,
                             ).length;
 
+                            if (managedRole === "GVP" && user.role === "CAS") {
+                              return (
+                                <tr className="table-light" key={user._rowKey || user.id}>
+                                  <td className="fw-semibold" colSpan="5">
+                                    CAS: {user.username}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
                             if (manager?.role === "Admin") {
                               return (
                                 <tr key={user.id}>
@@ -850,7 +1073,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                             return (
                               <tr
                                 className={isUnassigned ? "user-row-unassigned" : ""}
-                                key={user.id}
+                                key={user._rowKey || user.id}
                               >
                                 <td className="fw-medium user-name-column">
                                   {requiresPresident && (
@@ -867,12 +1090,12 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                                   )}
                                   {user.username}
                                 </td>
-                                <td>
+                                {!managedRole && <td>
                                   <span className="badge text-bg-secondary">
                                     {roles.includes(user.role) ? user.role : "Admin"}
                                   </span>
-                                </td>
-                                <td>
+                                </td>}
+                                {managedRole !== "CAS" && <td>
                                   {associationLabel ? (
                                     <span className="badge text-bg-success association-badge">
                                       {associationLabel}
@@ -888,7 +1111,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                                   ) : (
                                     <span className="text-secondary">-</span>
                                   )}
-                                </td>
+                                </td>}
                                 <td>
                                   {user.role === "CAS" ? (
                                     hospitalLabels.length > 0 ? (
@@ -908,15 +1131,37 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null }) => {
                                     <span className="text-secondary">-</span>
                                   )}
                                 </td>
-                                <td aria-label="Password impostata">********</td>
+                                {managedRole ? (
+                                  <>
+                                    {managedRole === "CAS" && <td className="text-center">
+                                      <span
+                                        className={`badge ${user.canInsertCas ? "text-bg-success" : "text-bg-danger"}`}
+                                        aria-label={user.canInsertCas ? "Permesso attivo" : "Permesso non attivo"}
+                                        title={user.canInsertCas ? "Sì" : "No"}
+                                      >
+                                        {user.canInsertCas ? "✓" : "×"}
+                                      </span>
+                                    </td>}
+                                    <td className="text-center">
+                                      <span
+                                        className={`badge ${user.canInsertGvp ? "text-bg-success" : "text-bg-danger"}`}
+                                        aria-label={user.canInsertGvp ? "Permesso attivo" : "Permesso non attivo"}
+                                        title={user.canInsertGvp ? "Sì" : "No"}
+                                      >
+                                        {user.canInsertGvp ? "✓" : "×"}
+                                      </span>
+                                    </td>
+                                  </>
+                                ) : <td aria-label="Password impostata">********</td>}
                                 <td className="text-end">
-                                  <button
+                                  {canEditManagedUser(user) && <button
                                     className="btn btn-outline-primary btn-sm"
                                     type="button"
                                     onClick={() => handleEdit(user)}
                                   >
                                     Modifica
                                   </button>
+                                  }
                                 </td>
                               </tr>
                             );
