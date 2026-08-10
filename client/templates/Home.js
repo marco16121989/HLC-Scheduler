@@ -408,6 +408,7 @@ export const Home = ({
             patients={patients}
             setPatients={setPatients}
             doctors={doctors}
+            hospitals={hospitals}
             users={users}
             currentUser={user}
             presidentId={presidentId}
