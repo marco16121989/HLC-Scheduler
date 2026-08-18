@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Meteor } from "meteor/meteor";
 
 const emptyForm = () => ({ id: "", startDate: "", endDate: "", note: "" });
@@ -6,61 +6,14 @@ const formatDate = (value) => value
   ? new Intl.DateTimeFormat("it-IT", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`))
   : "-";
 
-const SearchableMemberSelect = ({ id, options, value, allLabel, placeholder, onChange }) => {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const rootRef = useRef(null);
-  const selected = options.find((option) => option.id === value);
-  const filtered = options.filter((option) =>
-    option.username.toLocaleLowerCase("it-IT").includes(search.trim().toLocaleLowerCase("it-IT")),
-  );
-
-  useEffect(() => {
-    const closeOnOutsideClick = (event) => {
-      if (!rootRef.current?.contains(event.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, []);
-
-  const select = (nextValue) => {
-    onChange(nextValue);
-    setOpen(false);
-    setSearch("");
-  };
-
-  return <div className="position-relative" ref={rootRef}>
-    <button className="form-select text-start" id={id} type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
-      {selected?.username || allLabel}
-    </button>
-    {open && <div className="dropdown-menu show w-100 p-2 shadow" style={{ maxHeight: "18rem", overflowY: "auto", zIndex: 1050 }}>
-      <input className="form-control mb-2" type="search" value={search} placeholder={placeholder} onChange={(event) => setSearch(event.target.value)} autoFocus />
-      <button className={`dropdown-item ${value === "all" ? "active" : ""}`} type="button" onClick={() => select("all")}>{allLabel}</button>
-      {filtered.length === 0 ? <div className="small text-secondary p-2">Nessun risultato.</div> : filtered.map((option) =>
-        <button className={`dropdown-item ${value === option.id ? "active" : ""}`} type="button" key={option.id} onClick={() => select(option.id)}>{option.username}</button>
-      )}
-    </div>}
-  </div>;
-};
-
 export const Absences = ({ absences = [], users = [], currentUser }) => {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
-  const [periodFrom, setPeriodFrom] = useState("");
-  const [periodTo, setPeriodTo] = useState("");
-  const [casMemberId, setCasMemberId] = useState("all");
-  const [gvpMemberId, setGvpMemberId] = useState("all");
   const isEditing = Boolean(form.id);
-  const canViewOrganization = ["Presidente", "CAS"].includes(currentUser?.role);
-  const casMemberOptions = users.filter((user) => user.role === "CAS");
-  const gvpMemberOptions = users.filter((user) => user.role === "GVP");
-  const visibleAbsences = absences.filter((absence) => {
-    const selectedMemberId = casMemberId !== "all" ? casMemberId : gvpMemberId !== "all" ? gvpMemberId : "all";
-    const matchesMember = selectedMemberId === "all" || absence.userId === selectedMemberId;
-    const overlapsStart = !periodFrom || absence.endDate >= periodFrom;
-    const overlapsEnd = !periodTo || absence.startDate <= periodTo;
-    return matchesMember && overlapsStart && overlapsEnd;
-  });
+  const canViewAllAbsences = ["Presidente", "CAS"].includes(currentUser?.role);
+  const visibleAbsences = canViewAllAbsences
+    ? absences
+    : absences.filter((absence) => absence.userId === currentUser?.id);
   const getAbsenceUser = (absence) =>
     users.find((user) => user.id === absence.userId) ||
     (absence.userId === currentUser?.id ? currentUser : null);
@@ -111,15 +64,9 @@ export const Absences = ({ absences = [], users = [], currentUser }) => {
         </div></form>
       </section></div>
       <div className="col-12 col-lg-7"><section className="card">
-        <div className="card-header"><h2 className="card-title">{canViewOrganization ? "Assenze dell'organizzazione" : "Le mie assenze"}</h2></div>
-        {canViewOrganization && <div className="card-body border-bottom"><div className="row g-3">
-          <div className="col-12 col-md-3"><label className="form-label" htmlFor="absence-filter-from">Periodo dal</label><input className="form-control" id="absence-filter-from" type="date" value={periodFrom} onChange={(event) => setPeriodFrom(event.target.value)} /></div>
-          <div className="col-12 col-md-3"><label className="form-label" htmlFor="absence-filter-to">Periodo al</label><input className="form-control" id="absence-filter-to" type="date" min={periodFrom} value={periodTo} onChange={(event) => setPeriodTo(event.target.value)} /></div>
-          <div className="col-12 col-md-3"><label className="form-label" htmlFor="absence-filter-cas">CAS</label><SearchableMemberSelect id="absence-filter-cas" options={casMemberOptions} value={casMemberId} allLabel="Tutti i CAS" placeholder="Cerca CAS..." onChange={(value) => { setCasMemberId(value); if (value !== "all") setGvpMemberId("all"); }} /></div>
-          <div className="col-12 col-md-3"><label className="form-label" htmlFor="absence-filter-gvp">GVP</label><SearchableMemberSelect id="absence-filter-gvp" options={gvpMemberOptions} value={gvpMemberId} allLabel="Tutti i GVP" placeholder="Cerca GVP..." onChange={(value) => { setGvpMemberId(value); if (value !== "all") setCasMemberId("all"); }} /></div>
-        </div></div>}
-        <div className="card-body p-0"><div className="table-responsive"><table className="table table-hover align-middle mb-0 mobile-card-table"><thead><tr>{canViewOrganization && <th>Membro</th>}<th>Dal</th><th>Al</th><th>Nota</th><th className="text-end">Azioni</th></tr></thead><tbody>
-          {visibleAbsences.length === 0 ? <tr><td className="text-center text-secondary py-4" colSpan={canViewOrganization ? "5" : "4"}>Nessun periodo di assenza corrisponde ai filtri.</td></tr> : visibleAbsences.map((absence) => { const absenceUser = getAbsenceUser(absence); const isOwn = absence.userId === currentUser?.id; return <tr key={absence.id}>{canViewOrganization && <td data-label="Membro"><div className="fw-medium">{absenceUser?.username || absence.username || "Utente"}</div><span className="badge text-bg-secondary">{absenceUser?.role || "-"}</span></td>}<td data-label="Dal">{formatDate(absence.startDate)}</td><td data-label="Al">{formatDate(absence.endDate)}</td><td data-label="Nota">{absence.note || <span className="text-secondary">-</span>}</td><td className="text-end" data-label="Azioni">{isOwn && <div className="d-inline-flex gap-2"><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => { setForm({ id: absence.id, startDate: absence.startDate, endDate: absence.endDate, note: absence.note || "" }); setError(""); }}>Modifica</button><button className="btn btn-outline-danger btn-sm" type="button" onClick={() => remove(absence)}>Elimina</button></div>}</td></tr>; })}
+        <div className="card-header"><h2 className="card-title">{canViewAllAbsences ? "Assenze degli utenti" : "Le mie assenze"}</h2></div>
+        <div className="card-body p-0"><div className="table-responsive"><table className="table table-hover align-middle mb-0 mobile-card-table"><thead><tr>{canViewAllAbsences && <th>Utente</th>}<th>Dal</th><th>Al</th><th>Nota</th><th className="text-end">Azioni</th></tr></thead><tbody>
+          {visibleAbsences.length === 0 ? <tr><td className="text-center text-secondary py-4" colSpan={canViewAllAbsences ? "5" : "4"}>Nessun periodo di assenza inserito.</td></tr> : visibleAbsences.map((absence) => { const absenceUser = getAbsenceUser(absence); const isOwn = absence.userId === currentUser?.id; return <tr key={absence.id}>{canViewAllAbsences && <td data-label="Utente"><div className="fw-medium">{absenceUser?.username || absence.username || "Utente"}</div><span className="badge text-bg-secondary">{absenceUser?.role || "-"}</span></td>}<td data-label="Dal">{formatDate(absence.startDate)}</td><td data-label="Al">{formatDate(absence.endDate)}</td><td data-label="Nota">{absence.note || <span className="text-secondary">-</span>}</td><td className="text-end" data-label="Azioni">{isOwn && <div className="d-inline-flex gap-2"><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => { setForm({ id: absence.id, startDate: absence.startDate, endDate: absence.endDate, note: absence.note || "" }); setError(""); }}>Modifica</button><button className="btn btn-outline-danger btn-sm" type="button" onClick={() => remove(absence)}>Elimina</button></div>}</td></tr>; })}
         </tbody></table></div></div>
       </section></div>
     </div></div></div>
