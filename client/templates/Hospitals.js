@@ -13,7 +13,7 @@ const DEFAULT_DEPARTMENTS = [
   "Radiologia interventistica", "Terapia intensiva/Rianimazione", "Urologia",
 ];
 
-export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
+export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], presidentId }) => {
   const [name, setName] = useState("");
   const [director, setDirector] = useState("");
   const [departments, setDepartments] = useState([]);
@@ -25,6 +25,9 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
   const isEditing = editingId !== null;
   const visibleHospitals = hospitals.filter(
     (hospital) => hospital.presidentId === presidentId,
+  );
+  const visibleDepartmentTemplates = departmentTemplates.filter(
+    (department) => department.presidentId === presidentId,
   );
   const resetForm = () => {
     setName("");
@@ -41,21 +44,21 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
     setModalOpen(true);
   };
 
-  const toggleDepartment = (departmentName) => {
+  const toggleDepartment = (departmentTemplate) => {
     setDepartments((current) => {
       const selected = current.find(
-        (department) => department.name.toLowerCase() === departmentName.toLowerCase(),
+        (department) => department.templateId === departmentTemplate.id || department.name.toLowerCase() === departmentTemplate.name.toLowerCase(),
       );
       return selected
         ? current.filter((department) => department.id !== selected.id)
-        : [...current, { id: crypto.randomUUID(), name: departmentName, head: "" }];
+        : [...current, { id: crypto.randomUUID(), templateId: departmentTemplate.id, name: departmentTemplate.name, head: "" }];
     });
     setError("");
   };
 
-  const allDefaultDepartmentsSelected = DEFAULT_DEPARTMENTS.every((departmentName) =>
+  const allDefaultDepartmentsSelected = visibleDepartmentTemplates.length > 0 && visibleDepartmentTemplates.every((departmentTemplate) =>
     departments.some(
-      (department) => department.name.toLowerCase() === departmentName.toLowerCase(),
+      (department) => department.templateId === departmentTemplate.id || department.name.toLowerCase() === departmentTemplate.name.toLowerCase(),
     ),
   );
 
@@ -63,17 +66,17 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
     setDepartments((current) => {
       if (allDefaultDepartmentsSelected) {
         return current.filter(
-          (department) => !DEFAULT_DEPARTMENTS.some(
-            (name) => name.toLowerCase() === department.name.toLowerCase(),
+          (department) => !visibleDepartmentTemplates.some(
+            (template) => template.id === department.templateId || template.name.toLowerCase() === department.name.toLowerCase(),
           ),
         );
       }
 
-      const missingDepartments = DEFAULT_DEPARTMENTS
-        .filter((name) => !current.some(
-          (department) => department.name.toLowerCase() === name.toLowerCase(),
+      const missingDepartments = visibleDepartmentTemplates
+        .filter((template) => !current.some(
+          (department) => department.templateId === template.id || department.name.toLowerCase() === template.name.toLowerCase(),
         ))
-        .map((name) => ({ id: crypto.randomUUID(), name, head: "" }));
+        .map((template) => ({ id: crypto.randomUUID(), templateId: template.id, name: template.name, head: "" }));
       return [...current, ...missingDepartments];
     });
     setError("");
@@ -128,11 +131,17 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
       name: normalizedName,
       director: normalizedDirector,
       presidentId,
-      departments: departments.map((department) => ({
-        ...department,
-        name: department.name.trim(),
-        head: (department.head || "").trim(),
-      })),
+      departments: departments.map((department) => {
+        const template = visibleDepartmentTemplates.find(
+          (item) => item.id === department.templateId || item.name.toLowerCase() === department.name.toLowerCase(),
+        );
+        return {
+          ...department,
+          ...(template ? { templateId: template.id } : {}),
+          name: template?.name || department.name.trim(),
+          head: (department.head || "").trim(),
+        };
+      }),
     };
 
     if (isEditing) {
@@ -291,29 +300,30 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
 
                     <fieldset className="hospital-departments-fieldset">
                       <legend className="form-label">Reparti</legend>
+                      {visibleDepartmentTemplates.length === 0 && <div className="alert alert-info py-2">Inserisci prima almeno un reparto dalla sezione Reparti.</div>}
                       <label className="form-check hospital-select-all-departments mb-3">
-                        <input className="form-check-input" type="checkbox" checked={allDefaultDepartmentsSelected} onChange={toggleAllDepartments} />
+                        <input className="form-check-input" type="checkbox" checked={allDefaultDepartmentsSelected} onChange={toggleAllDepartments} disabled={visibleDepartmentTemplates.length === 0} />
                         <span className="form-check-label fw-semibold">Seleziona tutti i reparti</span>
                       </label>
                       <div className="hospital-default-departments">
-                        {DEFAULT_DEPARTMENTS.map((departmentName) => {
+                        {visibleDepartmentTemplates.map((departmentTemplate) => {
                           const selectedDepartment = departments.find(
-                            (department) => department.name.toLowerCase() === departmentName.toLowerCase(),
+                            (department) => department.templateId === departmentTemplate.id || department.name.toLowerCase() === departmentTemplate.name.toLowerCase(),
                           );
-                          return <div className={`hospital-default-department ${selectedDepartment ? "selected" : ""}`} key={departmentName}>
+                          return <div className={`hospital-default-department ${selectedDepartment ? "selected" : ""}`} key={departmentTemplate.id}>
                             <label className="form-check mb-0">
-                              <input className="form-check-input" type="checkbox" checked={Boolean(selectedDepartment)} onChange={() => toggleDepartment(departmentName)} />
-                              <span className="form-check-label">{departmentName}</span>
+                              <input className="form-check-input" type="checkbox" checked={Boolean(selectedDepartment)} onChange={() => toggleDepartment(departmentTemplate)} />
+                              <span className="form-check-label">{departmentTemplate.name}</span>
                             </label>
-                            {selectedDepartment && <input className="form-control form-control-sm mt-2" type="text" value={selectedDepartment.head || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "head", event.target.value)} aria-label={`Primario di ${departmentName}`} placeholder="Primario (facoltativo)" />}
+                            {selectedDepartment && <input className="form-control form-control-sm mt-2" type="text" value={selectedDepartment.head || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "head", event.target.value)} aria-label={`Primario di ${departmentTemplate.name}`} placeholder="Primario (facoltativo)" />}
                           </div>;
                         })}
                       </div>
 
-                      {departments.filter((department) => !DEFAULT_DEPARTMENTS.some((name) => name.toLowerCase() === department.name.toLowerCase())).length > 0 && <div className="mt-3">
+                      {departments.filter((department) => !visibleDepartmentTemplates.some((template) => template.id === department.templateId || template.name.toLowerCase() === department.name.toLowerCase())).length > 0 && <div className="mt-3">
                         <div className="form-label">Altri reparti già salvati</div>
                         <div className="hospital-department-list">
-                          {departments.filter((department) => !DEFAULT_DEPARTMENTS.some((name) => name.toLowerCase() === department.name.toLowerCase())).map((department) => <div className="hospital-department-row" key={department.id}>
+                          {departments.filter((department) => !visibleDepartmentTemplates.some((template) => template.id === department.templateId || template.name.toLowerCase() === department.name.toLowerCase())).map((department) => <div className="hospital-department-row" key={department.id}>
                             <input className="form-control form-control-sm" type="text" value={department.name} onChange={(event) => updateDepartment(department.id, "name", event.target.value)} aria-label="Nome reparto" required />
                             <input className="form-control form-control-sm" type="text" value={department.head || ""} onChange={(event) => updateDepartment(department.id, "head", event.target.value)} aria-label={`Primario di ${department.name}`} placeholder="Primario (facoltativo)" />
                             <button className="btn btn-outline-danger btn-sm" type="button" aria-label={`Rimuovi ${department.name}`} onClick={() => removeDepartment(department.id)}>&times;</button>
@@ -358,7 +368,7 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
                 </div>
                 <div className="card-body p-0">
                   <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0">
+                    <table className="table table-hover align-middle mb-0 mobile-card-table">
                       <thead>
                         <tr>
                           <th>Ospedale</th>
@@ -377,19 +387,19 @@ export const Hospitals = ({ hospitals, setHospitals, presidentId }) => {
                         ) : (
                           visibleHospitals.map((hospital) => (
                             <tr key={hospital.id}>
-                              <td className="fw-medium">
+                              <td className="fw-medium" data-label="Ospedale">
                                 <div className="d-flex align-items-center gap-2 flex-wrap">
                                   <span>{hospital.name}</span>
                                   <button className="badge text-bg-primary border-0" type="button" onClick={() => setDepartmentListHospital(normalizeHospital(hospital))}>{hospital.departments.length} reparti</button>
                                 </div>
                               </td>
-                              <td>{hospital.director || "-"}</td>
-                              <td>
+                              <td data-label="Direttore">{hospital.director || "-"}</td>
+                              <td data-label="Reparti">
                                 <button className="btn btn-outline-secondary btn-sm" type="button" onClick={() => setDepartmentListHospital(normalizeHospital(hospital))}>
                                   Visualizza reparti
                                 </button>
                               </td>
-                              <td className="text-end">
+                              <td className="text-end" data-label="Azioni">
                                 <button
                                   className="btn btn-outline-primary btn-sm"
                                   type="button"

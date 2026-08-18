@@ -5,6 +5,13 @@ import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPd
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 
+const PATIENT_STATUSES = [
+  "In attesa di ricovero",
+  "Ricoverato",
+  "Dimesso",
+  "Deceduto",
+];
+
 const getPatientGvpIds = (patient) =>
   Array.isArray(patient?.gvpIds)
     ? patient.gvpIds
@@ -254,6 +261,7 @@ export const Patients = ({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [admissionType, setAdmissionType] = useState("emergency");
+  const [patientStatus, setPatientStatus] = useState(PATIENT_STATUSES[0]);
   const [admissionDate, setAdmissionDate] = useState(getToday);
   const [pathology, setPathology] = useState("");
   const [doctorId, setDoctorId] = useState("");
@@ -265,6 +273,7 @@ export const Patients = ({
     currentUser.role === "CAS" ? currentUser.id : "all",
   );
   const [gvpPatientScope, setGvpPatientScope] = useState("mine");
+  const [statusFilter, setStatusFilter] = useState("Ricoverato");
   const [notes, setNotes] = useState("");
   const [details, setDetails] = useState({ isMinorOrNewborn: "No" });
   const [editingId, setEditingId] = useState(null);
@@ -288,7 +297,7 @@ export const Patients = ({
   const organizationPatients = patients.filter(
     (patient) => patient.presidentId === presidentId,
   );
-  const visiblePatients = isGvp
+  const roleFilteredPatients = isGvp
     ? organizationPatients.filter((patient) => {
         const patientGvpIds = getPatientGvpIds(patient);
         const isMine = patientGvpIds.includes(currentUser.id) || patient.casId === currentUser.id;
@@ -297,6 +306,11 @@ export const Patients = ({
     : currentUser.role === "CAS" && casFilter !== "all"
       ? organizationPatients.filter((patient) => patient.casId === casFilter)
       : organizationPatients;
+  const visiblePatients = statusFilter === "all"
+    ? roleFilteredPatients
+    : roleFilteredPatients.filter(
+        (patient) => (patient.status || PATIENT_STATUSES[0]) === statusFilter,
+      );
   const currentNotePatient = notePatient
     ? visiblePatients.find((patient) => patient.id === notePatient.id) || notePatient
     : null;
@@ -380,6 +394,7 @@ export const Patients = ({
     setFirstName("");
     setLastName("");
     setAdmissionType("emergency");
+    setPatientStatus(PATIENT_STATUSES[0]);
     setAdmissionDate(getToday());
     setPathology("");
     setDoctorId("");
@@ -494,6 +509,9 @@ export const Patients = ({
       lastName: normalizedLastName,
       admissionType:
         admissionType === "scheduled" ? "scheduled" : "emergency",
+      status: PATIENT_STATUSES.includes(patientStatus)
+        ? patientStatus
+        : PATIENT_STATUSES[0],
       admissionDate,
       pathology: normalizedPathology,
       doctorId: validDoctorId,
@@ -579,6 +597,11 @@ export const Patients = ({
     setAdmissionType(
       patient.admissionType === "scheduled" ? "scheduled" : "emergency",
     );
+    setPatientStatus(
+      PATIENT_STATUSES.includes(patient.status)
+        ? patient.status
+        : PATIENT_STATUSES[0],
+    );
     setAdmissionDate(patient.admissionDate || getToday());
     setPathology(patient.pathology || "");
     setDoctorId(patient.doctorId || "");
@@ -659,6 +682,7 @@ export const Patients = ({
     { label: "DAT compilata?", value: details.datCompleted },
     { label: "DAT registrata?", value: details.datRegistered },
     { label: "Tipo di accesso", value: admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza" },
+    { label: "Stato", value: patientStatus },
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
     { label: "Reparto", value: selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Non assegnato" },
     { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
@@ -674,6 +698,7 @@ export const Patients = ({
   const gvpSummaryEntries = [
     { label: "Nome", value: firstName },
     { label: "Cognome", value: lastName },
+    { label: "Stato", value: patientStatus },
     { label: "Congregazione", value: details.congregation },
     { label: "Età", value: details.age },
     { label: "Numero di cellulare del paziente", value: details.patientPhone },
@@ -694,6 +719,7 @@ export const Patients = ({
     { label: "DAT compilata?", value: details.datCompleted },
     { label: "DAT registrata?", value: details.datRegistered },
     { label: "Tipo di accesso", value: admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza" },
+    { label: "Stato", value: patientStatus },
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
     { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
     { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato" },
@@ -705,18 +731,29 @@ export const Patients = ({
 
   return (
     <>
-      <div className="app-content-header">
+      <div className="app-content-header patient-page-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
             <h1 className="mb-0">Pazienti</h1>
-            <div className="d-flex align-items-center gap-2">
+            <div className="d-flex align-items-center gap-2 flex-nowrap patient-header-actions">
+              <select
+                className="form-select w-auto flex-shrink-0"
+                aria-label="Filtra pazienti per stato"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+              >
+                <option value="all">Tutti gli stati</option>
+                {PATIENT_STATUSES.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
               {isGvp && (
-                <select className="form-select" aria-label="Filtra pazienti del GVP" value={gvpPatientScope} onChange={(event) => setGvpPatientScope(event.target.value)}>
+                <select className="form-select w-auto flex-shrink-0" aria-label="Filtra pazienti del GVP" value={gvpPatientScope} onChange={(event) => setGvpPatientScope(event.target.value)}>
                   <option value="mine">I miei pazienti</option>
                   <option value="all">Tutti i pazienti</option>
                 </select>
               )}
-              {!isGvp && currentUser.role === "CAS" && <select className="form-select" aria-label="Filtra pazienti per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
+              {!isGvp && currentUser.role === "CAS" && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra pazienti per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
                 <option value={currentUser.id}>I miei pazienti</option>
                 <option value="all">Tutti i pazienti</option>
                 {visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{casUser.username}</option>)}
@@ -727,7 +764,7 @@ export const Patients = ({
         </div>
       </div>
 
-      <div className="app-content">
+      <div className="app-content patient-page-content">
         <div className="container-fluid">
           {notePatient && <>
             <button className="entity-modal-backdrop" type="button" aria-label="Chiudi note" onClick={closeNotes} />
@@ -937,6 +974,22 @@ export const Patients = ({
                           </label>
                         </div>
                       </fieldset>
+                      <div className="w-100">
+                        <label className="form-label" htmlFor="patient-main-status">Stato del paziente</label>
+                        <select
+                          className="form-select"
+                          id="patient-main-status"
+                          value={patientStatus}
+                          onChange={(event) => {
+                            setPatientStatus(event.target.value);
+                            setError("");
+                          }}
+                        >
+                          {PATIENT_STATUSES.map((status) => (
+                            <option key={status} value={status}>{status}</option>
+                          ))}
+                        </select>
+                      </div>
                       <div className="patient-assignment-row row g-3 w-100">
                         <div className="col-12 col-md-3">
                           <div className="form-label">Medico responsabile</div>
@@ -1627,11 +1680,12 @@ export const Patients = ({
             </div>
             <div className="card-body p-0">
               <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0">
+                <table className="table table-hover align-middle mb-0 patient-list-table">
                   <thead>
                     {isGvp ? <tr><th>Paziente</th><th className="text-end">Azioni</th></tr> : <tr>
                       <th>Paziente</th>
                       <th>Accesso</th>
+                      <th>Stato</th>
                       <th>Data</th>
                       <th>Patologia</th>
                       <th>Medico responsabile</th>
@@ -1643,7 +1697,7 @@ export const Patients = ({
                   <tbody>
                     {visiblePatients.length === 0 ? (
                       <tr>
-                        <td className="text-center text-secondary py-4" colSpan={isGvp ? 2 : 8}>
+                        <td className="text-center text-secondary py-4" colSpan={isGvp ? 2 : 9}>
                           Nessun paziente inserito.
                         </td>
                       </tr>
@@ -1656,8 +1710,8 @@ export const Patients = ({
                           if (isGvp) {
                             return (
                               <tr key={patient.id}>
-                                <td className="fw-medium">{patient.lastName} {patient.firstName}</td>
-                                <td className="text-end"><div className="d-inline-flex gap-2"><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(patient)}>Visualizza</button><button className="btn btn-primary btn-sm" type="button" onClick={() => openNotes(patient)}>Note</button></div></td>
+                                <td className="fw-medium" data-label="Paziente">{patient.lastName} {patient.firstName}</td>
+                                <td className="text-end" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(patient)}>Visualizza</button><button className="btn btn-primary btn-sm" type="button" onClick={() => openNotes(patient)}>Note</button></div></td>
                               </tr>
                             );
                           }
@@ -1673,10 +1727,10 @@ export const Patients = ({
 
                           return (
                           <tr key={patient.id}>
-                            <td className="fw-medium">
+                            <td className="fw-medium" data-label="Paziente">
                               {patient.lastName} {patient.firstName}
                             </td>
-                            <td>
+                            <td data-label="Accesso">
                               <span
                                 className={`badge ${
                                   patient.admissionType === "scheduled"
@@ -1689,7 +1743,8 @@ export const Patients = ({
                                   : "Emergenza"}
                               </span>
                             </td>
-                            <td>
+                            <td data-label="Stato">{patient.status || PATIENT_STATUSES[0]}</td>
+                            <td data-label="Data">
                               {patient.admissionDate
                                 ? new Intl.DateTimeFormat("it-IT").format(
                                     new Date(
@@ -1698,29 +1753,31 @@ export const Patients = ({
                                   )
                                 : "-"}
                             </td>
-                            <td>{patient.pathology || "-"}</td>
-                            <td>
+                            <td data-label="Patologia">{patient.pathology || "-"}</td>
+                            <td data-label="Medico">
                               {doctor
                                 ? `${doctor.lastName} ${doctor.firstName}`
                                 : <span className="badge text-bg-warning">Non assegnato</span>}
                             </td>
-                            <td>
+                            <td data-label="CAS">
                               {casUser?.username || (
                                 <span className="badge text-bg-warning">
                                   Non assegnato
                                 </span>
                               )}
                             </td>
-                            <td>{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{getGvpDisplayName(gvpUser)}</span>)}</div> : <span className="text-secondary">-</span>}</td>
-                            <td className="text-end">
-                              <button
-                                className="btn btn-outline-primary btn-sm"
-                                type="button"
-                                onClick={() => handleEdit(patient)}
-                              >
+                            <td data-label="GVP">{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{getGvpDisplayName(gvpUser)}</span>)}</div> : <span className="text-secondary">-</span>}</td>
+                            <td className="text-end" data-label="Azioni">
+                              <div className="patient-row-actions">
+                                <button
+                                  className="btn btn-outline-primary btn-sm"
+                                  type="button"
+                                  onClick={() => handleEdit(patient)}
+                                >
                                   Dettagli/Modifica
                                 </button>
-                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm ms-2" type="button" onClick={() => openNotes(patient)}>Note</button>}
+                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm" type="button" onClick={() => openNotes(patient)}>Note</button>}
+                              </div>
                             </td>
                           </tr>
                           );

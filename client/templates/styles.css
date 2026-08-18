@@ -770,6 +770,10 @@ svg.admin-nav-icon {
 }
 
 @media (max-width: 767.98px) {
+  .table-responsive:has(.mobile-card-table) {
+    overflow: visible;
+  }
+
   .patient-form-grid > div,
   .patient-form-grid > div:has(input[type="date"]),
   .patient-form-grid > div:has(select) {
@@ -802,6 +806,17 @@ svg.admin-nav-icon {
 .patient-summary-value {
   color: var(--bs-secondary-color);
   white-space: pre-wrap;
+}
+
+.patient-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.patient-row-actions .btn {
+  width: 7.5rem;
 }
 
 .patient-notes-chat {
@@ -938,6 +953,327 @@ svg.admin-nav-icon {
 @media (max-width: 767.98px) {
   .patient-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .patient-page-header .container-fluid > .d-flex {
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  .patient-page-header h1 {
+    flex: 0 0 auto;
+    font-size: 1.4rem;
+  }
+
+  .patient-header-actions {
+    min-width: 0;
+    max-width: calc(100vw - 8.5rem);
+    padding-bottom: 0.2rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  .patient-header-actions .form-select,
+  .patient-header-actions .btn {
+    min-height: 2.75rem;
+  }
+
+  .entity-modal-shell:has(.patient-modal-card) {
+    padding: 0;
+  }
+
+  .patient-modal-card {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .patient-modal-card > .card-header,
+  .patient-modal-card > form > .card-footer {
+    position: sticky;
+    z-index: 3;
+    background: var(--bs-body-bg);
+  }
+
+  .patient-modal-card > .card-header {
+    top: 0;
+    padding: 0.8rem 1rem;
+  }
+
+  .patient-modal-card > form > .card-footer {
+    bottom: 0;
+    flex-wrap: wrap;
+    padding: 0.75rem;
+  }
+
+  .patient-modal-card > form > .card-body {
+    padding: 0.75rem;
+  }
+
+  .patient-form-tabs {
+    margin-right: -0.75rem;
+    margin-left: -0.75rem;
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+    scroll-snap-type: x proximity;
+  }
+
+  .patient-form-tabs .nav-link {
+    min-height: 2.75rem;
+    scroll-snap-align: start;
+  }
+
+  .patient-modal-card .form-label {
+    overflow: visible;
+    text-overflow: initial;
+    white-space: normal;
+  }
+
+  .patient-form-grid,
+  .patient-notification-grid,
+  .patient-hospital-grid,
+  .patient-hospital-fields-grid,
+  .patient-detail-section > .row {
+    gap: 0.85rem;
+  }
+
+  .patient-assignment-row > div,
+  .patient-notification-grid > div,
+  .patient-hospital-grid > div,
+  .patient-hospital-grid > fieldset,
+  .patient-hospital-fields-grid > div,
+  .patient-detail-section > .row > div {
+    flex: 1 1 100%;
+  }
+
+  .patient-form-actions .btn,
+  .patient-assignment-row .btn,
+  .patient-modal-card .form-control,
+  .patient-modal-card .form-select {
+    min-height: 2.75rem;
+  }
+
+  .patient-summary-item {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .patient-chat-bubble {
+    max-width: 92%;
+  }
+
+  .patient-page-content .table-responsive {
+    overflow: visible;
+  }
+
+  .patient-list-table,
+  .patient-list-table tbody,
+  .patient-list-table tr,
+  .patient-list-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .patient-list-table thead {
+    display: none;
+  }
+
+  .patient-list-table tbody {
+    padding: 0.45rem;
+  }
+
+  .patient-list-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 0.55rem;
+    overflow: hidden;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-body-bg);
+  }
+
+  .patient-list-table tbody tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .patient-list-table tbody td {
+    display: block;
+    padding: 0.3rem 0.45rem;
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+    text-align: left !important;
+    overflow-wrap: anywhere;
+    font-size: 0.8rem;
+  }
+
+  .patient-list-table tbody td::before {
+    content: attr(data-label);
+    color: var(--bs-secondary-color);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.05rem;
+  }
+
+  .patient-list-table tbody td:not([data-label]) {
+    display: block;
+    grid-column: 1 / -1;
+    text-align: center !important;
+  }
+
+  .patient-list-table tbody td:not([data-label])::before {
+    display: none;
+  }
+
+  .patient-list-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .patient-list-table tbody td[data-label="Paziente"] {
+    grid-column: 1 / -1;
+    padding: 0.4rem 0.55rem;
+    background: var(--bs-tertiary-bg);
+    font-size: 1rem;
+  }
+
+  .patient-list-table tbody td[data-label="Paziente"]::before {
+    display: none;
+  }
+
+  .patient-list-table tbody td[data-label="Azioni"] {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.35rem 0.45rem;
+  }
+
+  .patient-list-table tbody td[data-label="Azioni"] > .patient-row-actions {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .patient-list-table tbody td[data-label="Azioni"] .btn {
+    height: 2.75rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.78rem;
+    line-height: 1.05;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (min-width: 360px) and (max-width: 767.98px) {
+  .patient-list-table tbody tr {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767.98px) {
+  .mobile-card-table,
+  .mobile-card-table tbody,
+  .mobile-card-table tr,
+  .mobile-card-table td {
+    width: 100%;
+  }
+
+  .mobile-card-table thead {
+    display: none;
+  }
+
+  .mobile-card-table tbody {
+    display: block;
+    padding: 0.45rem;
+  }
+
+  .mobile-card-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 0.55rem;
+    overflow: hidden;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.7rem;
+    background: var(--bs-body-bg);
+  }
+
+  .mobile-card-table tbody tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .mobile-card-table tbody td {
+    display: block;
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+    text-align: left !important;
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-card-table tbody td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.05rem;
+    color: var(--bs-secondary-color);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .mobile-card-table tbody td:not([data-label]) {
+    grid-column: 1 / -1;
+    padding: 1rem;
+    text-align: center !important;
+  }
+
+  .mobile-card-table tbody td:not([data-label])::before {
+    display: none;
+  }
+
+  .mobile-card-table tbody td[data-label="Azioni"] {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .mobile-card-table tbody td[data-label="Azioni"] > * {
+    justify-self: end;
+  }
+
+  .mobile-card-table tbody td[data-label="Azioni"] > .d-inline-flex {
+    display: flex !important;
+    width: 100%;
+  }
+
+  .mobile-card-table tbody td[data-label="Azioni"] > .d-inline-flex .btn {
+    flex: 1 1 0;
+  }
+
+  .mobile-card-table tbody td[data-label="Azioni"] .btn {
+    min-height: 2.35rem;
+  }
+
+  .mobile-card-table tbody td[data-label="Reparto"],
+  .mobile-card-table tbody td[data-label="Ospedale"],
+  .mobile-card-table tbody td[data-label="Evento"],
+  .mobile-card-table tbody td[data-label="File"],
+  .mobile-card-table tbody td[data-label="Utente"],
+  .mobile-card-table tbody td[data-label="Presidente"] {
+    grid-column: 1 / -1;
+    background: var(--bs-tertiary-bg);
+    font-size: 0.95rem;
+    font-weight: 600;
   }
 }
 

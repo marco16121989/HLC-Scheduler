@@ -3,6 +3,7 @@ import { Mongo } from 'meteor/mongo';
 export const LinksCollection = new Mongo.Collection('links');
 
 export const HospitalsCollection = new Mongo.Collection("hospitals");
+export const DepartmentsCollection = new Mongo.Collection("departments");
 export const DoctorsCollection = new Mongo.Collection("doctors");
 export const PatientsCollection = new Mongo.Collection("patients");
 export const PresentationsCollection = new Mongo.Collection("presentations");

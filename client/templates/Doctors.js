@@ -502,7 +502,7 @@ export const Doctors = ({
                     </div>
                   </div>
                   <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0">
+                    <table className="table table-hover align-middle mb-0 mobile-card-table">
                       <thead>
                         <tr>
                           <th>Cognome</th>
@@ -534,14 +534,14 @@ export const Doctors = ({
 
                               return (
                               <tr key={doctor.id}>
-                                <td className="fw-medium">{doctor.lastName}</td>
-                                <td>{doctor.firstName}</td>
-                                <td>
+                                <td className="fw-medium" data-label="Cognome">{doctor.lastName}</td>
+                                <td data-label="Nome">{doctor.firstName}</td>
+                                <td data-label="Tipologia">
                                   <span className="badge text-bg-info">
                                     {doctor.doctorType || "Non specificata"}
                                   </span>
                                 </td>
-                                <td>
+                                <td data-label="Contatti">
                                   <div className="doctor-contact">
                                     <a href={`tel:${doctor.phone}`}>
                                       {doctor.phone}
@@ -551,7 +551,7 @@ export const Doctors = ({
                                     </a>
                                   </div>
                                 </td>
-                                <td>
+                                <td data-label="Reparti">
                                   {departmentLabels.length > 0 ? (
                                     <div className="d-flex flex-wrap gap-1">
                                       {departmentLabels.map((label) => (
@@ -569,12 +569,12 @@ export const Doctors = ({
                                     </span>
                                   )}
                                 </td>
-                                <td className="doctor-notes-cell">
+                                <td className="doctor-notes-cell" data-label="Note">
                                   {doctor.notes || (
                                     <span className="text-secondary">-</span>
                                   )}
                                 </td>
-                                <td className="text-end">
+                                <td className="text-end" data-label="Azioni">
                                   <button
                                     className="btn btn-outline-primary btn-sm"
                                     type="button"

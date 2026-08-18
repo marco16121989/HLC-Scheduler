@@ -991,7 +991,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                     </div>
                   )}
                   <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0">
+                    <table className="table table-hover align-middle mb-0 mobile-card-table">
                       <thead>
                         {manager?.role === "Admin" ? (
                         <tr>
@@ -1062,10 +1062,10 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                             if (manager?.role === "Admin") {
                               return (
                                 <tr key={user.id}>
-                                  <td className="fw-medium">{user.username} {user.disabled && <span className="badge text-bg-danger ms-2">Disattivato</span>}</td>
-                                  <td><span className="badge text-bg-primary user-count-badge">{casCount}</span></td>
-                                  <td><span className="badge text-bg-info user-count-badge">{gvpCount}</span></td>
-                                  <td className="text-end"><div className="d-inline-flex gap-2"><button className={`btn btn-sm ${user.disabled ? "btn-outline-success" : "btn-outline-danger"}`} type="button" onClick={() => togglePresidentActive(user)}>{user.disabled ? "Attiva" : "Disattiva"}</button><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(user)}>Modifica</button></div></td>
+                                  <td className="fw-medium" data-label="Presidente">{user.username} {user.disabled && <span className="badge text-bg-danger ms-2">Disattivato</span>}</td>
+                                  <td data-label="CAS"><span className="badge text-bg-primary user-count-badge">{casCount}</span></td>
+                                  <td data-label="GVP"><span className="badge text-bg-info user-count-badge">{gvpCount}</span></td>
+                                  <td className="text-end" data-label="Azioni"><div className="d-inline-flex gap-2"><button className={`btn btn-sm ${user.disabled ? "btn-outline-success" : "btn-outline-danger"}`} type="button" onClick={() => togglePresidentActive(user)}>{user.disabled ? "Attiva" : "Disattiva"}</button><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(user)}>Modifica</button></div></td>
                                 </tr>
                               );
                             }
@@ -1075,7 +1075,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                 className={isUnassigned ? "user-row-unassigned" : ""}
                                 key={user._rowKey || user.id}
                               >
-                                <td className="fw-medium user-name-column">
+                                <td className="fw-medium user-name-column" data-label="Utente">
                                   {requiresPresident && (
                                     <span
                                       className={`user-link-arrow ${depth} ${
@@ -1090,12 +1090,12 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                   )}
                                   {user.username}
                                 </td>
-                                {!managedRole && <td>
+                                {!managedRole && <td data-label="Ruolo">
                                   <span className="badge text-bg-secondary">
                                     {roles.includes(user.role) ? user.role : "Admin"}
                                   </span>
                                 </td>}
-                                {managedRole !== "CAS" && <td>
+                                {managedRole !== "CAS" && <td data-label="Associato a">
                                   {associationLabel ? (
                                     <span className="badge text-bg-success association-badge">
                                       {associationLabel}
@@ -1112,7 +1112,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                     <span className="text-secondary">-</span>
                                   )}
                                 </td>}
-                                <td>
+                                <td data-label="Sede">
                                   {user.role === "CAS" ? (
                                     hospitalLabels.length > 0 ? (
                                       <div className="d-flex flex-wrap gap-1">
@@ -1133,7 +1133,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                 </td>
                                 {managedRole ? (
                                   <>
-                                    {managedRole === "CAS" && <td className="text-center">
+                                    {managedRole === "CAS" && <td className="text-center" data-label="Inserimento CAS">
                                       <span
                                         className={`badge ${user.canInsertCas ? "text-bg-success" : "text-bg-danger"}`}
                                         aria-label={user.canInsertCas ? "Permesso attivo" : "Permesso non attivo"}
@@ -1142,7 +1142,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                         {user.canInsertCas ? "✓" : "×"}
                                       </span>
                                     </td>}
-                                    <td className="text-center">
+                                    <td className="text-center" data-label="Inserimento GVP">
                                       <span
                                         className={`badge ${user.canInsertGvp ? "text-bg-success" : "text-bg-danger"}`}
                                         aria-label={user.canInsertGvp ? "Permesso attivo" : "Permesso non attivo"}
@@ -1152,8 +1152,8 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                       </span>
                                     </td>
                                   </>
-                                ) : <td aria-label="Password impostata">********</td>}
-                                <td className="text-end">
+                                ) : <td aria-label="Password impostata" data-label="Password">********</td>}
+                                <td className="text-end" data-label="Azioni">
                                   {canEditManagedUser(user) && <button
                                     className="btn btn-outline-primary btn-sm"
                                     type="button"

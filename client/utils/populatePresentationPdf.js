@@ -41,6 +41,11 @@ export const createPopulatedPresentationPdf = async (presentation) => {
   Object.entries(FIELD_NAMES).forEach(([key, pdfField]) => {
     form.getTextField(pdfField).setText(String(presentation[key] || ""));
   });
+  // The template leaves these fields at font size 0 (automatic), which makes
+  // short text render disproportionately large when the form is flattened.
+  [FIELD_NAMES.problems, FIELD_NAMES.positiveExperiences].forEach((fieldName) => {
+    form.getTextField(fieldName).setFontSize(10);
+  });
   const specialization = form.getDropdown("900_10_HLC_Skills");
   const matchingOption = specialization.getOptions().find(
     (option) => option.trim() === presentation.attendeeSpecialization?.trim(),

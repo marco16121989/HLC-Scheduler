@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { Users } from "./Users.js";
 import { Hospitals } from "./Hospitals.js";
+import { Departments } from "./Departments.js";
 import { Doctors } from "./Doctors.js";
 import { Patients } from "./Patients.js";
 import { Presentations } from "./Presentations.js";
@@ -43,6 +44,8 @@ export const Home = ({
   setUsers,
   hospitals,
   setHospitals,
+  departments,
+  setDepartments,
   doctors,
   setDoctors,
   patients,
@@ -304,6 +307,16 @@ export const Home = ({
                   </li>
                   <li className="nav-item menu-order-health">
                     <button
+                      className={`nav-link w-100 ${activeView === "departments" ? "active" : ""}`}
+                      type="button"
+                      onClick={() => openView("departments")}
+                    >
+                      <MenuIcon name="hospital" />
+                      <p>Reparti</p>
+                    </button>
+                  </li>
+                  <li className="nav-item menu-order-health">
+                    <button
                       className={`nav-link w-100 ${activeView === "presentations" ? "active" : ""}`}
                       type="button"
                       onClick={() => openView("presentations")}
@@ -394,6 +407,14 @@ export const Home = ({
           <Hospitals
             hospitals={hospitals}
             setHospitals={setHospitals}
+            departmentTemplates={departments}
+            presidentId={presidentId}
+          />
+        ) : activeView === "departments" && presidentId ? (
+          <Departments
+            departments={departments}
+            setDepartments={setDepartments}
+            hospitals={hospitals}
             presidentId={presidentId}
           />
         ) : activeView === "doctors" && presidentId ? (

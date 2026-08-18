@@ -3,6 +3,7 @@ import { Accounts } from "meteor/accounts-base";
 import { check, Match } from "meteor/check";
 import {
   AbsencesCollection,
+  DepartmentsCollection,
   DoctorsCollection,
   HospitalsCollection,
   NotificationsCollection,
@@ -12,6 +13,7 @@ import {
   UsefulFilesCollection,
 } from "/imports/api/links";
 import { formatUserName } from "/imports/utils/formatUserName";
+import { DEFAULT_DEPARTMENT_NAMES } from "/imports/constants/departments";
 
 const usefulFileExtensions = new Set([
   "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
@@ -80,6 +82,13 @@ const userView = (user) => ({
   ...(user.profile || {}),
 });
 
+const ensureDefaultDepartments = async (presidentId) => {
+  if (!presidentId || await DepartmentsCollection.find({ presidentId }).countAsync() > 0) return;
+  for (const name of DEFAULT_DEPARTMENT_NAMES) {
+    await DepartmentsCollection.insertAsync({ name, presidentId });
+  }
+};
+
 Accounts.validateLoginAttempt((attempt) => {
   if (attempt.allowed && attempt.user?.profile?.disabled) {
     throw new Meteor.Error("account-disabled", "Il gestionale è stato disattivato per questo account.");
@@ -109,6 +118,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
             : actor.profile.associationId)
         : null;
   const dataSelector = presidentId ? { presidentId } : role === "Admin" ? {} : { _id: null };
+  await ensureDefaultDepartments(presidentId);
   const userSelector =
     role === "Admin"
       ? {}
@@ -138,6 +148,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
           lastName: 1,
           admissionDate: 1,
           admissionType: 1,
+          status: 1,
           gvpNotes: 1,
           "details.congregation": 1,
           "details.age": 1,
@@ -165,6 +176,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
   return [
     Meteor.users.find(userSelector, { fields: publicUserFields }),
     HospitalsCollection.find(dataSelector),
+    DepartmentsCollection.find(dataSelector),
     DoctorsCollection.find(dataSelector),
     PatientsCollection.find(dataSelector),
     // Le presentazioni sono eventi condivisi e visibili a tutti gli utenti autenticati.
@@ -534,7 +546,7 @@ Meteor.methods({
 
   async "hlc.replaceRecords"(kind, records) {
     requireUser(this);
-    check(kind, Match.OneOf("hospitals", "doctors", "patients", "presentations"));
+    check(kind, Match.OneOf("hospitals", "departments", "doctors", "patients", "presentations"));
     const actor = await Meteor.users.findOneAsync(this.userId);
     const role = actor?.profile?.role;
     const presidentId =
@@ -556,6 +568,7 @@ Meteor.methods({
 
     const collections = {
       hospitals: HospitalsCollection,
+      departments: DepartmentsCollection,
       doctors: DoctorsCollection,
       patients: PatientsCollection,
       presentations: PresentationsCollection,

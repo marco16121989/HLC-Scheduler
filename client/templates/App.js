@@ -5,6 +5,7 @@ import { Home } from "./Home.js";
 import { Login } from "./Login.js";
 import {
   AbsencesCollection,
+  DepartmentsCollection,
   DoctorsCollection,
   HospitalsCollection,
   NotificationsCollection,
@@ -47,7 +48,7 @@ export const App = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
   };
 
-  const { ready, user, users, hospitals, doctors, patients, presentations, supportRequests, notifications, usefulFiles, absences } = useTracker(() => {
+  const { ready, user, users, hospitals, departments, doctors, patients, presentations, supportRequests, notifications, usefulFiles, absences } = useTracker(() => {
     const dataSubscription = Meteor.subscribe("hlc-data");
     const notificationSubscription = Meteor.subscribe("hlc-notifications");
     const account = Meteor.user();
@@ -57,6 +58,7 @@ export const App = () => {
       user: account ? toClientRecord(account) : null,
       users: Meteor.users.find({}, { sort: { username: 1 } }).fetch().map(toClientRecord),
       hospitals: HospitalsCollection.find().fetch().map(toClientRecord),
+      departments: DepartmentsCollection.find({}, { sort: { name: 1 } }).fetch().map(toClientRecord),
       doctors: DoctorsCollection.find().fetch().map(toClientRecord),
       patients: PatientsCollection.find().fetch().map(toClientRecord),
       presentations: PresentationsCollection.find().fetch().map(toClientRecord),
@@ -105,6 +107,8 @@ export const App = () => {
       setUsers={setUsers}
       hospitals={hospitals}
       setHospitals={makeSetter("hospitals", hospitals)}
+      departments={departments}
+      setDepartments={makeSetter("departments", departments)}
       doctors={doctors}
       setDoctors={makeSetter("doctors", doctors)}
       patients={patients}
