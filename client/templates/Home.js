@@ -18,11 +18,14 @@ import { Absences } from "./Absences.js";
 
 const ICON_PATHS = {
   calendar: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18"],
+  absence: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18", "M8 15h8"],
   profile: ["M20 21a8 8 0 0 0-16 0", "M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
   sharepoint: ["M4 4h7v7H4z", "M13 4h7v7h-7z", "M4 13h7v7H4z", "M13 13h7v7h-7z"],
   users: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"],
   team: ["M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7z", "M9 12l2 2 4-4"],
+  cas: ["M12 3 4 6v6c0 4.5 3.2 7.5 8 9 4.8-1.5 8-4.5 8-9V6z", "M9 11h6M12 8v6"],
   hospital: ["M3 21h18M5 21V5h14v16M9 5V3h6v2M9 9h6M12 6v6M8 16h2M14 16h2"],
+  departments: ["M3 21h18M5 21V4h14v17", "M8 8h3v3H8zM13 8h3v3h-3zM8 14h3v3H8zM13 14h3v3h-3z"],
   presentation: ["M3 4h18v13H3z", "M8 21l4-4 4 4M7 9l3 3 4-5 3 3"],
   doctor: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", "M12 7v10M7 12h10"],
   patient: ["M4 21v-7a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v7", "M12 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M9 16h6M12 13v6"],
@@ -178,7 +181,7 @@ export const Home = ({
               </li>}
               {["Presidente", "CAS", "GVP"].includes(user.role) && <li className="nav-item menu-order-tools">
                 <button className={`nav-link w-100 ${activeView === "absences" ? "active" : ""}`} type="button" onClick={() => openView("absences")}>
-                  <MenuIcon name="calendar" />
+                  <MenuIcon name="absence" />
                   <p>Periodi di assenza</p>
                 </button>
               </li>}
@@ -253,7 +256,7 @@ export const Home = ({
                     type="button"
                     onClick={() => openView("cas")}
                   >
-                    <MenuIcon name="team" />
+                    <MenuIcon name="cas" />
                     <p>CAS</p>
                   </button>
                 </li>
@@ -311,7 +314,7 @@ export const Home = ({
                       type="button"
                       onClick={() => openView("departments")}
                     >
-                      <MenuIcon name="hospital" />
+                      <MenuIcon name="departments" />
                       <p>Reparti</p>
                     </button>
                   </li>
