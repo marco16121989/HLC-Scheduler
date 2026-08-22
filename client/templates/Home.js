@@ -61,6 +61,12 @@ export const Home = ({
   absences = [],
   theme,
   onToggleTheme,
+  fontSize,
+  onFontSizeChange,
+  highContrast,
+  onToggleHighContrast,
+  boldText,
+  onToggleBoldText,
   onLogout,
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(
@@ -382,7 +388,7 @@ export const Home = ({
         ) : activeView === "absences" && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
           <Absences absences={absences} users={users} currentUser={user} />
         ) : activeView === "settings" ? (
-          <Settings theme={theme} onToggleTheme={onToggleTheme} />
+          <Settings theme={theme} onToggleTheme={onToggleTheme} fontSize={fontSize} onFontSizeChange={onFontSizeChange} highContrast={highContrast} onToggleHighContrast={onToggleHighContrast} boldText={boldText} onToggleBoldText={onToggleBoldText} />
         ) : activeView === "info" ? (
           <Info />
         ) : activeView === "notifications" ? (

@@ -37,12 +37,39 @@ export const App = () => {
     if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
     return globalThis.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
+  const [fontSize, setFontSize] = useState(() => {
+    const savedFontSize = globalThis.localStorage?.getItem("hlc-font-size");
+    return ["xsmall", "small", "normal", "large", "xlarge"].includes(savedFontSize)
+      ? savedFontSize
+      : "normal";
+  });
+  const [highContrast, setHighContrast] = useState(
+    () => globalThis.localStorage?.getItem("hlc-high-contrast") === "true",
+  );
+  const [boldText, setBoldText] = useState(
+    () => globalThis.localStorage?.getItem("hlc-bold-text") === "true",
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute("data-bs-theme", theme);
     document.body.setAttribute("data-bs-theme", theme);
     globalThis.localStorage?.setItem("hlc-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-app-font-size", fontSize);
+    globalThis.localStorage?.setItem("hlc-font-size", fontSize);
+  }, [fontSize]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-high-contrast", String(highContrast));
+    globalThis.localStorage?.setItem("hlc-high-contrast", String(highContrast));
+  }, [highContrast]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-bold-text", String(boldText));
+    globalThis.localStorage?.setItem("hlc-bold-text", String(boldText));
+  }, [boldText]);
 
   const toggleTheme = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
@@ -121,6 +148,12 @@ export const App = () => {
       absences={absences}
       theme={theme}
       onToggleTheme={toggleTheme}
+      fontSize={fontSize}
+      onFontSizeChange={setFontSize}
+      highContrast={highContrast}
+      onToggleHighContrast={() => setHighContrast((current) => !current)}
+      boldText={boldText}
+      onToggleBoldText={() => setBoldText((current) => !current)}
       onLogout={() => Meteor.logout()}
     />
   ) : (
