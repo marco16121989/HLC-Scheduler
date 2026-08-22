@@ -1148,6 +1148,11 @@ svg.admin-nav-icon {
 }
 
 @media (max-width: 767.98px) {
+  .patient-departments-tab,
+  .patient-departments-content {
+    display: none !important;
+  }
+
   .hospital-list-header {
     display: none;
   }
