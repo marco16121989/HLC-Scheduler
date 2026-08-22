@@ -343,7 +343,7 @@ html[data-bold-text="true"] .fw-semibold {
 .settings-font-panel { order: 1; }
 .settings-theme-panel { order: 2; }
 .settings-contrast-panel { order: 3; }
-.settings-grid > .settings-panel:last-child { order: 4; }
+.settings-bold-panel { order: 4; }
 .settings-panel { padding: 1.15rem; border: 1px solid var(--bs-border-color-translucent); border-left: 5px solid var(--bs-primary); border-radius: 0.45rem; background: var(--bs-body-bg); box-shadow: 0 0.15rem 0.45rem rgb(0 0 0 / 5%); }
 .settings-panel-heading { display: flex; align-items: center; gap: 0.85rem; }
 .settings-panel-icon { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; color: var(--bs-primary); background: var(--bs-primary-bg-subtle); font-size: 1.3rem; font-weight: 700; }

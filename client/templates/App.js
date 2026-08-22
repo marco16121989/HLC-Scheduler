@@ -51,8 +51,20 @@ export const App = () => {
   );
 
   useEffect(() => {
+    const resetKey = "hlc-italian-interface-reset-v1";
+    document.documentElement.lang = "it";
+    globalThis.localStorage?.removeItem("hlc-language");
+    if (globalThis.sessionStorage?.getItem(resetKey) !== "done") {
+      globalThis.sessionStorage?.setItem(resetKey, "done");
+      globalThis.location.reload();
+    }
+  }, []);
+
+  useEffect(() => {
     document.documentElement.setAttribute("data-bs-theme", theme);
     document.body.setAttribute("data-bs-theme", theme);
+    document.documentElement.lang = "it";
+    globalThis.localStorage?.removeItem("hlc-language");
     globalThis.localStorage?.setItem("hlc-theme", theme);
   }, [theme]);
 
@@ -70,6 +82,7 @@ export const App = () => {
     document.documentElement.setAttribute("data-bold-text", String(boldText));
     globalThis.localStorage?.setItem("hlc-bold-text", String(boldText));
   }, [boldText]);
+
 
   const toggleTheme = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
