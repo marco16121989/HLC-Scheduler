@@ -147,6 +147,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
           firstName: 1,
           lastName: 1,
           admissionDate: 1,
+          dischargeDate: 1,
           admissionType: 1,
           status: 1,
           gvpNotes: 1,

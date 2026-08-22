@@ -1106,6 +1106,11 @@ svg.admin-nav-icon {
   grid-column: span 3;
 }
 
+.patient-form-grid > .patient-assignment-row:has(input[type="date"]) {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
 .patient-form-grid > div:has(textarea),
 .patient-form-grid > .alert,
 .patient-form-grid > fieldset,
@@ -1390,6 +1395,20 @@ svg.admin-nav-icon {
 
 .patient-row-actions .btn {
   width: 7.5rem;
+}
+
+.patient-note-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.patient-note-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
 }
 
 .patient-clickable-row {

@@ -280,6 +280,7 @@ export const Patients = ({
   const [admissionType, setAdmissionType] = useState("emergency");
   const [patientStatus, setPatientStatus] = useState(PATIENT_STATUSES[0]);
   const [admissionDate, setAdmissionDate] = useState(getToday);
+  const [dischargeDate, setDischargeDate] = useState("");
   const [pathology, setPathology] = useState("");
   const [doctorId, setDoctorId] = useState("");
   const [casId, setCasId] = useState(
@@ -413,6 +414,7 @@ export const Patients = ({
     setAdmissionType("emergency");
     setPatientStatus(PATIENT_STATUSES[0]);
     setAdmissionDate(getToday());
+    setDischargeDate("");
     setPathology("");
     setDoctorId("");
     setCasId(currentUser.role === "CAS" ? currentUser.id : "");
@@ -530,6 +532,7 @@ export const Patients = ({
         ? patientStatus
         : PATIENT_STATUSES[0],
       admissionDate,
+      dischargeDate,
       pathology: normalizedPathology,
       doctorId: validDoctorId,
       casId: validCasId,
@@ -620,6 +623,7 @@ export const Patients = ({
         : PATIENT_STATUSES[0],
     );
     setAdmissionDate(patient.admissionDate || getToday());
+    setDischargeDate(patient.dischargeDate || "");
     setPathology(patient.pathology || "");
     setDoctorId(patient.doctorId || "");
     setCasId(patient.casId || "");
@@ -992,19 +996,53 @@ export const Patients = ({
                           />
                         </div>}
                       </div>
-                      <div className="w-100">
-                        <label className="form-label" htmlFor="patient-main-pathology">Patologia</label>
-                        <input
-                          className="form-control"
-                          id="patient-main-pathology"
-                          type="text"
-                          value={pathology}
-                          onChange={(event) => {
-                            setPathology(event.target.value);
-                            setError("");
-                          }}
-                          required
-                        />
+                      <div className="patient-assignment-row row g-2 w-100">
+                        <div className="col-12 col-md-4">
+                          <label className="form-label" htmlFor="patient-main-pathology">Patologia</label>
+                          <input
+                            className="form-control"
+                            id="patient-main-pathology"
+                            type="text"
+                            value={pathology}
+                            onChange={(event) => {
+                              setPathology(event.target.value);
+                              setError("");
+                            }}
+                            required
+                          />
+                        </div>
+                        <div className="col-12 col-md-4">
+                          <label className="form-label" htmlFor="patient-main-admission-date">
+                            Data del ricovero
+                          </label>
+                          <input
+                            className="form-control"
+                            id="patient-main-admission-date"
+                            type="date"
+                            value={admissionDate}
+                            onChange={(event) => {
+                              setAdmissionDate(event.target.value);
+                              setError("");
+                            }}
+                            required
+                          />
+                        </div>
+                        <div className="col-12 col-md-4">
+                          <label className="form-label" htmlFor="patient-main-discharge-date">
+                            Data dimissioni
+                          </label>
+                          <input
+                            className="form-control"
+                            id="patient-main-discharge-date"
+                            type="date"
+                            min={admissionDate || undefined}
+                            value={dischargeDate}
+                            onChange={(event) => {
+                              setDischargeDate(event.target.value);
+                              setError("");
+                            }}
+                          />
+                        </div>
                       </div>
                       <div className="patient-assignment-row row g-2 w-100">
                         {SIMPLIFIED_FIELDS.slice(6, 8).map((field) => (
