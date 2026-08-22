@@ -14,6 +14,14 @@ const formatPatientListName = (patient) => {
   return `${patient.firstName} ${patient.lastName}`;
 };
 
+const NoteButtonContent = () => <span className="patient-note-content">
+  <svg className="patient-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 3h14v18H5z" />
+    <path d="M8 8h8M8 12h8M8 16h5" />
+  </svg>
+  <span>Note</span>
+</span>;
+
 const PATIENT_STATUSES = [
   "In attesa di ricovero",
   "Ricoverato",
@@ -200,9 +208,9 @@ export const SIMPLIFIED_FIELDS = [
 ];
 
 const PATIENT_FORM_TABS = [
-  ["main", "Informazioni principali"],
+  ["main", "Info Principali"],
   ["summary", "Riepilogo"],
-  ["insertion", "Informazioni Complete"],
+  ["insertion", "Info Complete"],
 ];
 
 const SIMPLIFIED_FIELD_NAMES = new Set(SIMPLIFIED_FIELDS.map(([name]) => name));
@@ -835,7 +843,7 @@ export const Patients = ({
                   <h2 className="card-title mb-0" id="patient-modal-title">
                     {isEditing ? "Modifica paziente" : "Inserisci paziente"}
                   </h2>
-                  <div className="d-flex align-items-center gap-2 ms-auto">
+                  <div className="d-flex align-items-center gap-2 ms-auto patient-header-status">
                     <label className="form-label mb-0" htmlFor="patient-header-status">Stato</label>
                     <select
                       className="form-select form-select-sm w-auto"
@@ -983,6 +991,20 @@ export const Patients = ({
                             }}
                           />
                         </div>}
+                      </div>
+                      <div className="w-100">
+                        <label className="form-label" htmlFor="patient-main-pathology">Patologia</label>
+                        <input
+                          className="form-control"
+                          id="patient-main-pathology"
+                          type="text"
+                          value={pathology}
+                          onChange={(event) => {
+                            setPathology(event.target.value);
+                            setError("");
+                          }}
+                          required
+                        />
                       </div>
                       <div className="patient-assignment-row row g-2 w-100">
                         {SIMPLIFIED_FIELDS.slice(6, 8).map((field) => (
@@ -1739,7 +1761,7 @@ export const Patients = ({
           </div>
 
           <section className="card">
-            <div className="card-header">
+            <div className="card-header patient-list-header">
               <h2 className="card-title">Elenco pazienti</h2>
             </div>
             <div className="card-body p-0">
@@ -1787,7 +1809,7 @@ export const Patients = ({
                                 }}
                               >
                                 <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}</td>
-                                <td className="text-center patient-actions-column" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-primary btn-sm" type="button" onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}>Note</button></div></td>
+                                <td className="text-center patient-actions-column" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-primary btn-sm" type="button" onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent /></button></div></td>
                               </tr>
                             );
                           }
@@ -1870,7 +1892,7 @@ export const Patients = ({
                             <td data-label="GVP">{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{getGvpDisplayName(gvpUser)}</span>)}</div> : <span className="text-secondary">-</span>}</td>
                             <td className="text-center patient-actions-column" data-label="Azioni">
                               <div className="patient-row-actions">
-                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm" type="button" onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}>Note</button>}
+                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm" type="button" onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent /></button>}
                               </div>
                             </td>
                           </tr>

@@ -188,7 +188,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
 
   return (
     <>
-      <div className="app-content-header">
+      <div className="app-content-header hospital-page-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
             <h1 className="mb-0">Ospedali</h1>
@@ -203,7 +203,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
         </div>
       </div>
 
-      <div className="app-content">
+      <div className="app-content hospital-page-content">
         <div className="container-fluid">
           <div className="row g-3">
             {departmentListHospital && <>
@@ -363,12 +363,12 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
 
             <div className="col-12">
               <section className="card">
-                <div className="card-header">
+                <div className="card-header hospital-list-header">
                   <h2 className="card-title">Elenco ospedali</h2>
                 </div>
                 <div className="card-body p-0">
                   <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0 mobile-card-table">
+                    <table className="table table-hover align-middle mb-0 mobile-card-table hospital-list-table">
                       <thead>
                         <tr>
                           <th>Ospedale</th>
@@ -386,16 +386,28 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
                           </tr>
                         ) : (
                           visibleHospitals.map((hospital) => (
-                            <tr key={hospital.id}>
+                            <tr
+                              className="hospital-clickable-row"
+                              key={hospital.id}
+                              role="button"
+                              tabIndex="0"
+                              onClick={() => handleEdit(hospital)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  handleEdit(hospital);
+                                }
+                              }}
+                            >
                               <td className="fw-medium" data-label="Ospedale">
                                 <div className="d-flex align-items-center gap-2 flex-wrap">
                                   <span>{hospital.name}</span>
-                                  <button className="badge text-bg-primary border-0" type="button" onClick={() => setDepartmentListHospital(normalizeHospital(hospital))}>{hospital.departments.length} reparti</button>
+                                  <button className="badge text-bg-primary border-0 hospital-department-count" type="button" onClick={(event) => { event.stopPropagation(); setDepartmentListHospital(normalizeHospital(hospital)); }}>{hospital.departments.length} reparti</button>
                                 </div>
                               </td>
                               <td data-label="Direttore">{hospital.director || "-"}</td>
                               <td data-label="Reparti">
-                                <button className="btn btn-outline-secondary btn-sm" type="button" onClick={() => setDepartmentListHospital(normalizeHospital(hospital))}>
+                                <button className="btn btn-outline-secondary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); setDepartmentListHospital(normalizeHospital(hospital)); }}>
                                   Visualizza reparti
                                 </button>
                               </td>
@@ -403,7 +415,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
                                 <button
                                   className="btn btn-outline-primary btn-sm"
                                   type="button"
-                                  onClick={() => handleEdit(hospital)}
+                                  onClick={(event) => { event.stopPropagation(); handleEdit(hospital); }}
                                 >
                                   Modifica
                                 </button>

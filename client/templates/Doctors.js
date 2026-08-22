@@ -450,11 +450,11 @@ export const Doctors = ({
 
             <div className="col-12">
               <section className="card">
-                <div className="card-header">
+                <div className="card-header mobile-list-header">
                   <h2 className="card-title">Elenco medici</h2>
                 </div>
                 <div className="card-body p-0">
-                  <div className="row g-3 p-3 border-bottom">
+                  <div className="row g-3 p-3 border-bottom doctor-list-filters">
                     <div className="col-12 col-lg-4">
                       <label className="form-label" htmlFor="doctor-name-filter">
                         Cerca medico
@@ -502,7 +502,7 @@ export const Doctors = ({
                     </div>
                   </div>
                   <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0 mobile-card-table">
+                    <table className="table table-hover align-middle mb-0 mobile-card-table doctor-list-table">
                       <thead>
                         <tr>
                           <th>Cognome</th>
@@ -533,7 +533,19 @@ export const Doctors = ({
                                 getDepartmentLabels(doctor);
 
                               return (
-                              <tr key={doctor.id}>
+                              <tr
+                                className="doctor-clickable-row"
+                                key={doctor.id}
+                                role="button"
+                                tabIndex="0"
+                                onClick={() => handleEdit(doctor)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    handleEdit(doctor);
+                                  }
+                                }}
+                              >
                                 <td className="fw-medium" data-label="Cognome">{doctor.lastName}</td>
                                 <td data-label="Nome">{doctor.firstName}</td>
                                 <td data-label="Tipologia">
@@ -578,7 +590,7 @@ export const Doctors = ({
                                   <button
                                     className="btn btn-outline-primary btn-sm"
                                     type="button"
-                                    onClick={() => handleEdit(doctor)}
+                                    onClick={(event) => { event.stopPropagation(); handleEdit(doctor); }}
                                   >
                                     Modifica
                                   </button>

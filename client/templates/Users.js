@@ -187,7 +187,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [casFilter, setCasFilter] = useState("all");
-  const [teamTab, setTeamTab] = useState("associated");
+  const [mobileFormOpen, setMobileFormOpen] = useState(false);
   const formHospitalAssignments = Array.isArray(form.hospitalAssignments)
     ? form.hospitalAssignments
     : form.hospitalId
@@ -252,6 +252,11 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     setForm(createEmptyForm(availableRoles[0], manager, users));
     setEditingId(null);
     setError("");
+  };
+
+  const closeMobileForm = () => {
+    resetForm();
+    setMobileFormOpen(false);
   };
 
   const canEditUser = (user) =>
@@ -438,6 +443,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     }
 
     resetForm();
+    setMobileFormOpen(false);
   };
 
   const handleEdit = (user) => {
@@ -458,6 +464,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       canInsertGvp: Boolean(user.canInsertGvp),
     });
     setError("");
+    setMobileFormOpen(true);
   };
 
   const toggleHospital = (hospitalId) => {
@@ -535,6 +542,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       current.filter((item) => !userIdsToDelete.has(item.id)),
     );
     resetForm();
+    setMobileFormOpen(false);
   };
 
   const togglePresidentActive = (user) => {
@@ -647,23 +655,20 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       (!filterPresidentId || getPresidentId(user, users) === filterPresidentId),
   );
   const selectedFilterCas = filterCasUsers.find((user) => user.id === casFilter);
-  const hasGvpTabs = isTeamManager && (managedRole === "GVP" || !managedRole);
-  const tabbedOrderedUsers = hasGvpTabs
-    ? orderedUsers.filter((user) =>
-        teamTab === "free"
-          ? user.role === "GVP" && !getCasId(user)
-          : user.role === "CAS" || (user.role === "GVP" && Boolean(getCasId(user))),
-      )
+  const filterableOrderedUsers = managedRole === "GVP"
+    ? visibleUsers
+        .filter((user) => user.role === "GVP")
+        .sort((first, second) => first.username.localeCompare(second.username, "it-IT"))
     : orderedUsers;
   const filteredOrderedUsers = !canFilterTeam || casFilter === "all"
-    ? tabbedOrderedUsers
+    ? filterableOrderedUsers
     : manager?.role === "Admin"
-      ? tabbedOrderedUsers.filter((user) => {
+      ? filterableOrderedUsers.filter((user) => {
           const matchesCas = !selectedFilterCas ||
             getPresidentId(selectedFilterCas, users) === user.id;
           return matchesCas;
         })
-      : tabbedOrderedUsers.filter((user) => {
+      : filterableOrderedUsers.filter((user) => {
           if (user.role === "CAS") {
             return casFilter !== "all" && user.id === casFilter;
           }
@@ -675,29 +680,58 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     <>
       <div className="app-content-header">
         <div className="container-fluid">
-          <h1 className="mb-0">
-            {managedRole
-              ? managedRole
-              : isPresidentManager
-              ? "La mia squadra"
-              : isCasManager
-                ? "GVP assegnati e liberi"
-                : manager?.role === "Admin"
-                  ? "Presidenti"
-                  : "Utenti"}
-          </h1>
+          <div className="d-flex align-items-center justify-content-between gap-3">
+            <h1 className="mb-0">
+              {managedRole
+                ? managedRole
+                : isPresidentManager
+                ? "La mia squadra"
+                : isCasManager
+                  ? "GVP assegnati e liberi"
+                  : manager?.role === "Admin"
+                    ? "Presidenti"
+                    : "Utenti"}
+            </h1>
+            {canCreateManagedRole && (
+              <button
+                className="btn btn-primary users-mobile-insert"
+                type="button"
+                onClick={() => {
+                  resetForm();
+                  setMobileFormOpen(true);
+                }}
+              >
+                Inserisci
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="app-content">
         <div className="container-fluid">
           <div className="row g-3">
-            {canCreateManagedRole && <div className="col-12 col-lg-5">
-              <section className="card">
-                <div className="card-header">
+            {canCreateManagedRole && <>
+              {mobileFormOpen && (
+                <button
+                  className="users-mobile-modal-backdrop"
+                  type="button"
+                  aria-label="Chiudi finestra"
+                  onClick={closeMobileForm}
+                />
+              )}
+              <div className={`col-12 col-lg-5 users-form-column ${mobileFormOpen ? "is-mobile-open" : ""}`}>
+              <section className="card users-form-card" role={mobileFormOpen ? "dialog" : undefined} aria-modal={mobileFormOpen ? "true" : undefined}>
+                <div className="card-header users-form-header">
                   <h2 className="card-title">
                     {isEditing ? "Modifica utente" : "Inserisci utente"}
                   </h2>
+                  <button
+                    className="btn-close users-mobile-modal-close"
+                    type="button"
+                    aria-label="Chiudi"
+                    onClick={closeMobileForm}
+                  />
                 </div>
                 <form onSubmit={handleSubmit}>
                   <div className="card-body">
@@ -919,7 +953,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                       <button
                         className="btn btn-outline-secondary"
                         type="button"
-                        onClick={resetForm}
+                        onClick={closeMobileForm}
                       >
                         Annulla
                       </button>
@@ -930,7 +964,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                   </div>
                 </form>
               </section>
-            </div>}
+            </div></>}
 
             <div className={canCreateManagedRole ? "col-12 col-lg-7" : "col-12"}>
               <section className="card">
@@ -940,39 +974,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                   </h2>
                 </div>
                 <div className="card-body p-0">
-                  {hasGvpTabs && (
-                    <ul className="nav nav-tabs px-3 pt-3" role="tablist" aria-label="Visualizzazione squadra">
-                      <li className="nav-item" role="presentation">
-                        <button
-                          className={`nav-link ${teamTab === "associated" ? "active" : ""}`}
-                          type="button"
-                          role="tab"
-                          aria-selected={teamTab === "associated"}
-                          onClick={() => {
-                            setTeamTab("associated");
-                            setCasFilter("all");
-                          }}
-                        >
-                          {managedRole === "GVP" ? "GVP associati" : isPresidentManager ? "CAS e GVP associati" : "GVP associati"}
-                        </button>
-                      </li>
-                      <li className="nav-item" role="presentation">
-                        <button
-                          className={`nav-link ${teamTab === "free" ? "active" : ""}`}
-                          type="button"
-                          role="tab"
-                          aria-selected={teamTab === "free"}
-                          onClick={() => {
-                            setTeamTab("free");
-                            setCasFilter("all");
-                          }}
-                        >
-                          GVP non associati
-                        </button>
-                      </li>
-                    </ul>
-                  )}
-                  {canFilterTeam && managedRole !== "CAS" && (!hasGvpTabs || teamTab === "associated") && (
+                  {canFilterTeam && managedRole !== "CAS" && (
                     <div className="row g-3 p-3 border-bottom">
                       <div className="col-12 col-md-6">
                         <label className="form-label" htmlFor="users-cas-filter">Filtra per CAS</label>
@@ -982,7 +984,8 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                           value={casFilter}
                           onChange={(event) => setCasFilter(event.target.value)}
                         >
-                          <option value="all">Tutti i CAS</option>
+                          <option value="all">{managedRole === "GVP" ? "Tutti i GVP" : "Tutti i CAS"}</option>
+                          {managedRole === "GVP" && <option value="none">GVP non associati</option>}
                           {filterCasUsers.map((casUser) => (
                             <option key={casUser.id} value={casUser.id}>{casUser.username}</option>
                           ))}
@@ -991,7 +994,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                     </div>
                   )}
                   <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0 mobile-card-table">
+                    <table className={`table table-hover align-middle mb-0 mobile-card-table ${managedRole === "CAS" ? "cas-list-table" : managedRole === "GVP" ? "gvp-list-table" : ""}`}>
                       <thead>
                         {manager?.role === "Admin" ? (
                         <tr>
@@ -1022,8 +1025,6 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                             <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "4" : managedRole ? "5" : "6"}>
                               {casFilter !== "all"
                                 ? "Nessun utente corrisponde ai filtri selezionati."
-                                : isTeamManager && teamTab === "free"
-                                  ? "Nessun GVP libero presente."
                                 : manager?.role === "Admin"
                                   ? "Nessun presidente inserito."
                                   : "Nessun utente inserito."}
@@ -1072,8 +1073,17 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
 
                             return (
                               <tr
-                                className={isUnassigned ? "user-row-unassigned" : ""}
+                                className={`${isUnassigned ? "user-row-unassigned" : ""} ${managedRole === "CAS" ? "cas-clickable-row" : managedRole === "GVP" ? "gvp-clickable-row" : ""}`}
                                 key={user._rowKey || user.id}
+                                role={["CAS", "GVP"].includes(managedRole) ? "button" : undefined}
+                                tabIndex={["CAS", "GVP"].includes(managedRole) ? "0" : undefined}
+                                onClick={["CAS", "GVP"].includes(managedRole) ? () => handleEdit(user) : undefined}
+                                onKeyDown={["CAS", "GVP"].includes(managedRole) ? (event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    handleEdit(user);
+                                  }
+                                } : undefined}
                               >
                                 <td className="fw-medium user-name-column" data-label="Utente">
                                   {requiresPresident && (
@@ -1157,7 +1167,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                   {canEditManagedUser(user) && <button
                                     className="btn btn-outline-primary btn-sm"
                                     type="button"
-                                    onClick={() => handleEdit(user)}
+                                    onClick={(event) => { event.stopPropagation(); handleEdit(user); }}
                                   >
                                     Modifica
                                   </button>

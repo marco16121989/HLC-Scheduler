@@ -224,11 +224,11 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
             </section>
           </div>
           <section className="card">
-            <div className="card-header"><h2 className="card-title">Elenco presentazioni</h2></div>
-            <div className="card-body p-0"><div className="table-responsive"><table className="table table-hover align-middle mb-0 mobile-card-table">
+            <div className="card-header mobile-list-header"><h2 className="card-title">Elenco presentazioni</h2></div>
+            <div className="card-body p-0"><div className="table-responsive"><table className="table table-hover align-middle mb-0 mobile-card-table presentation-list-table">
               <thead><tr><th>Data</th><th>Evento</th><th>Tipo</th><th>Presenti</th><th>Struttura</th><th className="text-end">Azioni</th></tr></thead>
               <tbody>{visiblePresentations.length === 0 ? <tr><td className="text-center text-secondary py-4" colSpan="6">Nessuna presentazione inserita.</td></tr> : [...visiblePresentations].sort((a, b) => (b.presentationDate || "").localeCompare(a.presentationDate || "")).map((item) => (
-                <tr key={item.id}><td data-label="Data">{item.presentationDate ? new Intl.DateTimeFormat("it-IT").format(new Date(`${item.presentationDate}T00:00:00`)) : "-"}</td><td className="fw-medium" data-label="Evento">{item.event}</td><td data-label="Tipo">{item.presentationTypes?.join(", ") || "-"}</td><td data-label="Presenti">{item.attendeesCount || "-"}</td><td data-label="Struttura">{item.facility || "-"}</td><td className="text-end" data-label="Azioni"><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(item)}>Modifica</button></td></tr>
+                <tr className="presentation-clickable-row" key={item.id} role="button" tabIndex="0" onClick={() => handleEdit(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleEdit(item); } }}><td data-label="Data">{item.presentationDate ? new Intl.DateTimeFormat("it-IT").format(new Date(`${item.presentationDate}T00:00:00`)) : "-"}</td><td className="fw-medium" data-label="Evento">{item.event}</td><td data-label="Tipo">{item.presentationTypes?.join(", ") || "-"}</td><td data-label="Presenti">{item.attendeesCount || "-"}</td><td data-label="Struttura">{item.facility || "-"}</td><td className="text-end" data-label="Azioni"><button className="btn btn-outline-primary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); handleEdit(item); }}>Modifica</button></td></tr>
               ))}</tbody>
             </table></div></div>
           </section>
