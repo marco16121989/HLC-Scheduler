@@ -478,6 +478,12 @@ a {
   margin-left: 0;
 }
 
+.sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) .sidebar-section-label {
+  color: transparent;
+  text-shadow: none;
+  user-select: none;
+}
+
 .brand-text {
   overflow: hidden;
   text-overflow: ellipsis;
