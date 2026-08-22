@@ -810,13 +810,32 @@ svg.admin-nav-icon {
 
 .patient-row-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   align-items: center;
   gap: 0.5rem;
 }
 
+.patient-actions-column {
+  width: 8.5rem;
+  min-width: 8.5rem;
+}
+
 .patient-row-actions .btn {
   width: 7.5rem;
+}
+
+.patient-clickable-row {
+  cursor: pointer;
+}
+
+.patient-clickable-row:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: -2px;
+}
+
+.patient-list-status {
+  min-width: 10rem;
+  width: auto;
 }
 
 .patient-notes-chat {
@@ -1169,6 +1188,14 @@ svg.admin-nav-icon {
     min-width: 0;
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+
+  .patient-list-status {
+    min-width: 0;
+    width: 100%;
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
+    font-size: 0.78rem;
   }
 }
 

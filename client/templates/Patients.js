@@ -5,6 +5,15 @@ import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPd
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 
+const formatPatientListName = (patient) => {
+  const isFemale = ["Femmina", "Femminile"].includes(patient.details?.sex);
+  const maidenName = patient.details?.maidenName?.trim();
+  if (isFemale && maidenName) {
+    return `${patient.firstName} ${maidenName} (${patient.lastName})`;
+  }
+  return `${patient.firstName} ${patient.lastName}`;
+};
+
 const PATIENT_STATUSES = [
   "In attesa di ricovero",
   "Ricoverato",
@@ -48,7 +57,7 @@ export const DETAIL_SECTIONS = [
   {
     title: "INFORMAZIONI SUL PAZIENTE/OSPEDALE",
     fields: [
-      ["sex", "Sesso", "select", ["Maschile", "Femminile", "Altro / non specificato"]],
+      ["sex", "Sesso", "select", ["Maschio", "Femmina"]],
       ["age", "Età", "number"],
       ["patientComments", "Commenti sul paziente", "textarea"],
       ["isMinorOrNewborn", "Paziente minore o neonato?", "yesno"],
@@ -610,6 +619,11 @@ export const Patients = ({
     setNotes(patient.notes || "");
     setDetails({
       ...(patient.details || {}),
+      sex: patient.details?.sex === "Maschile"
+        ? "Maschio"
+        : patient.details?.sex === "Femminile"
+          ? "Femmina"
+          : patient.details?.sex || "",
       isMinorOrNewborn: patient.details?.isMinorOrNewborn || "No",
     });
     setError("");
@@ -633,6 +647,13 @@ export const Patients = ({
       current.filter((item) => item.id !== editingId),
     );
     resetForm();
+  };
+
+  const updatePatientStatus = (patientId, status) => {
+    if (!PATIENT_STATUSES.includes(status)) return;
+    setPatients((current) => current.map((patient) =>
+      patient.id === patientId ? { ...patient, status } : patient,
+    ));
   };
 
   const openNotes = (patient) => {
@@ -679,6 +700,8 @@ export const Patients = ({
   const summaryEntries = [
     { label: "Nome", value: firstName },
     { label: "Cognome", value: lastName },
+    { label: "Sesso", value: details.sex },
+    ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
     { label: "DAT compilata?", value: details.datCompleted },
     { label: "DAT registrata?", value: details.datRegistered },
     { label: "Tipo di accesso", value: admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza" },
@@ -698,6 +721,8 @@ export const Patients = ({
   const gvpSummaryEntries = [
     { label: "Nome", value: firstName },
     { label: "Cognome", value: lastName },
+    { label: "Sesso", value: details.sex },
+    ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
     { label: "Stato", value: patientStatus },
     { label: "Congregazione", value: details.congregation },
     { label: "Età", value: details.age },
@@ -716,6 +741,8 @@ export const Patients = ({
   const mainSummaryEntries = [
     { label: "Nome", value: firstName },
     { label: "Cognome", value: lastName },
+    { label: "Sesso", value: details.sex },
+    ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
     { label: "DAT compilata?", value: details.datCompleted },
     { label: "DAT registrata?", value: details.datRegistered },
     { label: "Tipo di accesso", value: admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza" },
@@ -808,6 +835,22 @@ export const Patients = ({
                   <h2 className="card-title mb-0" id="patient-modal-title">
                     {isEditing ? "Modifica paziente" : "Inserisci paziente"}
                   </h2>
+                  <div className="d-flex align-items-center gap-2 ms-auto">
+                    <label className="form-label mb-0" htmlFor="patient-header-status">Stato</label>
+                    <select
+                      className="form-select form-select-sm w-auto"
+                      id="patient-header-status"
+                      value={patientStatus}
+                      onChange={(event) => {
+                        setPatientStatus(event.target.value);
+                        setError("");
+                      }}
+                    >
+                      {PATIENT_STATUSES.map((status) => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
+                    </select>
+                  </div>
                   <button
                     className="btn-close"
                     type="button"
@@ -878,7 +921,7 @@ export const Patients = ({
                         </div>
                       )}
                       <div className="patient-assignment-row row g-2 w-100">
-                        <div className="col-12 col-md-3">
+                        <div className={`col-12 ${details.sex === "Femmina" ? "col-md-3" : "col-md-4"}`}>
                           <label className="form-label" htmlFor="patient-main-row-first-name">Nome</label>
                           <input
                             className="form-control"
@@ -892,7 +935,7 @@ export const Patients = ({
                             required
                           />
                         </div>
-                        <div className="col-12 col-md-3">
+                        <div className={`col-12 ${details.sex === "Femmina" ? "col-md-3" : "col-md-4"}`}>
                           <label className="form-label" htmlFor="patient-main-row-last-name">Cognome</label>
                           <input
                             className="form-control"
@@ -906,12 +949,48 @@ export const Patients = ({
                             required
                           />
                         </div>
+                        <div className={`col-12 ${details.sex === "Femmina" ? "col-md-3" : "col-md-4"}`}>
+                          <label className="form-label" htmlFor="patient-main-sex">Sesso</label>
+                          <select
+                            className="form-select"
+                            id="patient-main-sex"
+                            value={details.sex || ""}
+                            onChange={(event) => {
+                              const sex = event.target.value;
+                              setDetails((current) => ({
+                                ...current,
+                                sex,
+                                ...(sex === "Femmina" ? {} : { maidenName: "" }),
+                              }));
+                              setError("");
+                            }}
+                          >
+                            <option value="">Seleziona</option>
+                            <option value="Maschio">Maschio</option>
+                            <option value="Femmina">Femmina</option>
+                          </select>
+                        </div>
+                        {details.sex === "Femmina" && <div className="col-12 col-md-3">
+                          <label className="form-label" htmlFor="patient-main-maiden-name">Cognome da nubile</label>
+                          <input
+                            className="form-control"
+                            id="patient-main-maiden-name"
+                            type="text"
+                            value={details.maidenName || ""}
+                            onChange={(event) => {
+                              setDetails((current) => ({ ...current, maidenName: event.target.value }));
+                              setError("");
+                            }}
+                          />
+                        </div>}
+                      </div>
+                      <div className="patient-assignment-row row g-2 w-100">
                         {SIMPLIFIED_FIELDS.slice(6, 8).map((field) => (
                           <PatientDetailField
                             key={field[0]}
                             field={field}
                             value={details[field[0]]}
-                            columnClassName="col-12 col-md-3"
+                            columnClassName="col-12 col-md-6"
                             onChange={(name, value) => {
                               setDetails((current) => ({ ...current, [name]: value }));
                               setError("");
@@ -974,22 +1053,6 @@ export const Patients = ({
                           </label>
                         </div>
                       </fieldset>
-                      <div className="w-100">
-                        <label className="form-label" htmlFor="patient-main-status">Stato del paziente</label>
-                        <select
-                          className="form-select"
-                          id="patient-main-status"
-                          value={patientStatus}
-                          onChange={(event) => {
-                            setPatientStatus(event.target.value);
-                            setError("");
-                          }}
-                        >
-                          {PATIENT_STATUSES.map((status) => (
-                            <option key={status} value={status}>{status}</option>
-                          ))}
-                        </select>
-                      </div>
                       <div className="patient-assignment-row row g-3 w-100">
                         <div className="col-12 col-md-3">
                           <div className="form-label">Medico responsabile</div>
@@ -1607,6 +1670,7 @@ export const Patients = ({
                           <div className="patient-hospital-fields-grid mt-1">
                             {DETAIL_SECTIONS.find((section) => section.title === "INFORMAZIONI SUL PAZIENTE/OSPEDALE")?.fields
                               .filter((field) => !SIMPLIFIED_FIELD_NAMES.has(field[0]))
+                              .filter((field) => field[0] !== "sex")
                               .filter((field) => details.isMinorOrNewborn === "Sì" || !PARENT_FIELD_NAMES.has(field[0]))
                               .map((field) => (
                               <PatientDetailField
@@ -1682,7 +1746,7 @@ export const Patients = ({
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0 patient-list-table">
                   <thead>
-                    {isGvp ? <tr><th>Paziente</th><th className="text-end">Azioni</th></tr> : <tr>
+                    {isGvp ? <tr><th>Paziente</th><th className="text-center patient-actions-column">Azioni</th></tr> : <tr>
                       <th>Paziente</th>
                       <th>Accesso</th>
                       <th>Stato</th>
@@ -1691,7 +1755,7 @@ export const Patients = ({
                       <th>Medico responsabile</th>
                       <th>CAS</th>
                       <th>GVP</th>
-                      <th className="text-end">Azioni</th>
+                      <th className="text-center patient-actions-column">Azioni</th>
                     </tr>}
                   </thead>
                   <tbody>
@@ -1709,9 +1773,21 @@ export const Patients = ({
                         .map((patient) => {
                           if (isGvp) {
                             return (
-                              <tr key={patient.id}>
-                                <td className="fw-medium" data-label="Paziente">{patient.lastName} {patient.firstName}</td>
-                                <td className="text-end" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(patient)}>Visualizza</button><button className="btn btn-primary btn-sm" type="button" onClick={() => openNotes(patient)}>Note</button></div></td>
+                              <tr
+                                className="patient-clickable-row"
+                                key={patient.id}
+                                role="button"
+                                tabIndex="0"
+                                onClick={() => handleEdit(patient)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    handleEdit(patient);
+                                  }
+                                }}
+                              >
+                                <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}</td>
+                                <td className="text-center patient-actions-column" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-primary btn-sm" type="button" onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}>Note</button></div></td>
                               </tr>
                             );
                           }
@@ -1726,9 +1802,21 @@ export const Patients = ({
                           );
 
                           return (
-                          <tr key={patient.id}>
+                          <tr
+                            className="patient-clickable-row"
+                            key={patient.id}
+                            role="button"
+                            tabIndex="0"
+                            onClick={() => handleEdit(patient)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                handleEdit(patient);
+                              }
+                            }}
+                          >
                             <td className="fw-medium" data-label="Paziente">
-                              {patient.lastName} {patient.firstName}
+                              {formatPatientListName(patient)}
                             </td>
                             <td data-label="Accesso">
                               <span
@@ -1743,7 +1831,20 @@ export const Patients = ({
                                   : "Emergenza"}
                               </span>
                             </td>
-                            <td data-label="Stato">{patient.status || PATIENT_STATUSES[0]}</td>
+                            <td data-label="Stato">
+                              <select
+                                className="form-select form-select-sm patient-list-status"
+                                aria-label={`Stato di ${patient.firstName} ${patient.lastName}`}
+                                value={patient.status || PATIENT_STATUSES[0]}
+                                onClick={(event) => event.stopPropagation()}
+                                onKeyDown={(event) => event.stopPropagation()}
+                                onChange={(event) => updatePatientStatus(patient.id, event.target.value)}
+                              >
+                                {PATIENT_STATUSES.map((status) => (
+                                  <option key={status} value={status}>{status}</option>
+                                ))}
+                              </select>
+                            </td>
                             <td data-label="Data">
                               {patient.admissionDate
                                 ? new Intl.DateTimeFormat("it-IT").format(
@@ -1767,16 +1868,9 @@ export const Patients = ({
                               )}
                             </td>
                             <td data-label="GVP">{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{getGvpDisplayName(gvpUser)}</span>)}</div> : <span className="text-secondary">-</span>}</td>
-                            <td className="text-end" data-label="Azioni">
+                            <td className="text-center patient-actions-column" data-label="Azioni">
                               <div className="patient-row-actions">
-                                <button
-                                  className="btn btn-outline-primary btn-sm"
-                                  type="button"
-                                  onClick={() => handleEdit(patient)}
-                                >
-                                  Dettagli/Modifica
-                                </button>
-                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm" type="button" onClick={() => openNotes(patient)}>Note</button>}
+                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm" type="button" onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}>Note</button>}
                               </div>
                             </td>
                           </tr>
