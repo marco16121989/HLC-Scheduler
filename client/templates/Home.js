@@ -5,6 +5,8 @@ import { Hospitals } from "./Hospitals.js";
 import { Departments } from "./Departments.js";
 import { Doctors } from "./Doctors.js";
 import { Patients } from "./Patients.js";
+import { PatientReports } from "./PatientReports.js";
+import { PresentationReports } from "./PresentationReports.js";
 import { Presentations } from "./Presentations.js";
 import { Calendar } from "./Calendar.js";
 import { SHAREPOINT_URL } from "./SharePoint.js";
@@ -29,6 +31,8 @@ const ICON_PATHS = {
   presentation: ["M3 4h18v13H3z", "M8 21l4-4 4 4M7 9l3 3 4-5 3 3"],
   doctor: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", "M12 7v10M7 12h10"],
   patient: ["M4 21v-7a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v7", "M12 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M9 16h6M12 13v6"],
+  reports: ["M4 20V10M10 20V4M16 20v-7M22 20H2", "M4 7h.01M10 1h.01M16 10h.01"],
+  presentationReports: ["M12 3v9l7.8 4.5A9 9 0 1 1 12 3z", "M14 3.3A9 9 0 0 1 21 10h-7z"],
   support: ["M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z", "M8 9h8M8 13h5"],
   files: ["M4 3h10l6 6v12H4z", "M14 3v6h6", "M8 14h8M8 18h6"],
   info: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 10v7M12 7h.01"],
@@ -334,6 +338,13 @@ export const Home = ({
                       <p>Presentazioni</p>
                     </button>
                   </li>
+                  <li className="sidebar-section-label menu-order-reports">Report</li>
+                  <li className="nav-item menu-order-reports">
+                    <button className={`nav-link w-100 ${activeView === "presentation-reports" ? "active" : ""}`} type="button" onClick={() => openView("presentation-reports")}>
+                      <MenuIcon name="presentationReports" />
+                      <p>Report presentazioni</p>
+                    </button>
+                  </li>
                   <li className="nav-item menu-order-health">
                     <button
                       className={`nav-link w-100 ${activeView === "doctors" ? "active" : ""}`}
@@ -352,6 +363,12 @@ export const Home = ({
                     >
                       <MenuIcon name="patient" />
                       <p>Pazienti</p>
+                    </button>
+                  </li>
+                  <li className="nav-item menu-order-reports">
+                    <button className={`nav-link w-100 ${activeView === "patient-reports" ? "active" : ""}`} type="button" onClick={() => openView("patient-reports")}>
+                      <MenuIcon name="reports" />
+                      <p>Report pazienti</p>
                     </button>
                   </li>
                 </>
@@ -444,6 +461,10 @@ export const Home = ({
             presidentId={presidentId}
             absences={absences}
           />
+        ) : activeView === "patient-reports" && presidentId && user.role !== "GVP" ? (
+          <PatientReports patients={patients} hospitals={hospitals} users={users} currentUser={user} presidentId={presidentId} />
+        ) : activeView === "presentation-reports" && presidentId && user.role !== "GVP" ? (
+          <PresentationReports presentations={presentations} presidentId={presidentId} />
         ) : activeView === "presentations" && presidentId ? (
           <Presentations
             presentations={presentations}
