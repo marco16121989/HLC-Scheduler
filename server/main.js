@@ -700,6 +700,9 @@ Meteor.methods({
         canInsertGvp: actorRole === "GVP" || isDelegatedCasRecord
           ? account?.profile?.canInsertGvp ?? false
           : record.canInsertGvp ?? account?.profile?.canInsertGvp ?? false,
+        isSecretary: actorRole === "CAS"
+          ? account?.profile?.isSecretary ?? false
+          : record.isSecretary ?? account?.profile?.isSecretary ?? false,
       };
 
       if (!account) {

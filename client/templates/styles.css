@@ -927,6 +927,23 @@ svg.admin-nav-icon {
   display: none;
 }
 
+.cas-secretary-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  margin-right: 0.45rem;
+  border-radius: 50%;
+  color: #fff;
+  background: #198754;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  transform: translateY(-4px);
+}
+
 .user-row-unassigned > td:first-child {
   border-left: 3px solid var(--bs-warning);
 }

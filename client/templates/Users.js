@@ -158,6 +158,7 @@ const createEmptyForm = (role, manager, users) => {
     hospitalAssignments: [],
     canInsertCas: false,
     canInsertGvp: false,
+    isSecretary: false,
   };
 };
 
@@ -188,6 +189,14 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   const [error, setError] = useState("");
   const [casFilter, setCasFilter] = useState("all");
   const [mobileFormOpen, setMobileFormOpen] = useState(false);
+
+  useEffect(() => {
+    const role = managedRole || availableRoles[0];
+    setForm(createEmptyForm(role, manager, users));
+    setEditingId(null);
+    setError("");
+    setMobileFormOpen(false);
+  }, [managedRole, manager?.id]);
   const formHospitalAssignments = Array.isArray(form.hospitalAssignments)
     ? form.hospitalAssignments
     : form.hospitalId
@@ -389,6 +398,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
           ? Boolean(form.canInsertGvp)
           : Boolean(editingUser?.canInsertGvp)
         : false,
+      isSecretary: role === "CAS" ? Boolean(form.isSecretary) : false,
       ...(role === "GVP" ? {
         canInsertGvp: (isPresidentManager || isCasManager)
           ? Boolean(form.canInsertGvp)
@@ -462,6 +472,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       hospitalAssignments: getHospitalAssignments(user),
       canInsertCas: Boolean(user.canInsertCas),
       canInsertGvp: Boolean(user.canInsertGvp),
+      isSecretary: Boolean(user.isSecretary),
     });
     setError("");
     setMobileFormOpen(true);
@@ -724,7 +735,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
               <section className="card users-form-card" role={mobileFormOpen ? "dialog" : undefined} aria-modal={mobileFormOpen ? "true" : undefined}>
                 <div className="card-header users-form-header">
                   <h2 className="card-title">
-                    {isEditing ? "Modifica utente" : "Inserisci utente"}
+                    {managedRole
+                      ? `${isEditing ? "Modifica" : "Inserisci"} ${managedRole}`
+                      : isEditing ? "Modifica utente" : "Inserisci utente"}
                   </h2>
                   <button
                     className="btn-close users-mobile-modal-close"
@@ -858,6 +871,21 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
 
                     {form.role === "CAS" && isPresidentManager && (
                       <div className="mb-3">
+                        <div className="form-check form-switch mb-3">
+                          <input
+                            className="form-check-input"
+                            id="user-is-secretary"
+                            type="checkbox"
+                            checked={Boolean(form.isSecretary)}
+                            onChange={(event) => setForm((current) => ({
+                              ...current,
+                              isSecretary: event.target.checked,
+                            }))}
+                          />
+                          <label className="form-check-label" htmlFor="user-is-secretary">
+                            Segretario
+                          </label>
+                        </div>
                         <div className="form-check form-switch">
                           <input
                             className="form-check-input"
@@ -1086,6 +1114,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                 } : undefined}
                               >
                                 <td className="fw-medium user-name-column" data-label="Utente">
+                                  {managedRole === "CAS" && user.isSecretary && (
+                                    <span className="cas-secretary-badge" aria-label="Segretario" title="Segretario">S</span>
+                                  )}
                                   {requiresPresident && (
                                     <span
                                       className={`user-link-arrow ${depth} ${
