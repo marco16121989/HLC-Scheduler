@@ -3,8 +3,8 @@ self.addEventListener("push", (event) => {
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data?.text() || "Nuova notifica" }; }
   event.waitUntil(self.registration.showNotification(data.title || "HLC Scheduler", {
     body: data.body || "Hai ricevuto una nuova notifica.",
-    icon: "/images/hlc-scheduler-logo.png",
-    badge: "/images/hlc-scheduler-logo.png",
+    icon: "/images/hlc-app-icon.png",
+    badge: "/images/hlc-app-icon.png",
     tag: data.notificationId || undefined,
     data: { url: data.url || "/" },
   }));

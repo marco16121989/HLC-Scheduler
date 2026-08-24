@@ -78,7 +78,9 @@ const sendDevicePush = async (notification) => {
 
 const insertNotification = async (notification) => {
   const id = await NotificationsCollection.insertAsync(notification);
-  await sendDevicePush({ ...notification, _id: id });
+  sendDevicePush({ ...notification, _id: id }).catch((error) => {
+    console.error("Preparazione della notifica push non riuscita.", error?.message || error);
+  });
   return id;
 };
 
@@ -761,10 +763,16 @@ Meteor.methods({
     const previousPatientAssignments = new Map();
     const previousPatientStatuses = new Map();
     if (kind === "patients") {
+      const recordIds = records.map((record) => record.id || record._id).filter(Boolean);
+      const previousPatients = await PatientsCollection.find(
+        { _id: { $in: recordIds } },
+        { fields: { gvpId: 1, gvpIds: 1, status: 1 } },
+      ).fetchAsync();
+      const previousPatientsById = new Map(previousPatients.map((patient) => [patient._id, patient]));
       for (const record of records) {
         const recordId = record.id || record._id;
         if (!recordId) continue;
-        const previous = await PatientsCollection.findOneAsync(recordId, { fields: { gvpId: 1, gvpIds: 1, status: 1 } });
+        const previous = previousPatientsById.get(recordId);
         const previousIds = Array.isArray(previous?.gvpIds)
           ? previous.gvpIds
           : previous?.gvpId ? [previous.gvpId] : [];

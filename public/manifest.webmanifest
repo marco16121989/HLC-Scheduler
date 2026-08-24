@@ -9,6 +9,6 @@
   "theme_color": "#0d6efd",
   "lang": "it",
   "icons": [
-    { "src": "/images/hlc-scheduler-logo.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/images/hlc-app-icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any maskable" }
   ]
 }
