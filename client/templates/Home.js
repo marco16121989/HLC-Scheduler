@@ -124,7 +124,7 @@ export const Home = ({
           </ul>
 
           <ul className="navbar-nav ms-auto align-items-center">
-            {(user.role === "CAS" || user.role === "Presidente") && (
+            {(["CAS", "Presidente", "GVP"].includes(user.role)) && (
               <li className="nav-item me-2 position-relative">
                 <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setNotificationsOpen((current) => !current)} aria-label="Mostra notifiche">
                   🔔

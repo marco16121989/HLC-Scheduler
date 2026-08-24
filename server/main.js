@@ -90,6 +90,56 @@ const ensureDefaultDepartments = async (presidentId) => {
   }
 };
 
+const sendScheduledAdmissionReminders = async () => {
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const patients = await PatientsCollection.find({
+    admissionType: "scheduled",
+    admissionDate: { $exists: true, $ne: "" },
+    status: { $nin: ["Dimesso", "Deceduto"] },
+  }).fetchAsync();
+
+  for (const patient of patients) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(patient.admissionDate || "");
+    if (!match) continue;
+    const admissionDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    const daysUntilAdmission = Math.round((admissionDate.getTime() - todayStart.getTime()) / 86400000);
+    if (![7, 2].includes(daysUntilAdmission)) continue;
+
+    const gvpIds = Array.isArray(patient.gvpIds)
+      ? patient.gvpIds
+      : patient.gvpId ? [patient.gvpId] : [];
+    const recipientIds = [...new Set([patient.casId, ...gvpIds].filter(Boolean))];
+    const patientName = `${patient.lastName || ""} ${patient.firstName || ""}`.trim();
+
+    for (const recipientId of recipientIds) {
+      const recipient = await Meteor.users.findOneAsync(recipientId, { fields: publicUserFields });
+      if (!["CAS", "GVP"].includes(recipient?.profile?.role)) continue;
+      const alreadySent = await NotificationsCollection.findOneAsync({
+        recipientId,
+        type: "scheduled-admission-reminder",
+        patientId: patient._id,
+        admissionDate: patient.admissionDate,
+        reminderDays: daysUntilAdmission,
+      });
+      if (alreadySent) continue;
+
+      await NotificationsCollection.insertAsync({
+        recipientId,
+        type: "scheduled-admission-reminder",
+        patientId: patient._id,
+        patientName,
+        admissionDate: patient.admissionDate,
+        reminderDays: daysUntilAdmission,
+        senderName: "Sistema",
+        message: `Il ricovero programmato di ${patientName || "un paziente assegnato"} è previsto tra ${daysUntilAdmission} giorni.`,
+        createdAt: new Date(),
+        readAt: null,
+      });
+    }
+  }
+};
+
 Accounts.validateLoginAttempt((attempt) => {
   if (attempt.allowed && attempt.user?.profile?.disabled) {
     throw new Meteor.Error("account-disabled", "Il gestionale è stato disattivato per questo account.");
@@ -399,6 +449,25 @@ Meteor.methods({
         );
       }
     }
+
+    if (actorRole === "CAS") {
+      const assignedGvpIds = Array.isArray(patient.gvpIds)
+        ? patient.gvpIds
+        : patient.gvpId ? [patient.gvpId] : [];
+      for (const gvpId of [...new Set(assignedGvpIds.filter(Boolean))]) {
+        const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
+        if (recipient?.profile?.role !== "GVP") continue;
+        await NotificationsCollection.insertAsync(
+          buildPatientNoteNotification({
+            recipientId: recipient._id,
+            patientId: patient._id,
+            patientName: `${patient.lastName} ${patient.firstName}`.trim(),
+            noteAuthor: actor.username || actorRole,
+            noteText: normalizedText,
+          }),
+        );
+      }
+    }
   },
 
   async "hlc.deletePatientNote"(patientId, noteId) {
@@ -618,7 +687,67 @@ Meteor.methods({
       patients: PatientsCollection,
       presentations: PresentationsCollection,
     };
+    const previousPatientAssignments = new Map();
+    const previousPatientStatuses = new Map();
+    if (kind === "patients") {
+      for (const record of records) {
+        const recordId = record.id || record._id;
+        if (!recordId) continue;
+        const previous = await PatientsCollection.findOneAsync(recordId, { fields: { gvpId: 1, gvpIds: 1, status: 1 } });
+        const previousIds = Array.isArray(previous?.gvpIds)
+          ? previous.gvpIds
+          : previous?.gvpId ? [previous.gvpId] : [];
+        previousPatientAssignments.set(recordId, new Set(previousIds.filter(Boolean)));
+        previousPatientStatuses.set(recordId, previous?.status || "");
+      }
+    }
     await replaceRecords(collections[kind], records, { presidentId });
+
+    if (kind === "patients") {
+      for (const record of records) {
+        const recordId = record.id || record._id;
+        const previousIds = previousPatientAssignments.get(recordId) || new Set();
+        const currentIds = Array.isArray(record.gvpIds)
+          ? record.gvpIds
+          : record.gvpId ? [record.gvpId] : [];
+        const newlyAssignedIds = [...new Set(currentIds.filter(Boolean))]
+          .filter((gvpId) => !previousIds.has(gvpId));
+        for (const gvpId of newlyAssignedIds) {
+          const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
+          if (recipient?.profile?.role !== "GVP") continue;
+          await NotificationsCollection.insertAsync({
+            recipientId: gvpId,
+            type: "patient-assignment",
+            patientId: recordId,
+            patientName: `${record.lastName || ""} ${record.firstName || ""}`.trim(),
+            senderName: actor.username || role,
+            message: `Ti è stato assegnato il paziente ${`${record.lastName || ""} ${record.firstName || ""}`.trim() || "selezionato"}.`,
+            createdAt: new Date(),
+            readAt: null,
+          });
+        }
+
+        if (record.status === "Deceduto" && previousPatientStatuses.get(recordId) !== "Deceduto") {
+          const patientPresidentId = record.presidentId || presidentId;
+          const recipient = patientPresidentId
+            ? await Meteor.users.findOneAsync(patientPresidentId, { fields: publicUserFields })
+            : null;
+          if (recipient?.profile?.role === "Presidente") {
+            const patientName = `${record.lastName || ""} ${record.firstName || ""}`.trim();
+            await NotificationsCollection.insertAsync({
+              recipientId: recipient._id,
+              type: "patient-deceased",
+              patientId: recordId,
+              patientName,
+              senderName: actor.username || role,
+              message: `Il paziente ${patientName || "selezionato"} è stato indicato come deceduto.`,
+              createdAt: new Date(),
+              readAt: null,
+            });
+          }
+        }
+      }
+    }
   },
 
   async "hlc.syncUsers"(records) {
@@ -837,4 +966,11 @@ Meteor.startup(async () => {
 
   // Keep this function referenced during development for easy server-side inspection.
   void userView;
+
+  await sendScheduledAdmissionReminders();
+  Meteor.setInterval(() => {
+    sendScheduledAdmissionReminders().catch((error) => {
+      console.error("Impossibile controllare i promemoria dei ricoveri programmati.", error);
+    });
+  }, 60 * 60 * 1000);
 });
