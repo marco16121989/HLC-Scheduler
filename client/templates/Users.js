@@ -159,6 +159,7 @@ const createEmptyForm = (role, manager, users) => {
     canInsertCas: false,
     canInsertGvp: false,
     isSecretary: false,
+    casMembership: "",
   };
 };
 
@@ -399,6 +400,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
           : Boolean(editingUser?.canInsertGvp)
         : false,
       isSecretary: role === "CAS" ? Boolean(form.isSecretary) : false,
+      casMembership: role === "Presidente" ? form.casMembership.trim() : "",
       ...(role === "GVP" ? {
         canInsertGvp: (isPresidentManager || isCasManager)
           ? Boolean(form.canInsertGvp)
@@ -473,6 +475,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       canInsertCas: Boolean(user.canInsertCas),
       canInsertGvp: Boolean(user.canInsertGvp),
       isSecretary: Boolean(user.isSecretary),
+      casMembership: user.casMembership || "",
     });
     setError("");
     setMobileFormOpen(true);
@@ -788,6 +791,21 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                       </div>
                     )}
 
+                    {form.role === "Presidente" && (
+                      <div className="mb-3">
+                        <label className="form-label" htmlFor="user-cas-membership">CAS di appartenenza</label>
+                        <input
+                          className="form-control"
+                          id="user-cas-membership"
+                          name="casMembership"
+                          type="text"
+                          value={form.casMembership || ""}
+                          onChange={handleChange}
+                          placeholder="Inserisci il CAS di appartenenza"
+                        />
+                      </div>
+                    )}
+
                     {!isTeamManager &&
                       (form.role === "CAS" || form.role === "GVP") && (
                         <div className="mb-3">
@@ -1027,6 +1045,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                         {manager?.role === "Admin" ? (
                         <tr>
                           <th>Presidente</th>
+                          <th>CAS di appartenenza</th>
                           <th>Numero CAS</th>
                           <th>Numero GVP</th>
                           <th className="text-end">Azioni</th>
@@ -1050,7 +1069,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                       <tbody>
                         {filteredOrderedUsers.length === 0 ? (
                           <tr>
-                            <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "4" : managedRole ? "5" : "6"}>
+                            <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "5" : managedRole ? "5" : "6"}>
                               {casFilter !== "all"
                                 ? "Nessun utente corrisponde ai filtri selezionati."
                                 : manager?.role === "Admin"
@@ -1092,6 +1111,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                               return (
                                 <tr key={user.id}>
                                   <td className="fw-medium" data-label="Presidente">{user.username} {user.disabled && <span className="badge text-bg-danger ms-2">Disattivato</span>}</td>
+                                  <td data-label="CAS di appartenenza">{user.casMembership || <span className="text-secondary">-</span>}</td>
                                   <td data-label="CAS"><span className="badge text-bg-primary user-count-badge">{casCount}</span></td>
                                   <td data-label="GVP"><span className="badge text-bg-info user-count-badge">{gvpCount}</span></td>
                                   <td className="text-end" data-label="Azioni"><div className="d-inline-flex gap-2"><button className={`btn btn-sm ${user.disabled ? "btn-outline-success" : "btn-outline-danger"}`} type="button" onClick={() => togglePresidentActive(user)}>{user.disabled ? "Attiva" : "Disattiva"}</button><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(user)}>Modifica</button></div></td>

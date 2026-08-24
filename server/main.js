@@ -703,6 +703,9 @@ Meteor.methods({
         isSecretary: actorRole === "CAS"
           ? account?.profile?.isSecretary ?? false
           : record.isSecretary ?? account?.profile?.isSecretary ?? false,
+        casMembership: actorRole === "Admin" && record.role === "Presidente"
+          ? String(record.casMembership || "").trim()
+          : account?.profile?.casMembership ?? "",
       };
 
       if (!account) {
