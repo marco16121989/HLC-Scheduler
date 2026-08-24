@@ -16,6 +16,7 @@ import {
   UsefulFilesCollection,
 } from "/imports/api/links";
 import { formatUserName } from "/imports/utils/formatUserName";
+import { usePushNotifications } from "./usePushNotifications.js";
 
 const toClientRecord = ({ _id, profile, ...record }) => ({
   id: _id,
@@ -123,6 +124,8 @@ export const App = () => {
     Meteor.call("hlc.trackAccess");
   }, [user?.id]);
 
+  const pushNotifications = usePushNotifications(user?.id);
+
   const makeSetter = (kind, current) => (update) => {
     const next = typeof update === "function" ? update(current) : update;
     callServer("hlc.replaceRecords", kind, next);
@@ -171,6 +174,7 @@ export const App = () => {
       usefulFiles={usefulFiles}
       absences={absences}
       accessLogs={accessLogs}
+      pushNotifications={pushNotifications}
       theme={theme}
       onToggleTheme={toggleTheme}
       fontSize={fontSize}

@@ -1,6 +1,7 @@
 import { Meteor } from "meteor/meteor";
 import { Accounts } from "meteor/accounts-base";
 import { check, Match } from "meteor/check";
+import webpush from "web-push";
 import {
   AccessLogsCollection,
   AbsencesCollection,
@@ -10,6 +11,8 @@ import {
   NotificationsCollection,
   PatientsCollection,
   PresentationsCollection,
+  PushSettingsCollection,
+  PushSubscriptionsCollection,
   SupportRequestsCollection,
   UsefulFilesCollection,
 } from "/imports/api/links";
@@ -34,6 +37,49 @@ const usefulFileMimeTypes = new Set([
 const publicUserFields = {
   username: 1,
   profile: 1,
+};
+
+let vapidPublicKey = "";
+
+const initializeWebPush = async () => {
+  const environmentKeys = process.env.HLC_VAPID_PUBLIC_KEY && process.env.HLC_VAPID_PRIVATE_KEY
+    ? { publicKey: process.env.HLC_VAPID_PUBLIC_KEY, privateKey: process.env.HLC_VAPID_PRIVATE_KEY }
+    : null;
+  let keys = environmentKeys || await PushSettingsCollection.findOneAsync("vapid");
+  if (!keys) {
+    keys = { _id: "vapid", ...webpush.generateVAPIDKeys(), createdAt: new Date() };
+    await PushSettingsCollection.insertAsync(keys);
+  }
+  vapidPublicKey = keys.publicKey;
+  webpush.setVapidDetails(process.env.HLC_VAPID_SUBJECT || "mailto:assistenza@hlcscheduler.local", keys.publicKey, keys.privateKey);
+};
+
+const sendDevicePush = async (notification) => {
+  if (!vapidPublicKey) return;
+  const subscriptions = await PushSubscriptionsCollection.find({ userId: notification.recipientId }).fetchAsync();
+  const payload = JSON.stringify({
+    title: "HLC Scheduler",
+    body: notification.message,
+    url: "/",
+    notificationId: notification._id,
+  });
+  for (const item of subscriptions) {
+    try {
+      await webpush.sendNotification(item.subscription, payload);
+    } catch (error) {
+      if ([404, 410].includes(error?.statusCode)) {
+        await PushSubscriptionsCollection.removeAsync(item._id);
+      } else {
+        console.error("Invio notifica push non riuscito.", error?.message || error);
+      }
+    }
+  }
+};
+
+const insertNotification = async (notification) => {
+  const id = await NotificationsCollection.insertAsync(notification);
+  await sendDevicePush({ ...notification, _id: id });
+  return id;
 };
 
 const requireUser = (context) => {
@@ -124,7 +170,7 @@ const sendScheduledAdmissionReminders = async () => {
       });
       if (alreadySent) continue;
 
-      await NotificationsCollection.insertAsync({
+      await insertNotification({
         recipientId,
         type: "scheduled-admission-reminder",
         patientId: patient._id,
@@ -267,6 +313,31 @@ Meteor.publish("hlc-access-logs", async function publishHlcAccessLogs() {
 });
 
 Meteor.methods({
+  "hlc.getPushPublicKey"() {
+    requireUser(this);
+    if (!vapidPublicKey) throw new Meteor.Error("push-unavailable", "Le notifiche del dispositivo non sono ancora disponibili.");
+    return vapidPublicKey;
+  },
+
+  async "hlc.savePushSubscription"(subscription) {
+    requireUser(this);
+    check(subscription, {
+      endpoint: String,
+      expirationTime: Match.Maybe(Number),
+      keys: { p256dh: String, auth: String },
+    });
+    await PushSubscriptionsCollection.upsertAsync(
+      { "subscription.endpoint": subscription.endpoint },
+      { $set: { userId: this.userId, subscription, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+    );
+  },
+
+  async "hlc.removePushSubscription"(endpoint) {
+    requireUser(this);
+    check(endpoint, String);
+    await PushSubscriptionsCollection.removeAsync({ userId: this.userId, "subscription.endpoint": endpoint });
+  },
+
   async "hlc.trackAccess"() {
     requireUser(this);
     const actor = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
@@ -438,7 +509,7 @@ Meteor.methods({
     if (actorRole === "GVP" && patient.casId) {
       const recipient = await Meteor.users.findOneAsync(patient.casId);
       if (recipient) {
-        await NotificationsCollection.insertAsync(
+        await insertNotification(
           buildPatientNoteNotification({
             recipientId: recipient._id,
             patientId: patient._id,
@@ -457,7 +528,7 @@ Meteor.methods({
       for (const gvpId of [...new Set(assignedGvpIds.filter(Boolean))]) {
         const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
         if (recipient?.profile?.role !== "GVP") continue;
-        await NotificationsCollection.insertAsync(
+        await insertNotification(
           buildPatientNoteNotification({
             recipientId: recipient._id,
             patientId: patient._id,
@@ -715,7 +786,7 @@ Meteor.methods({
         for (const gvpId of newlyAssignedIds) {
           const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
           if (recipient?.profile?.role !== "GVP") continue;
-          await NotificationsCollection.insertAsync({
+          await insertNotification({
             recipientId: gvpId,
             type: "patient-assignment",
             patientId: recordId,
@@ -734,7 +805,7 @@ Meteor.methods({
             : null;
           if (recipient?.profile?.role === "Presidente") {
             const patientName = `${record.lastName || ""} ${record.firstName || ""}`.trim();
-            await NotificationsCollection.insertAsync({
+            await insertNotification({
               recipientId: recipient._id,
               type: "patient-deceased",
               patientId: recordId,
@@ -924,6 +995,7 @@ Meteor.methods({
 });
 
 Meteor.startup(async () => {
+  await initializeWebPush();
   const adminUsername = formatUserName(
     process.env.HLC_ADMIN_USERNAME || "marco.mattiazzo",
   );

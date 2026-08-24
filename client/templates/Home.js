@@ -66,6 +66,7 @@ export const Home = ({
   usefulFiles = [],
   absences = [],
   accessLogs = [],
+  pushNotifications,
   theme,
   onToggleTheme,
   fontSize,
@@ -419,7 +420,7 @@ export const Home = ({
         ) : activeView === "absences" && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
           <Absences absences={absences} users={users} currentUser={user} />
         ) : activeView === "settings" ? (
-          <Settings theme={theme} onToggleTheme={onToggleTheme} fontSize={fontSize} onFontSizeChange={onFontSizeChange} highContrast={highContrast} onToggleHighContrast={onToggleHighContrast} boldText={boldText} onToggleBoldText={onToggleBoldText} />
+          <Settings theme={theme} onToggleTheme={onToggleTheme} fontSize={fontSize} onFontSizeChange={onFontSizeChange} highContrast={highContrast} onToggleHighContrast={onToggleHighContrast} boldText={boldText} onToggleBoldText={onToggleBoldText} pushNotifications={pushNotifications} />
         ) : activeView === "info" ? (
           <Info />
         ) : activeView === "notifications" ? (
