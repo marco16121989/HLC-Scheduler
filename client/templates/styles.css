@@ -2853,7 +2853,7 @@ svg.admin-nav-icon {
 }
 
 /* Evita che i modal mobile finiscano sotto la barra superiore del browser. */
-@media (max-width: 767.98px) {
+@media (max-width: 1199.98px) {
   .entity-modal-shell,
   .entity-modal-shell:has(.patient-modal-card) {
     align-items: flex-start;
