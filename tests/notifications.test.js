@@ -1,5 +1,11 @@
 import assert from "assert";
-import { buildPatientNoteNotification, getAssignedGvpIds, normalizePushSubscription } from "../server/main.js";
+import {
+  buildPatientNoteNotification,
+  getAssignedGvpIds,
+  getPatientCoordinatorIds,
+  isNewCasAssignment,
+  normalizePushSubscription,
+} from "../server/main.js";
 
 describe("patient note notifications", function () {
   it("builds a notification for the CAS recipient", function () {
@@ -53,5 +59,18 @@ describe("push subscriptions", function () {
       getAssignedGvpIds({ gvpIds: ["gvp-1", "gvp-2"], gvpId: "gvp-1" }),
       ["gvp-1", "gvp-2"],
     );
+  });
+
+  it("treats the President and CAS as patient notification coordinators", function () {
+    assert.deepStrictEqual(
+      getPatientCoordinatorIds({ casId: "cas-1", presidentId: "president-1" }),
+      ["cas-1", "president-1"],
+    );
+  });
+
+  it("detects a new CAS assignment independently from GVP assignments", function () {
+    assert.strictEqual(isNewCasAssignment("", "cas-1"), true);
+    assert.strictEqual(isNewCasAssignment("cas-1", "cas-1"), false);
+    assert.strictEqual(isNewCasAssignment("cas-1", "cas-2"), true);
   });
 });

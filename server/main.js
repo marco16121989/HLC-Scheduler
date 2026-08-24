@@ -134,6 +134,14 @@ export const getAssignedGvpIds = (patient) => [...new Set([
   patient?.gvpId,
 ].filter(Boolean))];
 
+export const getPatientCoordinatorIds = (patient) => [...new Set([
+  patient?.casId,
+  patient?.presidentId,
+].filter(Boolean))];
+
+export const isNewCasAssignment = (previousCasId, currentCasId) =>
+  Boolean(currentCasId) && currentCasId !== previousCasId;
+
 const cleanRecord = (record) => {
   const { _id, password, passwordHash, ...fields } = record;
   return { _id: record.id || _id, ...fields };
@@ -187,12 +195,12 @@ const sendScheduledAdmissionReminders = async () => {
     if (![7, 2].includes(daysUntilAdmission)) continue;
 
     const gvpIds = getAssignedGvpIds(patient);
-    const recipientIds = [...new Set([patient.casId, ...gvpIds].filter(Boolean))];
+    const recipientIds = [...new Set([...getPatientCoordinatorIds(patient), ...gvpIds])];
     const patientName = `${patient.lastName || ""} ${patient.firstName || ""}`.trim();
 
     for (const recipientId of recipientIds) {
       const recipient = await Meteor.users.findOneAsync(recipientId, { fields: publicUserFields });
-      if (!["CAS", "GVP"].includes(recipient?.profile?.role)) continue;
+      if (!["Presidente", "CAS", "GVP"].includes(recipient?.profile?.role)) continue;
       const alreadySent = await NotificationsCollection.findOneAsync({
         recipientId,
         type: "scheduled-admission-reminder",
@@ -534,9 +542,10 @@ Meteor.methods({
       $set: { gvpNotes: [...existingNotes, note] },
     });
 
-    if (actorRole === "GVP" && patient.casId) {
-      const recipient = await Meteor.users.findOneAsync(patient.casId);
-      if (recipient) {
+    if (actorRole === "GVP") {
+      for (const recipientId of getPatientCoordinatorIds(patient)) {
+        const recipient = await Meteor.users.findOneAsync(recipientId, { fields: publicUserFields });
+        if (!["Presidente", "CAS"].includes(recipient?.profile?.role)) continue;
         await insertNotification(
           buildPatientNoteNotification({
             recipientId: recipient._id,
@@ -549,7 +558,7 @@ Meteor.methods({
       }
     }
 
-    if (actorRole === "CAS") {
+    if (["CAS", "Presidente"].includes(actorRole)) {
       const assignedGvpIds = getAssignedGvpIds(patient);
       for (const gvpId of assignedGvpIds) {
         const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
@@ -785,22 +794,22 @@ Meteor.methods({
       presentations: PresentationsCollection,
     };
     const previousPatientAssignments = new Map();
+    const previousPatientCasAssignments = new Map();
     const previousPatientStatuses = new Map();
     if (kind === "patients") {
       const recordIds = records.map((record) => record.id || record._id).filter(Boolean);
       const previousPatients = await PatientsCollection.find(
         { _id: { $in: recordIds } },
-        { fields: { gvpId: 1, gvpIds: 1, status: 1 } },
+        { fields: { casId: 1, gvpId: 1, gvpIds: 1, status: 1 } },
       ).fetchAsync();
       const previousPatientsById = new Map(previousPatients.map((patient) => [patient._id, patient]));
       for (const record of records) {
         const recordId = record.id || record._id;
         if (!recordId) continue;
         const previous = previousPatientsById.get(recordId);
-        const previousIds = Array.isArray(previous?.gvpIds)
-          ? previous.gvpIds
-          : previous?.gvpId ? [previous.gvpId] : [];
+        const previousIds = getAssignedGvpIds(previous);
         previousPatientAssignments.set(recordId, new Set(previousIds.filter(Boolean)));
+        previousPatientCasAssignments.set(recordId, previous?.casId || "");
         previousPatientStatuses.set(recordId, previous?.status || "");
       }
     }
@@ -810,13 +819,29 @@ Meteor.methods({
       for (const record of records) {
         const recordId = record.id || record._id;
         const previousIds = previousPatientAssignments.get(recordId) || new Set();
-        const currentIds = Array.isArray(record.gvpIds)
-          ? record.gvpIds
-          : record.gvpId ? [record.gvpId] : [];
+        const currentIds = getAssignedGvpIds(record);
         const newlyAssignedIds = [...new Set(currentIds.filter(Boolean))]
           .filter((gvpId) => !previousIds.has(gvpId));
         const removedGvpIds = [...previousIds]
           .filter((gvpId) => !currentIds.includes(gvpId));
+
+        if (role === "Presidente" && isNewCasAssignment(previousPatientCasAssignments.get(recordId), record.casId)) {
+          const recipient = await Meteor.users.findOneAsync(record.casId, { fields: publicUserFields });
+          if (recipient?.profile?.role === "CAS") {
+            const patientName = `${record.lastName || ""} ${record.firstName || ""}`.trim();
+            await insertNotification({
+              recipientId: recipient._id,
+              type: "patient-assignment",
+              patientId: recordId,
+              patientName,
+              senderName: actor.username || role,
+              message: `Ti è stato assegnato il paziente ${patientName || "selezionato"}.`,
+              createdAt: new Date(),
+              readAt: null,
+            });
+          }
+        }
+
         for (const gvpId of newlyAssignedIds) {
           const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
           if (recipient?.profile?.role !== "GVP") continue;
