@@ -139,6 +139,14 @@ export const App = () => {
 
   const pushNotifications = usePushNotifications(user?.id);
 
+  const logout = async () => {
+    try {
+      await pushNotifications.detach();
+    } finally {
+      Meteor.logout();
+    }
+  };
+
   useEffect(() => {
     if (!("setAppBadge" in navigator) || !("clearAppBadge" in navigator)) return;
     const unreadCount = user?.id
@@ -230,7 +238,7 @@ export const App = () => {
       onToggleHighContrast={() => setHighContrast((current) => !current)}
       boldText={boldText}
       onToggleBoldText={() => setBoldText((current) => !current)}
-      onLogout={() => Meteor.logout()}
+      onLogout={logout}
     />
   ) : (
     <Login theme={theme} onToggleTheme={toggleTheme} />

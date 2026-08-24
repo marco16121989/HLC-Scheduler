@@ -23,7 +23,12 @@ export const usePushNotifications = (userId) => {
     if (!supported || !userId) return undefined;
     navigator.serviceWorker.register("/service-worker.js")
       .then((registration) => registration.pushManager.getSubscription())
-      .then((subscription) => { if (active) setEnabled(Boolean(subscription)); })
+      .then(async (subscription) => {
+        if (subscription) {
+          await callAsync("hlc.savePushSubscription", subscription.toJSON());
+        }
+        if (active) setEnabled(Boolean(subscription));
+      })
       .catch(() => { if (active) setError("Impossibile inizializzare le notifiche del dispositivo."); });
     setPermission(Notification.permission);
     return () => { active = false; };
@@ -63,5 +68,23 @@ export const usePushNotifications = (userId) => {
     } finally { setBusy(false); }
   }, [supported]);
 
-  return { supported, enabled, permission, busy, error, enable, disable };
+  const detach = useCallback(async () => {
+    if (!supported || !userId) return;
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (subscription) {
+      try {
+        await callAsync("hlc.removePushSubscription", subscription.endpoint);
+      } catch (error) {
+        await subscription.unsubscribe().catch(() => {});
+        setEnabled(false);
+        throw error;
+      }
+    }
+    if ("clearAppBadge" in navigator) {
+      await navigator.clearAppBadge().catch(() => {});
+    }
+  }, [supported, userId]);
+
+  return { supported, enabled, permission, busy, error, enable, disable, detach };
 };
