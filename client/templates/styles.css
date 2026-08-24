@@ -2851,3 +2851,28 @@ svg.admin-nav-icon {
   .patient-pie-layout { grid-template-columns: 1fr; }
   .patient-pie-wrap { width: min(100%, 13rem); margin: 0 auto; }
 }
+
+/* Evita che i modal mobile finiscano sotto la barra superiore del browser. */
+@media (max-width: 767.98px) {
+  .entity-modal-shell,
+  .entity-modal-shell:has(.patient-modal-card) {
+    align-items: flex-start;
+    padding: calc(env(safe-area-inset-top, 0px) + 1.25rem) 0.75rem calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+  .entity-modal-card,
+  .patient-modal-card {
+    width: 100%;
+    min-height: 0;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 2.75rem);
+    max-height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 2.75rem);
+    overflow-y: auto;
+  }
+  .users-form-column.is-mobile-open {
+    align-items: flex-start;
+    padding: calc(env(safe-area-inset-top, 0px) + 1.25rem) 0.75rem calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+  .users-form-card {
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 2.75rem);
+    max-height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 2.75rem);
+  }
+}

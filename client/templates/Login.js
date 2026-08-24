@@ -24,7 +24,7 @@ export const Login = ({ theme, onToggleTheme }) => {
       </button>
       <main className="main login-main">
         <section className="card login-card">
-          <img className="login-logo" src="/images/hlc-scheduler-logo.png" alt="HLC Scheduler" />
+          <img className="login-logo" src="/images/hlc-scheduler-logo-optimized.jpg" alt="HLC Scheduler" decoding="async" fetchPriority="high" />
           <span className="eyebrow">Accedi</span>
           <h1>Benvenuto</h1>
           <p>Accedi per andare alla tua home page.</p>

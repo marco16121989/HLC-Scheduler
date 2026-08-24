@@ -169,7 +169,7 @@ export const Home = ({
           <a href="#" className="brand-link" aria-label="HLC Scheduler home">
             <img
               className="brand-logo"
-              src="/images/hlc-scheduler-logo.png"
+              src="/images/hlc-scheduler-logo-optimized.jpg"
               alt=""
             />
             <span className="brand-text fw-semibold">HLC Scheduler</span>
@@ -493,8 +493,10 @@ export const Home = ({
             <div className="home-welcome-inner">
               <img
                 className="home-welcome-logo"
-                src="/images/hlc-scheduler-logo.png"
+                src="/images/hlc-scheduler-logo-optimized.jpg"
                 alt="HLC Scheduler"
+                decoding="async"
+                fetchPriority="high"
               />
               <h1>HLC Scheduler</h1>
               <p>Benvenuto, {user.firstName || user.username}</p>
