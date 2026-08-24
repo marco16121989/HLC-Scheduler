@@ -139,6 +139,17 @@ export const App = () => {
 
   const pushNotifications = usePushNotifications(user?.id);
 
+  useEffect(() => {
+    if (!("setAppBadge" in navigator) || !("clearAppBadge" in navigator)) return;
+    const unreadCount = user?.id
+      ? notifications.filter((notification) => !notification.readAt).length
+      : 0;
+    const badgeUpdate = unreadCount > 0
+      ? navigator.setAppBadge(unreadCount)
+      : navigator.clearAppBadge();
+    badgeUpdate.catch(() => {});
+  }, [notifications, user?.id]);
+
   const initialLoadingComplete = logoReady && !Meteor.loggingIn() && !(Meteor.userId() && !ready);
   useEffect(() => {
     if (!initialLoadingComplete || startupComplete) return undefined;

@@ -79,11 +79,16 @@ const initializeWebPush = async () => {
 const sendDevicePush = async (notification) => {
   if (!vapidPublicKey) return;
   const subscriptions = await PushSubscriptionsCollection.find({ userId: notification.recipientId }).fetchAsync();
+  const badgeCount = await NotificationsCollection.find({
+    recipientId: notification.recipientId,
+    readAt: null,
+  }).countAsync();
   const payload = JSON.stringify({
     title: "HLC Scheduler",
     body: notification.message,
     url: "/",
     notificationId: notification._id,
+    badgeCount,
   });
   for (const item of subscriptions) {
     try {
