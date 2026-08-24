@@ -80,9 +80,7 @@ export const Home = ({
   const [sidebarOpen, setSidebarOpen] = useState(
     () => globalThis.innerWidth >= 992,
   );
-  const [activeView, setActiveView] = useState(
-    user.role === "GVP" ? "patients" : "home",
-  );
+  const [activeView, setActiveView] = useState("home");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const unreadNotifications = notifications.filter((notification) => !notification.readAt);
   const markNotificationRead = (notificationId) => Meteor.call("hlc.markNotificationAsRead", notificationId);

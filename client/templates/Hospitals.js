@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirmAction } from "./ConfirmDialog.js";
 import { normalizeHospital } from "../utils/hospitals.js";
 
 const DEFAULT_DEPARTMENTS = [
@@ -173,10 +174,10 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
     setModalOpen(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     const hospital = hospitals.find((item) => item.id === editingId);
 
-    if (!hospital || !globalThis.confirm(`Eliminare ${hospital.name}?`)) {
+    if (!hospital || !await confirmAction(`Eliminare ${hospital.name}?`)) {
       return;
     }
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
 import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPdf.js";
+import { confirmAction } from "./ConfirmDialog.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 
@@ -626,6 +627,9 @@ export const Patients = ({
       );
     } else {
       setPatients((current) => [...current, savedPatient]);
+      if (statusFilter !== "all" && statusFilter !== savedPatient.status) {
+        setStatusFilter(savedPatient.status);
+      }
     }
 
     resetForm();
@@ -715,12 +719,12 @@ export const Patients = ({
     setModalOpen(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     const patient = patients.find((item) => item.id === editingId);
 
     if (
       !patient ||
-      !globalThis.confirm(
+      !await confirmAction(
         `Eliminare il paziente ${patient.firstName} ${patient.lastName}?`,
       )
     ) {
@@ -826,9 +830,9 @@ export const Patients = ({
     });
   };
 
-  const deleteGvpNote = (note) => {
+  const deleteGvpNote = async (note) => {
     if (!notePatient || note.authorId !== currentUser.id) return;
-    if (!globalThis.confirm("Eliminare questa nota?")) return;
+    if (!await confirmAction("Eliminare questa nota?")) return;
     setNoteError("");
     Meteor.call("hlc.deletePatientNote", notePatient.id, note.id, (methodError) => {
       if (methodError) {

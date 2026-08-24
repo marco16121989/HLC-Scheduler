@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirmAction } from "./ConfirmDialog.js";
 
 export const Departments = ({ departments, setDepartments, hospitals, presidentId }) => {
   const [name, setName] = useState("");
@@ -59,7 +60,7 @@ export const Departments = ({ departments, setDepartments, hospitals, presidentI
     resetForm();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     const department = visibleDepartments.find((item) => item.id === editingId);
     if (!department) return;
     const usedBy = hospitals.filter((hospital) =>
@@ -73,7 +74,7 @@ export const Departments = ({ departments, setDepartments, hospitals, presidentI
       setError(`Il reparto è utilizzato da ${usedBy.length} ospedale/i e non può essere eliminato.`);
       return;
     }
-    if (!globalThis.confirm(`Eliminare il reparto “${department.name}”?`)) return;
+    if (!await confirmAction(`Eliminare il reparto “${department.name}”?`)) return;
     setDepartments((current) => current.filter((item) => item.id !== editingId));
     resetForm();
   };

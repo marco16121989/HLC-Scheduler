@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Meteor } from "meteor/meteor";
+import { confirmAction } from "./ConfirmDialog.js";
 
 const emptyForm = () => ({ id: "", startDate: "", endDate: "", note: "" });
 const formatDate = (value) => value
@@ -38,8 +39,8 @@ export const Absences = ({ absences = [], users = [], currentUser }) => {
     });
   };
 
-  const remove = (absence) => {
-    if (!globalThis.confirm("Eliminare questo periodo di assenza?")) return;
+  const remove = async (absence) => {
+    if (!await confirmAction("Eliminare questo periodo di assenza?")) return;
     Meteor.call("hlc.deleteAbsence", absence.id, (methodError) => {
       if (methodError) setError(methodError.reason || "Impossibile eliminare il periodo.");
       else if (form.id === absence.id) setForm(emptyForm());

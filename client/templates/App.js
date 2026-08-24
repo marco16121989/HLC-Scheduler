@@ -1,6 +1,6 @@
 import { Meteor } from "meteor/meteor";
 import { useTracker } from "meteor/react-meteor-data";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Home } from "./Home.js";
 import { Login } from "./Login.js";
 import {
@@ -17,6 +17,7 @@ import {
 } from "/imports/api/links";
 import { formatUserName } from "/imports/utils/formatUserName";
 import { usePushNotifications } from "./usePushNotifications.js";
+import { ConfirmDialogHost } from "./ConfirmDialog.js";
 
 const toClientRecord = ({ _id, profile, ...record }) => ({
   id: _id,
@@ -34,6 +35,10 @@ const callServer = (method, ...args) => {
 };
 
 export const App = () => {
+  const [logoReady, setLogoReady] = useState(false);
+  const [startupExiting, setStartupExiting] = useState(false);
+  const [startupComplete, setStartupComplete] = useState(false);
+  const startupStartedAt = useRef(Date.now());
   const [theme, setTheme] = useState(() => {
     const savedTheme = globalThis.localStorage?.getItem("hlc-theme");
     if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
@@ -51,6 +56,14 @@ export const App = () => {
   const [boldText, setBoldText] = useState(
     () => globalThis.localStorage?.getItem("hlc-bold-text") === "true",
   );
+
+  useEffect(() => {
+    const logo = new Image();
+    logo.onload = () => setLogoReady(true);
+    logo.onerror = () => setLogoReady(true);
+    logo.src = "/images/hlc-scheduler-logo-optimized.jpg";
+    if (logo.complete) setLogoReady(true);
+  }, []);
 
   useEffect(() => {
     const resetKey = "hlc-italian-interface-reset-v1";
@@ -126,6 +139,22 @@ export const App = () => {
 
   const pushNotifications = usePushNotifications(user?.id);
 
+  const initialLoadingComplete = logoReady && !Meteor.loggingIn() && !(Meteor.userId() && !ready);
+  useEffect(() => {
+    if (!initialLoadingComplete || startupComplete) return undefined;
+    const elapsed = Date.now() - startupStartedAt.current;
+    const remaining = Math.max(0, 3000 - elapsed);
+    let completionTimer;
+    const exitTimer = globalThis.setTimeout(() => {
+      setStartupExiting(true);
+      completionTimer = globalThis.setTimeout(() => setStartupComplete(true), 420);
+    }, remaining);
+    return () => {
+      globalThis.clearTimeout(exitTimer);
+      globalThis.clearTimeout(completionTimer);
+    };
+  }, [initialLoadingComplete, startupComplete]);
+
   const makeSetter = (kind, current) => (update) => {
     const next = typeof update === "function" ? update(current) : update;
     callServer("hlc.replaceRecords", kind, next);
@@ -145,8 +174,15 @@ export const App = () => {
     callServer("hlc.replaceRecords", "presentations", writableRecords);
   };
 
-  if (Meteor.loggingIn() || (Meteor.userId() && !ready)) {
-    return null;
+  const startupLoader = <div className={`startup-loader ${startupExiting ? "is-exiting" : ""}`} role="status" aria-live="polite">
+      <div className="startup-loader-content">
+        <div className="startup-loader-mark" aria-hidden="true">HLC</div>
+        <div className="startup-progress" aria-label="Caricamento in corso"><span /></div>
+      </div>
+    </div>;
+
+  if (!startupComplete && !startupExiting) {
+    return startupLoader;
   }
 
   if (user?.disabled) {
@@ -154,7 +190,7 @@ export const App = () => {
     return null;
   }
 
-  return user ? (
+  return <>{!startupComplete && startupLoader}<ConfirmDialogHost />{user ? (
     <Home
       user={user}
       users={users}
@@ -187,5 +223,5 @@ export const App = () => {
     />
   ) : (
     <Login theme={theme} onToggleTheme={toggleTheme} />
-  );
+  )}</>;
 };

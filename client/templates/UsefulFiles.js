@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Meteor } from "meteor/meteor";
+import { confirmAction } from "./ConfirmDialog.js";
 
 const MAX_FILE_SIZE = 6 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set([
@@ -62,8 +63,8 @@ export const UsefulFiles = ({ files, currentUser }) => {
     reader.readAsDataURL(selectedFile);
   };
 
-  const deleteFile = (file) => {
-    if (!globalThis.confirm(`Eliminare ${file.name}?`)) return;
+  const deleteFile = async (file) => {
+    if (!await confirmAction(`Eliminare ${file.name}?`)) return;
     Meteor.call("hlc.deleteUsefulFile", file.id, (methodError) => {
       if (methodError) setError(methodError.reason || "Impossibile eliminare il file.");
     });

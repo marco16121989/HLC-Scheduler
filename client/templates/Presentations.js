@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirmAction } from "./ConfirmDialog.js";
 import { createPopulatedPresentationPdf } from "../utils/populatePresentationPdf.js";
 
 const PRESENTATION_TYPES = ["In presenza", "Online", "PowerPoint", "Espositori"];
@@ -134,9 +135,9 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
     setError("");
     setModalOpen(true);
   };
-  const handleDelete = () => {
+  const handleDelete = async () => {
     const item = presentations.find((presentation) => presentation.id === editingId);
-    if (!item || !globalThis.confirm(`Eliminare la presentazione “${item.event}”?`)) return;
+    if (!item || !await confirmAction(`Eliminare la presentazione “${item.event}”?`)) return;
     setPresentations((current) => current.filter((presentation) => presentation.id !== editingId));
     resetForm();
   };

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirmAction } from "./ConfirmDialog.js";
 
 const doctorTypes = [
   "Consulente",
@@ -219,12 +220,12 @@ export const Doctors = ({
         .map((department) => `${hospital.name} / ${department.name}`),
     );
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     const doctor = doctors.find((item) => item.id === editingId);
 
     if (
       !doctor ||
-      !globalThis.confirm(
+      !await confirmAction(
         `Eliminare il medico ${doctor.firstName} ${doctor.lastName}?`,
       )
     ) {

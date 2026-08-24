@@ -791,6 +791,8 @@ Meteor.methods({
           : record.gvpId ? [record.gvpId] : [];
         const newlyAssignedIds = [...new Set(currentIds.filter(Boolean))]
           .filter((gvpId) => !previousIds.has(gvpId));
+        const removedGvpIds = [...previousIds]
+          .filter((gvpId) => !currentIds.includes(gvpId));
         for (const gvpId of newlyAssignedIds) {
           const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
           if (recipient?.profile?.role !== "GVP") continue;
@@ -801,6 +803,22 @@ Meteor.methods({
             patientName: `${record.lastName || ""} ${record.firstName || ""}`.trim(),
             senderName: actor.username || role,
             message: `Ti è stato assegnato il paziente ${`${record.lastName || ""} ${record.firstName || ""}`.trim() || "selezionato"}.`,
+            createdAt: new Date(),
+            readAt: null,
+          });
+        }
+
+        for (const gvpId of removedGvpIds) {
+          const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
+          if (recipient?.profile?.role !== "GVP") continue;
+          const patientName = `${record.lastName || ""} ${record.firstName || ""}`.trim();
+          await insertNotification({
+            recipientId: gvpId,
+            type: "patient-unassignment",
+            patientId: recordId,
+            patientName,
+            senderName: actor.username || role,
+            message: `Non sei più assegnato al paziente ${patientName || "selezionato"}.`,
             createdAt: new Date(),
             readAt: null,
           });

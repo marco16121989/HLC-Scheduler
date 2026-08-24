@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { formatUserName } from "/imports/utils/formatUserName";
+import { confirmAction } from "./ConfirmDialog.js";
 
 const roles = ["Admin", "Presidente", "CAS", "GVP"];
 
@@ -516,7 +517,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     setError("");
   };
 
-  const handleDelete = (user) => {
+  const handleDelete = async (user) => {
     const canDelete =
       manager?.role === "Admin" ||
       (isTeamManager && visibleUsers.some((item) => item.id === user.id));
@@ -548,7 +549,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
         ? `Eliminare ${user.username} e ${descendantCount} utenti collegati?`
         : `Eliminare l'utente ${user.username}?`;
 
-    if (!globalThis.confirm(message)) {
+    if (!await confirmAction(message)) {
       return;
     }
 
@@ -559,10 +560,10 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     setMobileFormOpen(false);
   };
 
-  const togglePresidentActive = (user) => {
+  const togglePresidentActive = async (user) => {
     const willActivate = Boolean(user.disabled);
     const action = willActivate ? "riattivare" : "disattivare";
-    if (!globalThis.confirm(`Vuoi ${action} ${user.username} e tutti i suoi CAS e GVP?`)) return;
+    if (!await confirmAction(`Vuoi ${action} ${user.username} e tutti i suoi CAS e GVP?`, { title: "Conferma operazione", confirmLabel: willActivate ? "Riattiva" : "Disattiva", tone: willActivate ? "primary" : "danger" })) return;
     Meteor.call("hlc.setPresidentActive", user.id, willActivate, (methodError) => {
       if (methodError) globalThis.alert(methodError.reason || "Impossibile aggiornare lo stato.");
     });
