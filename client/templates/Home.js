@@ -17,8 +17,10 @@ import { Notifications } from "./Notifications.js";
 import { Info } from "./Info.js";
 import { Settings } from "./Settings.js";
 import { Absences } from "./Absences.js";
+import { AdminDashboard } from "./AdminDashboard.js";
 
 const ICON_PATHS = {
+  dashboard: ["M3 13h8V3H3z", "M13 21h8V11h-8z", "M13 3h8v6h-8z", "M3 15h8v6H3z"],
   calendar: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18"],
   absence: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18", "M8 15h8"],
   profile: ["M20 21a8 8 0 0 0-16 0", "M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
@@ -63,6 +65,7 @@ export const Home = ({
   notifications = [],
   usefulFiles = [],
   absences = [],
+  accessLogs = [],
   theme,
   onToggleTheme,
   fontSize,
@@ -213,7 +216,7 @@ export const Home = ({
                   <p>Info</p>
                 </button>
               </li>
-              {user.role === "GVP" && <li className="nav-item menu-order-tools">
+              {(user.role === "Admin" || user.role === "GVP") && <li className="nav-item menu-order-tools">
                 <button
                   className={`nav-link w-100 ${activeView === "profile" ? "active" : ""}`}
                   type="button"
@@ -244,8 +247,14 @@ export const Home = ({
                 </button>
               </li>}
               {user.role === "Admin" && (
-              <>
+                <>
               <li className="sidebar-section-label menu-order-admin">Amministrazione</li>
+              <li className="nav-item menu-order-admin">
+                <button className={`nav-link w-100 ${activeView === "home" ? "active" : ""}`} type="button" onClick={() => openView("home")}>
+                  <MenuIcon name="dashboard" />
+                  <p>Dashboard</p>
+                </button>
+              </li>
               <li className="nav-item menu-order-admin">
                 <button
                   className={`nav-link w-100 ${activeView === "users" ? "active" : ""}`}
@@ -400,7 +409,12 @@ export const Home = ({
       />
 
       <main className="app-main" aria-label="Contenuto principale">
-        {activeView === "support" ? (
+        {activeView === "home" && user.role === "Admin" ? (
+          <AdminDashboard
+            accessLogs={accessLogs}
+            users={users}
+          />
+        ) : activeView === "support" ? (
           <SupportRequests requests={supportRequests} currentUser={user} />
         ) : activeView === "absences" && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
           <Absences absences={absences} users={users} currentUser={user} />

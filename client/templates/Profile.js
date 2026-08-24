@@ -141,7 +141,7 @@ export const Profile = ({ currentUser, hospitals = [] }) => {
                 <div className="col-12 col-md-6"><label className="form-label" htmlFor="profile-email">E-mail</label><input className="form-control" id="profile-email" name="email" type="email" value={form.email} onChange={update} autoComplete="email" /></div>
                 <div className="col-12 col-md-6"><label className="form-label" htmlFor="profile-phone">Telefono</label><input className="form-control" id="profile-phone" name="phone" type="tel" value={form.phone} onChange={update} autoComplete="tel" /></div>
               </div>
-              {currentUser.role !== "GVP" && <><hr className="my-4" />
+              {["Presidente", "CAS"].includes(currentUser.role) && <><hr className="my-4" />
               <div className="d-flex align-items-center justify-content-between gap-3 mb-3">
                 <h3 className="h6 mb-0">I miei ospedali</h3>
                 <button className="btn btn-outline-primary btn-sm" type="button" onClick={openHospitalModal}>Modifica</button>

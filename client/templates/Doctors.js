@@ -19,6 +19,7 @@ export const Doctors = ({
   const [doctorType, setDoctorType] = useState(doctorTypes[0]);
   const [notes, setNotes] = useState("");
   const [departmentIds, setDepartmentIds] = useState([]);
+  const [selectedHospitalIds, setSelectedHospitalIds] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -75,6 +76,7 @@ export const Doctors = ({
     setDoctorType(doctorTypes[0]);
     setNotes("");
     setDepartmentIds([]);
+    setSelectedHospitalIds([]);
     setEditingId(null);
     setError("");
     setModalOpen(false);
@@ -179,6 +181,10 @@ export const Doctors = ({
         availableDepartmentIds.has(departmentId),
       ),
     );
+    setSelectedHospitalIds(visibleHospitals.filter((hospital) =>
+      (hospital.departments || []).some((department) =>
+        (doctor.departmentIds || []).includes(department.id),
+      )).map((hospital) => hospital.id));
     setError("");
     setModalOpen(true);
   };
@@ -189,6 +195,18 @@ export const Doctors = ({
         ? current.filter((id) => id !== departmentId)
         : [...current, departmentId],
     );
+    setError("");
+  };
+
+  const toggleHospital = (hospital) => {
+    const selected = selectedHospitalIds.includes(hospital.id);
+    setSelectedHospitalIds((current) => selected
+      ? current.filter((id) => id !== hospital.id)
+      : [...current, hospital.id]);
+    if (selected) {
+      const hospitalDepartmentIds = new Set((hospital.departments || []).map((department) => department.id));
+      setDepartmentIds((current) => current.filter((id) => !hospitalDepartmentIds.has(id)));
+    }
     setError("");
   };
 
@@ -382,40 +400,32 @@ export const Doctors = ({
                     </div>
 
                     <fieldset className="doctor-departments-fieldset mt-3">
-                      <legend className="form-label">Reparti</legend>
+                      <legend className="form-label">Ospedali e reparti</legend>
                       {visibleHospitals.length === 0 ? (
                         <div className="form-text">
                           Inserisci prima un ospedale con almeno un reparto.
                         </div>
                       ) : (
-                        <div className="doctor-department-options">
-                          {visibleHospitals.map((hospital) => (
-                            <div key={hospital.id}>
-                              <div className="doctor-hospital-name">
-                                {hospital.name}
-                              </div>
-                              {hospital.departments.map((department) => (
-                                <label
-                                  className="form-check"
-                                  key={department.id}
-                                >
-                                  <input
-                                    className="form-check-input"
-                                    type="checkbox"
-                                    checked={departmentIds.includes(
-                                      department.id,
-                                    )}
-                                    onChange={() =>
-                                      toggleDepartment(department.id)
-                                    }
-                                  />
-                                  <span className="form-check-label">
-                                    {department.name}
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                          ))}
+                        <div className="profile-hospitals">
+                          {visibleHospitals.map((hospital) => {
+                            const selected = selectedHospitalIds.includes(hospital.id);
+                            return <article className={`profile-hospital ${selected ? "selected" : ""}`} key={hospital.id}>
+                              <label className="form-check profile-hospital-title">
+                                <input className="form-check-input" type="checkbox" checked={selected} onChange={() => toggleHospital(hospital)} />
+                                <span className="form-check-label"><strong>{hospital.name}</strong></span>
+                              </label>
+                              {selected && (hospital.departments || []).length > 0 && (
+                                <div className="profile-departments">
+                                  {hospital.departments.map((department) => (
+                                    <label className="form-check" key={department.id}>
+                                      <input className="form-check-input" type="checkbox" checked={departmentIds.includes(department.id)} onChange={() => toggleDepartment(department.id)} />
+                                      <span className="form-check-label">{department.name}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                            </article>;
+                          })}
                         </div>
                       )}
                     </fieldset>

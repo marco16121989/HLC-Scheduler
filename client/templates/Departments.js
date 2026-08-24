@@ -81,8 +81,13 @@ export const Departments = ({ departments, setDepartments, hospitals, presidentI
   return <>
     <div className="app-content-header">
       <div className="container-fluid">
-        <div className="d-flex align-items-center justify-content-between gap-3">
-          <h1 className="mb-0">Reparti</h1>
+        <div className="d-flex align-items-start justify-content-between gap-3">
+          <div>
+            <h1 className="mb-1">Reparti</h1>
+            <p className="text-secondary mb-0">
+              Questa sezione contiene un elenco di modelli di reparto, non i reparti effettivi degli ospedali. I modelli possono essere importati durante la creazione di un ospedale.
+            </p>
+          </div>
           <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>
         </div>
       </div>

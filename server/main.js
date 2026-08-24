@@ -2,6 +2,7 @@ import { Meteor } from "meteor/meteor";
 import { Accounts } from "meteor/accounts-base";
 import { check, Match } from "meteor/check";
 import {
+  AccessLogsCollection,
   AbsencesCollection,
   DepartmentsCollection,
   DoctorsCollection,
@@ -202,7 +203,44 @@ Meteor.publish("hlc-notifications", function publishHlcNotifications() {
   return NotificationsCollection.find({ recipientId: this.userId }, { sort: { createdAt: -1 } });
 });
 
+Meteor.publish("hlc-access-logs", async function publishHlcAccessLogs() {
+  if (!this.userId) return this.ready();
+  const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
+  if (actor?.profile?.role !== "Admin") return this.ready();
+
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  return AccessLogsCollection.find(
+    { createdAt: { $gte: twelveMonthsAgo } },
+    { sort: { createdAt: -1 } },
+  );
+});
+
 Meteor.methods({
+  async "hlc.trackAccess"() {
+    requireUser(this);
+    const actor = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
+    const duplicateWindow = new Date(Date.now() - 30 * 60 * 1000);
+    const recentAccess = await AccessLogsCollection.findOneAsync({
+      userId: this.userId,
+      createdAt: { $gte: duplicateWindow },
+    });
+    if (recentAccess) return recentAccess._id;
+
+    const role = actor?.profile?.role || "Utente";
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : actor?.profile?.presidentId || actor?.profile?.associationId || "";
+
+    return AccessLogsCollection.insertAsync({
+      userId: this.userId,
+      username: formatUserName(actor?.username || "Utente"),
+      role,
+      presidentId,
+      createdAt: new Date(),
+    });
+  },
+
   async "hlc.saveAbsence"(record) {
     requireUser(this);
     check(record, { id: String, startDate: String, endDate: String, note: String });

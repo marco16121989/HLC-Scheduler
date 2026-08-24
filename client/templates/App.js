@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Home } from "./Home.js";
 import { Login } from "./Login.js";
 import {
+  AccessLogsCollection,
   AbsencesCollection,
   DepartmentsCollection,
   DoctorsCollection,
@@ -88,13 +89,14 @@ export const App = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
   };
 
-  const { ready, user, users, hospitals, departments, doctors, patients, presentations, supportRequests, notifications, usefulFiles, absences } = useTracker(() => {
+  const { ready, user, users, hospitals, departments, doctors, patients, presentations, supportRequests, notifications, usefulFiles, absences, accessLogs } = useTracker(() => {
     const dataSubscription = Meteor.subscribe("hlc-data");
     const notificationSubscription = Meteor.subscribe("hlc-notifications");
+    const accessSubscription = Meteor.subscribe("hlc-access-logs");
     const account = Meteor.user();
 
     return {
-      ready: dataSubscription.ready() && notificationSubscription.ready(),
+      ready: dataSubscription.ready() && notificationSubscription.ready() && accessSubscription.ready(),
       user: account ? toClientRecord(account) : null,
       users: Meteor.users.find({}, { sort: { username: 1 } }).fetch().map(toClientRecord),
       hospitals: HospitalsCollection.find().fetch().map(toClientRecord),
@@ -109,8 +111,17 @@ export const App = () => {
       })),
       usefulFiles: UsefulFilesCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
       absences: AbsencesCollection.find({}, { sort: { startDate: 1 } }).fetch().map(toClientRecord),
+      accessLogs: AccessLogsCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const trackingKey = `hlc-access-session:${user.id}`;
+    if (globalThis.sessionStorage?.getItem(trackingKey)) return;
+    globalThis.sessionStorage?.setItem(trackingKey, "tracked");
+    Meteor.call("hlc.trackAccess");
+  }, [user?.id]);
 
   const makeSetter = (kind, current) => (update) => {
     const next = typeof update === "function" ? update(current) : update;
@@ -159,6 +170,7 @@ export const App = () => {
       notifications={notifications}
       usefulFiles={usefulFiles}
       absences={absences}
+      accessLogs={accessLogs}
       theme={theme}
       onToggleTheme={toggleTheme}
       fontSize={fontSize}
