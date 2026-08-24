@@ -129,6 +129,11 @@ export const buildPatientNoteNotification = ({ recipientId, patientId, patientNa
   readAt: null,
 });
 
+export const getAssignedGvpIds = (patient) => [...new Set([
+  ...(Array.isArray(patient?.gvpIds) ? patient.gvpIds : []),
+  patient?.gvpId,
+].filter(Boolean))];
+
 const cleanRecord = (record) => {
   const { _id, password, passwordHash, ...fields } = record;
   return { _id: record.id || _id, ...fields };
@@ -181,9 +186,7 @@ const sendScheduledAdmissionReminders = async () => {
     const daysUntilAdmission = Math.round((admissionDate.getTime() - todayStart.getTime()) / 86400000);
     if (![7, 2].includes(daysUntilAdmission)) continue;
 
-    const gvpIds = Array.isArray(patient.gvpIds)
-      ? patient.gvpIds
-      : patient.gvpId ? [patient.gvpId] : [];
+    const gvpIds = getAssignedGvpIds(patient);
     const recipientIds = [...new Set([patient.casId, ...gvpIds].filter(Boolean))];
     const patientName = `${patient.lastName || ""} ${patient.firstName || ""}`.trim();
 
@@ -547,10 +550,8 @@ Meteor.methods({
     }
 
     if (actorRole === "CAS") {
-      const assignedGvpIds = Array.isArray(patient.gvpIds)
-        ? patient.gvpIds
-        : patient.gvpId ? [patient.gvpId] : [];
-      for (const gvpId of [...new Set(assignedGvpIds.filter(Boolean))]) {
+      const assignedGvpIds = getAssignedGvpIds(patient);
+      for (const gvpId of assignedGvpIds) {
         const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
         if (recipient?.profile?.role !== "GVP") continue;
         await insertNotification(

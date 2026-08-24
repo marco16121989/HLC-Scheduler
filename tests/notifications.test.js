@@ -1,5 +1,5 @@
 import assert from "assert";
-import { buildPatientNoteNotification, normalizePushSubscription } from "../server/main.js";
+import { buildPatientNoteNotification, getAssignedGvpIds, normalizePushSubscription } from "../server/main.js";
 
 describe("patient note notifications", function () {
   it("builds a notification for the CAS recipient", function () {
@@ -42,5 +42,16 @@ describe("push subscriptions", function () {
     });
 
     assert.strictEqual(subscription.expirationTime, null);
+  });
+
+  it("finds the assigned GVP when a legacy assignment coexists with an empty list", function () {
+    assert.deepStrictEqual(getAssignedGvpIds({ gvpIds: [], gvpId: "gvp-1" }), ["gvp-1"]);
+  });
+
+  it("notifies every unique assigned GVP", function () {
+    assert.deepStrictEqual(
+      getAssignedGvpIds({ gvpIds: ["gvp-1", "gvp-2"], gvpId: "gvp-1" }),
+      ["gvp-1", "gvp-2"],
+    );
   });
 });
