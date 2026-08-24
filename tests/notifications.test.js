@@ -1,5 +1,5 @@
 import assert from "assert";
-import { buildPatientNoteNotification } from "../server/main.js";
+import { buildPatientNoteNotification, normalizePushSubscription } from "../server/main.js";
 
 describe("patient note notifications", function () {
   it("builds a notification for the CAS recipient", function () {
@@ -16,5 +16,31 @@ describe("patient note notifications", function () {
     assert.strictEqual(notification.patientId, "patient-1");
     assert.match(notification.message, /Mario Rossi/);
     assert.strictEqual(notification.readAt, null);
+  });
+});
+
+describe("push subscriptions", function () {
+  it("accepts browser-specific extra fields and normalizes the stored value", function () {
+    const subscription = normalizePushSubscription({
+      endpoint: "https://push.example/subscription",
+      expirationTime: null,
+      keys: { p256dh: "public-key", auth: "auth-secret", browserExtra: "ignored" },
+      browserExtra: true,
+    });
+
+    assert.deepStrictEqual(subscription, {
+      endpoint: "https://push.example/subscription",
+      expirationTime: null,
+      keys: { p256dh: "public-key", auth: "auth-secret" },
+    });
+  });
+
+  it("accepts a missing optional expiration time", function () {
+    const subscription = normalizePushSubscription({
+      endpoint: "https://push.example/subscription",
+      keys: { p256dh: "public-key", auth: "auth-secret" },
+    });
+
+    assert.strictEqual(subscription.expirationTime, null);
   });
 });

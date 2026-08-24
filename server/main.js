@@ -23,6 +23,28 @@ const usefulFileExtensions = new Set([
   "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
   "xls", "xlsx", "ods", "csv", "ppt", "pptx", "odp", "zip",
 ]);
+
+export const normalizePushSubscription = (subscription) => {
+  check(subscription, Object);
+  check(subscription.endpoint, String);
+  check(subscription.keys, Object);
+  check(subscription.keys.p256dh, String);
+  check(subscription.keys.auth, String);
+
+  const expirationTime = subscription.expirationTime;
+  if (expirationTime !== undefined && expirationTime !== null) {
+    check(expirationTime, Number);
+  }
+
+  return {
+    endpoint: subscription.endpoint,
+    expirationTime: expirationTime ?? null,
+    keys: {
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth,
+    },
+  };
+};
 const usefulFileMimeTypes = new Set([
   "application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp",
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -323,14 +345,10 @@ Meteor.methods({
 
   async "hlc.savePushSubscription"(subscription) {
     requireUser(this);
-    check(subscription, {
-      endpoint: String,
-      expirationTime: Match.Maybe(Number),
-      keys: { p256dh: String, auth: String },
-    });
+    const normalizedSubscription = normalizePushSubscription(subscription);
     await PushSubscriptionsCollection.upsertAsync(
-      { "subscription.endpoint": subscription.endpoint },
-      { $set: { userId: this.userId, subscription, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+      { "subscription.endpoint": normalizedSubscription.endpoint },
+      { $set: { userId: this.userId, subscription: normalizedSubscription, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
     );
   },
 
