@@ -118,6 +118,18 @@ export const Home = ({
     };
   }, [notificationsOpen]);
 
+  useEffect(() => {
+    const desktopViewport = globalThis.matchMedia?.("(min-width: 992px)");
+    if (!desktopViewport) return undefined;
+    const syncSidebarWithViewport = (event) => setSidebarOpen(event.matches);
+    if (typeof desktopViewport.addEventListener === "function") {
+      desktopViewport.addEventListener("change", syncSidebarWithViewport);
+      return () => desktopViewport.removeEventListener("change", syncSidebarWithViewport);
+    }
+    desktopViewport.addListener(syncSidebarWithViewport);
+    return () => desktopViewport.removeListener(syncSidebarWithViewport);
+  }, []);
+
   return (
     <div
       className={`app-wrapper sidebar-expand-lg sidebar-mini ${

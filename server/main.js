@@ -298,6 +298,8 @@ Meteor.publish("hlc-data", async function publishHlcData() {
           "details.sex": 1,
           "details.departmentId": 1,
           "details.hospitalDepartment": 1,
+          "details.hospitalRoom": 1,
+          "details.hospitalBed": 1,
           "details.maidenName": 1,
           "details.congregation": 1,
           "details.age": 1,

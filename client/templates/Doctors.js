@@ -19,6 +19,7 @@ export const Doctors = ({
   const [email, setEmail] = useState("");
   const [doctorType, setDoctorType] = useState(doctorTypes[0]);
   const [notes, setNotes] = useState("");
+  const [officeInstructions, setOfficeInstructions] = useState("");
   const [departmentIds, setDepartmentIds] = useState([]);
   const [selectedHospitalIds, setSelectedHospitalIds] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -76,6 +77,7 @@ export const Doctors = ({
     setEmail("");
     setDoctorType(doctorTypes[0]);
     setNotes("");
+    setOfficeInstructions("");
     setDepartmentIds([]);
     setSelectedHospitalIds([]);
     setEditingId(null);
@@ -95,6 +97,7 @@ export const Doctors = ({
     const normalizedPhone = phone.trim();
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedNotes = notes.trim();
+    const normalizedOfficeInstructions = officeInstructions.trim();
 
     if (
       !normalizedFirstName ||
@@ -145,6 +148,7 @@ export const Doctors = ({
       email: normalizedEmail,
       doctorType: doctorTypes.includes(doctorType) ? doctorType : doctorTypes[0],
       notes: normalizedNotes,
+      officeInstructions: normalizedOfficeInstructions,
       presidentId,
       departmentIds: validDepartmentIds,
     };
@@ -177,6 +181,7 @@ export const Doctors = ({
         : doctorTypes[0],
     );
     setNotes(doctor.notes || "");
+    setOfficeInstructions(doctor.officeInstructions || "");
     setDepartmentIds(
       (doctor.departmentIds || []).filter((departmentId) =>
         availableDepartmentIds.has(departmentId),
@@ -397,6 +402,24 @@ export const Doctors = ({
                           setNotes(event.target.value);
                           setError("");
                         }}
+                      />
+                    </div>
+
+                    <div className="mt-3">
+                      <label className="form-label" htmlFor="doctor-office-instructions">
+                        Studio / sede di ricevimento
+                      </label>
+                      <textarea
+                        className="form-control"
+                        id="doctor-office-instructions"
+                        rows="5"
+                        value={officeInstructions}
+                        onChange={(event) => {
+                          setOfficeInstructions(event.target.value);
+                          setError("");
+                        }}
+                        placeholder="Es. Ospedale San Carlo, secondo piano, studio 12"
+                        maxLength="4000"
                       />
                     </div>
 

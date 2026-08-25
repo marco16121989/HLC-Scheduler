@@ -80,7 +80,8 @@ export const DETAIL_SECTIONS = [
       ["motherBaptized", "Madre battezzata?", "yesno"],
       ["familySituation", "Situazione familiare", "textarea"],
       ["hospitalName", "Nome dell’ospedale"],
-      ["hospitalRoom", "Stanza"],
+      ["hospitalRoom", "Numero camera"],
+      ["hospitalBed", "Numero letto"],
       ["hospitalPhone", "Telefono dell’ospedale", "tel"],
       ["congregation", "Congregazione"],
       ["localElders", "Anziani locali contattati"],
@@ -900,6 +901,8 @@ export const Patients = ({
     ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
     { label: "Stato", value: patientStatus },
     ...(patientStatus === "Trasferito" ? [{ label: "Dove è stato trasferito", value: transferNotes }] : []),
+    { label: "Numero camera", value: details.hospitalRoom },
+    { label: "Numero letto", value: details.hospitalBed },
     { label: "Congregazione", value: details.congregation },
     { label: "Età", value: details.age },
     { label: "Numero di cellulare del paziente", value: details.patientPhone },
@@ -924,6 +927,8 @@ export const Patients = ({
     { label: "Tipo di accesso", value: admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza" },
     { label: "Stato", value: patientStatus },
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
+    { label: "Numero camera", value: details.hospitalRoom },
+    { label: "Numero letto", value: details.hospitalBed },
     { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
     { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato" },
     { label: "Reparto", value: selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Non assegnato" },
@@ -1331,6 +1336,26 @@ export const Patients = ({
                             </button>
                           )}
                         </div>
+                      </div>
+                      <div className="row g-3 w-100">
+                        <PatientDetailField
+                          field={["hospitalRoom", "Numero camera"]}
+                          value={details.hospitalRoom}
+                          onChange={(name, value) => {
+                            setDetails((current) => ({ ...current, [name]: value }));
+                            setError("");
+                          }}
+                          columnClassName="col-12 col-sm-6"
+                        />
+                        <PatientDetailField
+                          field={["hospitalBed", "Numero letto"]}
+                          value={details.hospitalBed}
+                          onChange={(name, value) => {
+                            setDetails((current) => ({ ...current, [name]: value }));
+                            setError("");
+                          }}
+                          columnClassName="col-12 col-sm-6"
+                        />
                       </div>
                       <div className="d-none">
                         <div className="form-label">Medico responsabile</div>
