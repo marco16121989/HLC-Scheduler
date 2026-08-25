@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { Users } from "./Users.js";
 import { Hospitals } from "./Hospitals.js";
@@ -82,6 +82,7 @@ export const Home = ({
   );
   const [activeView, setActiveView] = useState("home");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsMenuRef = useRef(null);
   const unreadNotifications = notifications.filter((notification) => !notification.readAt);
   const markNotificationRead = (notificationId) => Meteor.call("hlc.markNotificationAsRead", notificationId);
   const markAllNotificationsRead = () => Meteor.call("hlc.markAllNotificationsAsRead");
@@ -98,6 +99,24 @@ export const Home = ({
     setActiveView(view);
     closeMobileSidebar();
   };
+
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!notificationsMenuRef.current?.contains(event.target)) {
+        setNotificationsOpen(false);
+      }
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setNotificationsOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [notificationsOpen]);
 
   return (
     <div
@@ -124,8 +143,8 @@ export const Home = ({
 
           <ul className="navbar-nav ms-auto align-items-center">
             {(["CAS", "Presidente", "GVP"].includes(user.role)) && (
-              <li className="nav-item me-2 position-relative">
-                <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setNotificationsOpen((current) => !current)} aria-label="Mostra notifiche">
+              <li className="nav-item me-2 position-relative" ref={notificationsMenuRef}>
+                <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setNotificationsOpen((current) => !current)} aria-label="Mostra notifiche" aria-expanded={notificationsOpen}>
                   🔔
                   {unreadNotifications.length > 0 && <span className="badge text-bg-danger ms-2">{unreadNotifications.length}</span>}
                 </button>
@@ -473,6 +492,7 @@ export const Home = ({
             currentUser={user}
             presidentId={presidentId}
             absences={absences}
+            notifications={notifications}
           />
         ) : activeView === "patient-reports" && presidentId && user.role !== "GVP" ? (
           <PatientReports patients={patients} hospitals={hospitals} users={users} currentUser={user} presidentId={presidentId} />

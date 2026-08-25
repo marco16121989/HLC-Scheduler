@@ -15,12 +15,13 @@ const formatPatientListName = (patient) => {
   return `${patient.firstName} ${patient.lastName}`;
 };
 
-const NoteButtonContent = () => <span className="patient-note-content">
+const NoteButtonContent = ({ unreadCount = 0 }) => <span className="patient-note-content">
   <svg className="patient-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.8 8.8 0 0 1-3.35-.66L4 20l1.55-4.1A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z" />
     <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" strokeWidth="2.5" />
   </svg>
   <span>Note</span>
+  {unreadCount > 0 && <span className="patient-note-unread" aria-label={`${unreadCount} nuove note`}>{unreadCount}</span>}
 </span>;
 
 const PATIENT_STATUSES = [
@@ -276,6 +277,7 @@ export const Patients = ({
   currentUser,
   presidentId,
   absences = [],
+  notifications = [],
 }) => {
   const isGvp = currentUser.role === "GVP";
   const [firstName, setFirstName] = useState("");
@@ -805,6 +807,18 @@ export const Patients = ({
   };
 
   const openNotes = (patient) => {
+    const isAssigned = currentUser.role === "CAS"
+      ? patient.casId === currentUser.id
+      : currentUser.role === "GVP" && getPatientGvpIds(patient).includes(currentUser.id);
+    if (isAssigned) {
+      notifications
+        .filter((notification) =>
+          notification.type === "patient-note" &&
+          notification.patientId === patient.id &&
+          !notification.readAt,
+        )
+        .forEach((notification) => Meteor.call("hlc.markNotificationAsRead", notification.id));
+    }
     setNotePatient(patient);
     setNewGvpNote("");
     setNoteError("");
@@ -814,6 +828,18 @@ export const Patients = ({
     setNotePatient(null);
     setNewGvpNote("");
     setNoteError("");
+  };
+
+  const getUnreadNoteCount = (patient) => {
+    const isAssigned = currentUser.role === "CAS"
+      ? patient.casId === currentUser.id
+      : currentUser.role === "GVP" && getPatientGvpIds(patient).includes(currentUser.id);
+    if (!isAssigned) return 0;
+    return notifications.filter((notification) =>
+      notification.type === "patient-note" &&
+      notification.patientId === patient.id &&
+      !notification.readAt,
+    ).length;
   };
 
   const saveGvpNotes = () => {
@@ -2081,7 +2107,7 @@ export const Patients = ({
                                 }}
                               >
                                 <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}</td>
-                                <td className="text-center patient-actions-column" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-primary btn-sm" type="button" onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent /></button></div></td>
+                                <td className="text-center patient-actions-column" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-primary btn-sm" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button></div></td>
                               </tr>
                             );
                           }
@@ -2155,7 +2181,7 @@ export const Patients = ({
                             <td data-label="GVP">{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{getGvpDisplayName(gvpUser)}</span>)}</div> : <span className="text-secondary">-</span>}</td>
                             <td className="text-center patient-actions-column" data-label="Azioni">
                               <div className="patient-row-actions">
-                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm" type="button" onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent /></button>}
+                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button>}
                               </div>
                             </td>
                           </tr>

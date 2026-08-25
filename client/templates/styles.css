@@ -1440,6 +1440,21 @@ svg.admin-nav-icon {
   height: 1rem;
 }
 
+.patient-note-unread {
+  display: inline-grid;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  place-items: center;
+  padding-inline: 0.25rem;
+  border: 2px solid var(--bs-white);
+  border-radius: 999px;
+  background: var(--bs-danger);
+  color: var(--bs-white);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .patient-clickable-row {
   cursor: pointer;
 }
