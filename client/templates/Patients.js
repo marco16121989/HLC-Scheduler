@@ -16,9 +16,9 @@ const formatPatientListName = (patient) => {
 };
 
 const NoteButtonContent = () => <span className="patient-note-content">
-  <svg className="patient-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 3h14v18H5z" />
-    <path d="M8 8h8M8 12h8M8 16h5" />
+  <svg className="patient-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.8 8.8 0 0 1-3.35-.66L4 20l1.55-4.1A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z" />
+    <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" strokeWidth="2.5" />
   </svg>
   <span>Note</span>
 </span>;

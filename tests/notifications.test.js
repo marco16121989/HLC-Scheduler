@@ -2,6 +2,7 @@ import assert from "assert";
 import {
   buildPatientNoteNotification,
   getAssignedGvpIds,
+  getPatientDeletionRecipientIds,
   getPatientCoordinatorIds,
   isNewCasAssignment,
   normalizePushSubscription,
@@ -72,5 +73,16 @@ describe("push subscriptions", function () {
     assert.strictEqual(isNewCasAssignment("", "cas-1"), true);
     assert.strictEqual(isNewCasAssignment("cas-1", "cas-1"), false);
     assert.strictEqual(isNewCasAssignment("cas-1", "cas-2"), true);
+  });
+
+  it("notifies involved users of deletion but excludes the acting CAS", function () {
+    assert.deepStrictEqual(
+      getPatientDeletionRecipientIds({
+        presidentId: "president-1",
+        casId: "cas-1",
+        gvpIds: ["gvp-1", "gvp-2"],
+      }, "cas-1"),
+      ["president-1", "gvp-1", "gvp-2"],
+    );
   });
 });

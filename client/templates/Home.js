@@ -508,7 +508,10 @@ export const Home = ({
                 className="home-welcome-logo"
                 src="/images/hlc-scheduler-logo-optimized.jpg"
                 alt="HLC Scheduler"
-                decoding="async"
+                width="900"
+                height="900"
+                decoding="sync"
+                loading="eager"
                 fetchPriority="high"
               />
               <h1>HLC Scheduler</h1>

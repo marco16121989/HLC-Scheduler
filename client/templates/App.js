@@ -59,10 +59,26 @@ export const App = () => {
 
   useEffect(() => {
     const logo = new Image();
-    logo.onload = () => setLogoReady(true);
-    logo.onerror = () => setLogoReady(true);
+    let cancelled = false;
+    const markLogoReady = () => {
+      if (!cancelled) setLogoReady(true);
+    };
+    const decodeLogo = () => {
+      if (typeof logo.decode !== "function") {
+        markLogoReady();
+        return;
+      }
+      logo.decode().then(markLogoReady, markLogoReady);
+    };
+    logo.onload = decodeLogo;
+    logo.onerror = markLogoReady;
     logo.src = "/images/hlc-scheduler-logo-optimized.jpg";
-    if (logo.complete) setLogoReady(true);
+    if (logo.complete) decodeLogo();
+    return () => {
+      cancelled = true;
+      logo.onload = null;
+      logo.onerror = null;
+    };
   }, []);
 
   useEffect(() => {

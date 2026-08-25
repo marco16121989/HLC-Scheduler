@@ -142,6 +142,11 @@ export const getPatientCoordinatorIds = (patient) => [...new Set([
 export const isNewCasAssignment = (previousCasId, currentCasId) =>
   Boolean(currentCasId) && currentCasId !== previousCasId;
 
+export const getPatientDeletionRecipientIds = (patient, actorId) => [...new Set([
+  ...getPatientCoordinatorIds(patient),
+  ...getAssignedGvpIds(patient),
+].filter((recipientId) => recipientId && recipientId !== actorId))];
+
 const cleanRecord = (record) => {
   const { _id, password, passwordHash, ...fields } = record;
   return { _id: record.id || _id, ...fields };
@@ -796,8 +801,16 @@ Meteor.methods({
     const previousPatientAssignments = new Map();
     const previousPatientCasAssignments = new Map();
     const previousPatientStatuses = new Map();
+    let deletedPatients = [];
     if (kind === "patients") {
       const recordIds = records.map((record) => record.id || record._id).filter(Boolean);
+      const deletedPatientSelector = {
+        ...(presidentId ? { presidentId } : {}),
+        _id: { $nin: recordIds },
+      };
+      deletedPatients = await PatientsCollection.find(deletedPatientSelector, {
+        fields: { firstName: 1, lastName: 1, presidentId: 1, casId: 1, gvpId: 1, gvpIds: 1 },
+      }).fetchAsync();
       const previousPatients = await PatientsCollection.find(
         { _id: { $in: recordIds } },
         { fields: { casId: 1, gvpId: 1, gvpIds: 1, status: 1 } },
@@ -816,6 +829,24 @@ Meteor.methods({
     await replaceRecords(collections[kind], records, { presidentId });
 
     if (kind === "patients") {
+      for (const deletedPatient of deletedPatients) {
+        const patientName = `${deletedPatient.lastName || ""} ${deletedPatient.firstName || ""}`.trim();
+        for (const recipientId of getPatientDeletionRecipientIds(deletedPatient, this.userId)) {
+          const recipient = await Meteor.users.findOneAsync(recipientId, { fields: publicUserFields });
+          if (!["Presidente", "CAS", "GVP"].includes(recipient?.profile?.role)) continue;
+          await insertNotification({
+            recipientId,
+            type: "patient-deleted",
+            patientId: deletedPatient._id,
+            patientName,
+            senderName: actor.username || role,
+            message: `${actor.username || role} ha eliminato il paziente ${patientName || "selezionato"}.`,
+            createdAt: new Date(),
+            readAt: null,
+          });
+        }
+      }
+
       for (const record of records) {
         const recordId = record.id || record._id;
         const previousIds = previousPatientAssignments.get(recordId) || new Set();

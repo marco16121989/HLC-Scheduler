@@ -2031,6 +2031,7 @@ svg.admin-nav-icon {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     position: relative;
+    min-height: 3.4rem;
     border: 1px solid var(--bs-border-color-translucent);
     border-radius: 0.3rem;
     background: var(--bs-body-bg);
@@ -2064,23 +2065,22 @@ svg.admin-nav-icon {
     height: 100%;
     display: flex;
     align-items: center;
-    padding: 0.65rem 0.75rem;
+    padding: 0.65rem 6.25rem 0.65rem 0.75rem;
     border: 0;
     background: transparent;
     font-size: 0.95rem;
   }
 
   .patient-list-table tbody td[data-label="Azioni"] {
-    grid-column: 2;
-    align-self: stretch;
+    position: static;
     display: flex;
-    align-items: stretch;
-    justify-content: center;
-    width: auto;
+    align-items: center;
+    justify-content: flex-end;
+    width: 0;
     min-width: 0;
     padding: 0;
     border: 0;
-    background: var(--bs-primary);
+    background: transparent;
   }
 
   .patient-list-table tbody td[data-label="Azioni"]::before {
@@ -2088,35 +2088,41 @@ svg.admin-nav-icon {
   }
 
   .patient-list-table tbody td[data-label="Azioni"] > .patient-row-actions {
-    flex: 1 1 auto;
-    width: 100%;
-    height: 100%;
-    align-items: stretch;
-    justify-content: center;
+    flex: 0 0 auto;
+    width: auto;
+    height: auto;
+    align-items: center;
+    justify-content: flex-end;
   }
 
   .patient-list-table tbody td[data-label="Azioni"] .btn {
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.3rem;
     flex: 0 0 auto;
-    width: 4.75rem;
+    width: auto;
     min-width: 4.75rem;
-    height: auto;
-    min-height: 2.75rem;
-    padding: 0.35rem 0.5rem;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
+    height: 2.4rem;
+    min-height: 2.4rem;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--bs-primary);
+    border-radius: 0.55rem;
+    background: var(--bs-primary);
     color: var(--bs-white);
     font-size: 0.75rem;
     font-weight: 600;
+    box-shadow: 0 0.15rem 0.4rem rgb(13 110 253 / 20%);
+    transform: translateY(-50%);
   }
 
   .patient-note-icon {
-    width: 0.9rem;
-    height: 0.9rem;
+    width: 1.1rem;
+    height: 1.1rem;
     flex: 0 0 auto;
   }
 
@@ -2125,12 +2131,12 @@ svg.admin-nav-icon {
     align-items: center;
     justify-content: center;
     gap: 0.3rem;
-    transform: translateX(20px);
   }
 
   .patient-list-table tbody td[data-label="Azioni"] .btn:hover,
   .patient-list-table tbody td[data-label="Azioni"] .btn:focus-visible {
-    background: rgb(0 0 0 / 12%);
+    border-color: var(--bs-primary);
+    background: color-mix(in srgb, var(--bs-primary) 88%, black);
     color: var(--bs-white);
   }
 }
@@ -2401,9 +2407,17 @@ svg.admin-nav-icon {
 }
 
 .home-welcome-logo {
+  display: block;
   width: min(28rem, 75vw);
   height: auto;
+  margin-inline: auto;
   filter: drop-shadow(0 1rem 2rem rgb(0 0 0 / 18%));
+  animation: home-logo-in .55s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes home-logo-in {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .home-welcome h1 {
@@ -2965,7 +2979,10 @@ svg.admin-nav-icon {
 .startup-progress span { display: block; width: 0; height: 100%; border-radius: inherit; background: #77777c; animation: startup-progress-fill 3s cubic-bezier(.18,.7,.25,1) forwards; transition: width .38s cubic-bezier(.4,0,.2,1), background-color .25s ease; }
 .startup-loader.is-exiting .startup-progress span { width: 100%; background: #2363b7; animation: none; }
 @keyframes startup-progress-fill { 0% { width: 0; } 18% { width: 18%; } 55% { width: 62%; } 100% { width: 92%; } }
-@media (prefers-reduced-motion: reduce) { .startup-progress span { width: 92%; animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .startup-progress span { width: 92%; animation: none; }
+  .home-welcome-logo { animation: none; }
+}
 [data-bs-theme="dark"] .startup-loader { background: #000; color: #f5f5f7; }
 [data-bs-theme="dark"] .startup-loader-mark { color: #f5f5f7; }
 [data-bs-theme="dark"] .startup-progress { background: #333336; }
