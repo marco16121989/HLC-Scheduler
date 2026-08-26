@@ -17,11 +17,13 @@ import { Notifications } from "./Notifications.js";
 import { Info } from "./Info.js";
 import { Settings } from "./Settings.js";
 import { Absences } from "./Absences.js";
+import { Events } from "./Events.js";
 import { AdminDashboard } from "./AdminDashboard.js";
 
 const ICON_PATHS = {
   dashboard: ["M3 13h8V3H3z", "M13 21h8V11h-8z", "M13 3h8v6h-8z", "M3 15h8v6H3z"],
   calendar: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18"],
+  events: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18", "M8 15h8M12 11v8"],
   absence: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18", "M8 15h8"],
   profile: ["M20 21a8 8 0 0 0-16 0", "M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
   sharepoint: ["M4 4h7v7H4z", "M13 4h7v7h-7z", "M4 13h7v7H4z", "M13 13h7v7h-7z"],
@@ -60,6 +62,7 @@ export const Home = ({
   patients,
   setPatients,
   presentations,
+  events = [],
   setPresentations,
   supportRequests,
   notifications = [],
@@ -220,6 +223,12 @@ export const Home = ({
                 >
                   <MenuIcon name="calendar" />
                   <p>Calendario</p>
+                </button>
+              </li>}
+              {user.role !== "Admin" && <li className="nav-item menu-order-tools">
+                <button className={`nav-link w-100 ${activeView === "events" ? "active" : ""}`} type="button" onClick={() => openView("events")}>
+                  <MenuIcon name="events" />
+                  <p>Eventi</p>
                 </button>
               </li>}
               {["Presidente", "CAS", "GVP"].includes(user.role) && <li className="nav-item menu-order-tools">
@@ -464,8 +473,11 @@ export const Home = ({
             patients={patients}
             doctors={doctors}
             users={users}
+            invitedEvents={events}
             currentUser={user}
           />
+        ) : activeView === "events" && presidentId ? (
+          <Events events={events} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "users" && user.role === "Admin" ? (
           <Users
             users={users}

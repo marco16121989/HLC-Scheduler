@@ -2221,6 +2221,11 @@ svg.admin-nav-icon {
   background: var(--bs-danger);
 }
 
+.calendar-dot.event,
+.calendar-event.event {
+  background: var(--bs-success);
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -2301,6 +2306,7 @@ svg.admin-nav-icon {
 
 .calendar-agenda-item.presentation { border-color: var(--bs-primary); }
 .calendar-agenda-item.patient { border-color: var(--bs-danger); }
+.calendar-agenda-item.event { border-color: var(--bs-success); }
 .calendar-agenda-item .badge { background: var(--bs-secondary-bg); color: var(--bs-body-color); }
 .calendar-agenda-item h3 { margin: 0.35rem 0 0; font-size: 1rem; }
 .calendar-agenda-item p { margin: 0.3rem 0 0; color: var(--bs-secondary-color); font-size: 0.85rem; }
@@ -2483,6 +2489,58 @@ svg.admin-nav-icon {
 .support-request time, .support-request small { color: var(--bs-secondary-color); font-size: 0.75rem; }
 .support-request > p { margin: 0.75rem 0; white-space: pre-wrap; }
 .support-status-select { width: auto; min-width: 9rem; }
+
+.event-modal-card {
+  max-width: 52rem;
+}
+
+.event-invite-grid,
+.event-card-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.event-invite-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.event-invite-group {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.65rem;
+  background: var(--bs-tertiary-bg);
+}
+
+.event-invite-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.event-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+}
+
+.event-card {
+  overflow: hidden;
+}
+
+.event-meta {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.event-description {
+  white-space: pre-wrap;
+}
+
+@media (max-width: 767.98px) {
+  .event-invite-grid { grid-template-columns: 1fr; }
+  .event-card .card-footer { flex-wrap: wrap; }
+  .event-card .card-footer .btn { flex: 1 1 auto; }
+}
 
 .user-count-badge {
   min-width: 2.25rem;

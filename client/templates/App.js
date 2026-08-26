@@ -8,6 +8,7 @@ import {
   AbsencesCollection,
   DepartmentsCollection,
   DoctorsCollection,
+  EventsCollection,
   HospitalsCollection,
   NotificationsCollection,
   PatientsCollection,
@@ -119,14 +120,15 @@ export const App = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
   };
 
-  const { ready, user, users, hospitals, departments, doctors, patients, presentations, supportRequests, notifications, usefulFiles, absences, accessLogs } = useTracker(() => {
+  const { ready, user, users, hospitals, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, accessLogs } = useTracker(() => {
     const dataSubscription = Meteor.subscribe("hlc-data");
+    const eventSubscription = Meteor.subscribe("hlc-events");
     const notificationSubscription = Meteor.subscribe("hlc-notifications");
     const accessSubscription = Meteor.subscribe("hlc-access-logs");
     const account = Meteor.user();
 
     return {
-      ready: dataSubscription.ready() && notificationSubscription.ready() && accessSubscription.ready(),
+      ready: dataSubscription.ready() && eventSubscription.ready() && notificationSubscription.ready() && accessSubscription.ready(),
       user: account ? toClientRecord(account) : null,
       users: Meteor.users.find({}, { sort: { username: 1 } }).fetch().map(toClientRecord),
       hospitals: HospitalsCollection.find().fetch().map(toClientRecord),
@@ -134,6 +136,7 @@ export const App = () => {
       doctors: DoctorsCollection.find().fetch().map(toClientRecord),
       patients: PatientsCollection.find().fetch().map(toClientRecord),
       presentations: PresentationsCollection.find().fetch().map(toClientRecord),
+      events: EventsCollection.find({}, { sort: { startsAt: 1 } }).fetch().map(toClientRecord),
       supportRequests: SupportRequestsCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
       notifications: NotificationsCollection.find({}, { sort: { createdAt: -1 } }).fetch().map((item) => ({
         ...item,
@@ -240,6 +243,7 @@ export const App = () => {
       setPatients={makeSetter("patients", patients)}
       presentations={presentations}
       setPresentations={setPresentations}
+      events={events}
       supportRequests={supportRequests}
       notifications={notifications}
       usefulFiles={usefulFiles}

@@ -14,7 +14,7 @@ const dateKey = (date) => {
 };
 const parseDate = (value) => value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null;
 
-export const Calendar = ({ presentations, patients, doctors, users = [], currentUser }) => {
+export const Calendar = ({ presentations, patients, doctors, users = [], invitedEvents = [], currentUser }) => {
   const [displayedMonth, setDisplayedMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -22,11 +22,11 @@ export const Calendar = ({ presentations, patients, doctors, users = [], current
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [viewMode, setViewMode] = useState("month");
   const isGvp = currentUser.role === "GVP";
-  const [eventFilter, setEventFilter] = useState(isGvp ? "patient" : "all");
+  const [eventFilter, setEventFilter] = useState(isGvp ? "assigned" : "all");
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patientModalTab, setPatientModalTab] = useState("info");
 
-  const events = useMemo(() => {
+  const calendarEvents = useMemo(() => {
     const presentationEvents = presentations
       .filter((item) => item.presentationDate)
       .map((item) => ({
@@ -53,12 +53,32 @@ export const Calendar = ({ presentations, patients, doctors, users = [], current
           ].filter(Boolean).join(" · "),
         };
       });
-    return [...presentationEvents, ...patientEvents].sort((a, b) => a.title.localeCompare(b.title));
-  }, [presentations, patients, doctors, isGvp]);
+    const invitationEvents = invitedEvents
+      .filter((item) => item.startsAt)
+      .map((item) => {
+        const start = new Date(item.startsAt);
+        const end = item.endsAt ? new Date(item.endsAt) : null;
+        const timeFormatter = new Intl.DateTimeFormat("it-IT", { timeStyle: "short" });
+        return {
+          id: `event-${item.id}`,
+          date: item.startsAt.slice(0, 10),
+          type: "event",
+          title: item.title || "Evento",
+          detail: [
+            end ? `${timeFormatter.format(start)} – ${timeFormatter.format(end)}` : timeFormatter.format(start),
+            item.location,
+            item.creatorName ? `Creato da ${item.creatorName}` : "",
+          ].filter(Boolean).join(" · "),
+        };
+      });
+    return [...presentationEvents, ...patientEvents, ...invitationEvents].sort((a, b) => a.title.localeCompare(b.title));
+  }, [presentations, patients, doctors, invitedEvents, isGvp]);
 
   const filteredEvents = eventFilter === "all"
-    ? events
-    : events.filter((event) => event.type === eventFilter);
+    ? calendarEvents
+    : eventFilter === "assigned"
+      ? calendarEvents.filter((event) => event.type !== "presentation")
+      : calendarEvents.filter((event) => event.type === eventFilter);
   const firstDayOffset = (displayedMonth.getDay() + 6) % 7;
   const daysInMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() + 1, 0).getDate();
   const cells = [];
@@ -122,7 +142,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], current
         }
       }}
     >
-      <span className="badge">{event.type === "presentation" ? "Presentazione" : "Paziente"}</span>
+      <span className="badge">{event.type === "presentation" ? "Presentazione" : event.type === "event" ? "Evento" : "Paziente"}</span>
       <h3>{event.title}</h3>
       {event.detail && <p>{event.detail}</p>}
     </article>
@@ -228,7 +248,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], current
             <div><h1 className="mb-0">Calendario</h1><div className="text-secondary small">Eventi disponibili per {currentUser.username}</div></div>
             <div className="d-flex flex-wrap gap-2">
               {!isGvp && <div className="btn-group" role="group" aria-label="Filtro eventi">
-                {[['all', 'Tutti'], ['presentation', 'Presentazioni'], ['patient', 'Pazienti']].map(([filter, label]) => <button className={`btn ${eventFilter === filter ? "btn-secondary" : "btn-outline-secondary"}`} type="button" key={filter} onClick={() => setEventFilter(filter)}>{label}</button>)}
+                {[['all', 'Tutti'], ['event', 'Eventi'], ['presentation', 'Presentazioni'], ['patient', 'Pazienti']].map(([filter, label]) => <button className={`btn ${eventFilter === filter ? "btn-secondary" : "btn-outline-secondary"}`} type="button" key={filter} onClick={() => setEventFilter(filter)}>{label}</button>)}
               </div>}
               <div className="btn-group" role="group" aria-label="Tipo di vista">
                 {[['month', 'Mese'], ['week', 'Settimana'], ['day', 'Giorno']].map(([mode, label]) => <button className={`btn ${viewMode === mode ? "btn-primary" : "btn-outline-primary"}`} type="button" key={mode} onClick={() => selectView(mode)}>{label}</button>)}
@@ -244,7 +264,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], current
       </div>
       <div className="app-content"><div className="container-fluid"><div className="row g-3">
         <div className={viewMode === "month" ? "col-12 col-xl-9" : "col-12"}><section className="card calendar-card">
-          <div className="calendar-legend">{!isGvp && <span><i className="calendar-dot presentation" /> Presentazioni (tutti)</span>}<span><i className="calendar-dot patient" /> {isGvp ? "Casi affidati" : "Pazienti autorizzati"}</span></div>
+          <div className="calendar-legend"><span><i className="calendar-dot event" /> Eventi su invito</span>{!isGvp && <span><i className="calendar-dot presentation" /> Presentazioni (tutti)</span>}<span><i className="calendar-dot patient" /> {isGvp ? "Casi affidati" : "Pazienti autorizzati"}</span></div>
           {viewMode === "month" && <><div className="calendar-grid calendar-week-header">{WEEK_DAYS.map((day) => <div key={day}>{day}</div>)}</div>
           <div className="calendar-grid calendar-days">{cells.map((date, index) => {
             if (!date) return <div className="calendar-day empty" key={`empty-${index}`} />;

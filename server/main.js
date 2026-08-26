@@ -7,6 +7,7 @@ import {
   AbsencesCollection,
   DepartmentsCollection,
   DoctorsCollection,
+  EventsCollection,
   HospitalsCollection,
   NotificationsCollection,
   PatientsCollection,
@@ -146,6 +147,18 @@ export const getPatientDeletionRecipientIds = (patient, actorId) => [...new Set(
   ...getPatientCoordinatorIds(patient),
   ...getAssignedGvpIds(patient),
 ].filter((recipientId) => recipientId && recipientId !== actorId))];
+
+const getActorPresidentId = async (actor) => {
+  const role = actor?.profile?.role;
+  if (role === "Presidente") return actor._id;
+  if (actor?.profile?.presidentId) return actor.profile.presidentId;
+  if (role === "CAS" && actor.profile?.associationId) return actor.profile.associationId;
+  if (role !== "GVP") return "";
+  const linkedCasId = actor.profile?.casIds?.[0] || actor.profile?.casId || actor.profile?.associationId || "";
+  const linkedCas = linkedCasId ? await Meteor.users.findOneAsync(linkedCasId) : null;
+  return linkedCas?.profile?.presidentId || linkedCas?.profile?.associationId ||
+    (linkedCas?.profile?.role === "Presidente" ? linkedCas._id : "");
+};
 
 const cleanRecord = (record) => {
   const { _id, password, passwordHash, ...fields } = record;
@@ -338,6 +351,18 @@ Meteor.publish("hlc-data", async function publishHlcData() {
   ];
 });
 
+Meteor.publish("hlc-events", async function publishHlcEvents() {
+  if (!this.userId) return this.ready();
+  const actor = await Meteor.users.findOneAsync(this.userId);
+  if (!actor || actor.profile?.role === "Admin") return this.ready();
+  const presidentId = await getActorPresidentId(actor);
+  if (!presidentId) return this.ready();
+  return EventsCollection.find({
+    presidentId,
+    $or: [{ createdBy: actor._id }, { "invitees.userId": actor._id }],
+  }, { sort: { startsAt: 1 } });
+});
+
 Meteor.publish("hlc-notifications", function publishHlcNotifications() {
   if (!this.userId) {
     return this.ready();
@@ -502,6 +527,112 @@ Meteor.methods({
       (role === "Presidente" || (role === "CAS" && file.createdBy === actor._id));
     if (!canDelete) throw new Meteor.Error("not-authorized", "Non puoi eliminare questo file.");
     await UsefulFilesCollection.removeAsync(fileId);
+  },
+
+  async "hlc.createEvent"(data) {
+    requireUser(this);
+    check(data, {
+      title: String,
+      description: String,
+      startsAt: String,
+      endsAt: String,
+      location: String,
+      inviteeIds: [String],
+    });
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    if (!["Presidente", "CAS"].includes(role)) {
+      throw new Meteor.Error("not-authorized", "Solo Presidente e CAS possono creare eventi.");
+    }
+    const presidentId = await getActorPresidentId(actor);
+    const title = data.title.trim().slice(0, 160);
+    const description = data.description.trim().slice(0, 4000);
+    const location = data.location.trim().slice(0, 300);
+    const startsAt = new Date(data.startsAt);
+    const endsAt = new Date(data.endsAt);
+    if (!title || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      throw new Meteor.Error("invalid-event", "Inserisci titolo, inizio e fine validi.");
+    }
+    if (endsAt <= startsAt) {
+      throw new Meteor.Error("invalid-event-period", "La fine dell’evento deve essere successiva all’inizio.");
+    }
+    const requestedIds = [...new Set(data.inviteeIds)].filter((id) => id !== this.userId);
+    const inviteeUsers = await Meteor.users.find({
+      _id: { $in: requestedIds },
+      "profile.role": { $in: ["CAS", "GVP"] },
+      $or: [
+        { "profile.presidentId": presidentId },
+        { "profile.associationId": presidentId },
+      ],
+    }, { fields: publicUserFields }).fetchAsync();
+    if (inviteeUsers.length === 0) {
+      throw new Meteor.Error("invitees-required", "Seleziona almeno un CAS o un GVP da invitare.");
+    }
+    const createdAt = new Date();
+    const eventId = await EventsCollection.insertAsync({
+      title,
+      description,
+      startsAt: data.startsAt,
+      endsAt: data.endsAt,
+      location,
+      presidentId,
+      createdBy: actor._id,
+      creatorName: actor.username || role,
+      invitees: inviteeUsers.map((user) => ({
+        userId: user._id,
+        username: user.username || user.profile?.role,
+        role: user.profile?.role,
+        status: "pending",
+        respondedAt: null,
+      })),
+      createdAt,
+      updatedAt: createdAt,
+    });
+    for (const invitee of inviteeUsers) {
+      await insertNotification({
+        recipientId: invitee._id,
+        type: "event-invitation",
+        eventId,
+        senderName: actor.username || role,
+        message: `${actor.username || role} ti ha invitato all'evento “${title}”.`,
+        createdAt: new Date(),
+        readAt: null,
+      });
+    }
+    return eventId;
+  },
+
+  async "hlc.respondToEvent"(eventId, response) {
+    requireUser(this);
+    check(eventId, String);
+    check(response, Match.OneOf("accepted", "declined"));
+    const event = await EventsCollection.findOneAsync({
+      _id: eventId,
+      "invitees.userId": this.userId,
+    });
+    if (!event) throw new Meteor.Error("not-authorized", "Invito non disponibile.");
+    await EventsCollection.updateAsync(
+      { _id: eventId, "invitees.userId": this.userId },
+      { $set: {
+        "invitees.$.status": response,
+        "invitees.$.respondedAt": new Date(),
+        updatedAt: new Date(),
+      } },
+    );
+    await NotificationsCollection.updateAsync(
+      { recipientId: this.userId, eventId, type: "event-invitation", readAt: null },
+      { $set: { readAt: new Date() } },
+      { multi: true },
+    );
+  },
+
+  async "hlc.deleteEvent"(eventId) {
+    requireUser(this);
+    check(eventId, String);
+    const event = await EventsCollection.findOneAsync({ _id: eventId, createdBy: this.userId });
+    if (!event) throw new Meteor.Error("not-authorized", "Puoi eliminare soltanto gli eventi che hai creato.");
+    await EventsCollection.removeAsync(eventId);
+    await NotificationsCollection.removeAsync({ eventId, type: "event-invitation" });
   },
 
   async "hlc.addPatientNote"(patientId, noteText) {
