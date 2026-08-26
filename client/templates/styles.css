@@ -2536,6 +2536,34 @@ svg.admin-nav-icon {
   white-space: pre-wrap;
 }
 
+.event-invitee-details {
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.6rem;
+  background: var(--bs-tertiary-bg);
+}
+
+.event-invitee-details summary {
+  cursor: pointer;
+}
+
+.event-invitee-summary-title,
+.event-invitee-summary-counts,
+.event-invitee-summary-counts > span {
+  display: block;
+}
+
+.event-invitee-summary-title {
+  font-weight: 700;
+}
+
+.event-invitee-summary-counts {
+  margin-top: 0.35rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 767.98px) {
   .event-invite-grid { grid-template-columns: 1fr; }
   .event-card .card-footer { flex-wrap: wrap; }

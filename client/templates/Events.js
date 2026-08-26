@@ -154,6 +154,8 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
         {events.length === 0 ? <section className="card"><div className="card-body text-center text-secondary py-5">Nessun evento disponibile.</div></section> : <div className="event-card-grid">{events.map((event) => {
           const isOwner = event.createdBy === currentUser.id;
           const invitation = event.invitees?.find((item) => item.userId === currentUser.id);
+          const invitees = event.invitees || [];
+          const responseCount = (role, status) => invitees.filter((item) => item.role === role && item.status === status).length;
           return <article className="card event-card" key={event.id}>
             <div className="card-body">
               <div className="d-flex align-items-start justify-content-between gap-3">
@@ -162,7 +164,16 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
               </div>
               <div className="event-meta mt-3"><strong>{formatEventPeriod(event.startsAt, event.endsAt)}</strong>{event.location && <span>{event.location}</span>}</div>
               {event.description && <p className="event-description mt-3 mb-0">{event.description}</p>}
-              {isOwner && <div className="mt-4"><h3 className="h6">Risposte degli invitati</h3><div className="table-responsive"><table className="table table-sm align-middle mb-0"><thead><tr><th>Invitato</th><th>Ruolo</th><th>Risposta</th></tr></thead><tbody>{event.invitees?.map((invitee) => <tr key={invitee.userId}><td>{invitee.username}</td><td>{invitee.role}</td><td><span className={`badge ${statusClass[invitee.status] || statusClass.pending}`}>{statusLabel[invitee.status] || statusLabel.pending}</span></td></tr>)}</tbody></table></div></div>}
+              {isOwner && <details className="event-invitee-details mt-4">
+                <summary>
+                  <span className="event-invitee-summary-title">Risposte degli invitati</span>
+                  <span className="event-invitee-summary-counts">
+                    <span><strong>CAS</strong>: {responseCount("CAS", "accepted")} sì · {responseCount("CAS", "declined")} no · {responseCount("CAS", "pending")} in attesa</span>
+                    <span><strong>GVP</strong>: {responseCount("GVP", "accepted")} sì · {responseCount("GVP", "declined")} no · {responseCount("GVP", "pending")} in attesa</span>
+                  </span>
+                </summary>
+                <div className="table-responsive mt-3"><table className="table table-sm align-middle mb-0"><thead><tr><th>Invitato</th><th>Ruolo</th><th>Risposta</th></tr></thead><tbody>{invitees.map((invitee) => <tr key={invitee.userId}><td>{invitee.username}</td><td>{invitee.role}</td><td><span className={`badge ${statusClass[invitee.status] || statusClass.pending}`}>{statusLabel[invitee.status] || statusLabel.pending}</span></td></tr>)}</tbody></table></div>
+              </details>}
             </div>
             <div className="card-footer d-flex align-items-center justify-content-end gap-2">
               {isOwner ? <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => removeEvent(event)}>Elimina evento</button> : <><button className={`btn btn-sm ${invitation?.status === "declined" ? "btn-danger" : "btn-outline-danger"}`} type="button" onClick={() => respond(event.id, "declined")}>Non partecipo</button><button className={`btn btn-sm ${invitation?.status === "accepted" ? "btn-success" : "btn-outline-success"}`} type="button" onClick={() => respond(event.id, "accepted")}>Partecipo</button></>}
