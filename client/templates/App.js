@@ -40,6 +40,7 @@ export const App = () => {
   const [impersonation, setImpersonation] = useState(() => {
     try { return JSON.parse(globalThis.sessionStorage?.getItem("hlc-impersonation") || "null"); } catch { return null; }
   });
+  const [impersonationBannerOpen, setImpersonationBannerOpen] = useState(false);
   const [logoReady, setLogoReady] = useState(false);
   const [startupExiting, setStartupExiting] = useState(false);
   const [startupComplete, setStartupComplete] = useState(false);
@@ -270,6 +271,7 @@ export const App = () => {
           }
           globalThis.sessionStorage?.removeItem("hlc-impersonation");
           setImpersonation(null);
+          setImpersonationBannerOpen(false);
         },
       });
     });
@@ -284,7 +286,7 @@ export const App = () => {
     return null;
   }
 
-  return <>{!startupComplete && startupLoader}<ConfirmDialogHost />{impersonation && <div className="impersonation-banner" role="status"><span><strong>Modalità assistenza</strong> — Stai operando come {impersonation.targetUsername}</span><button className="btn btn-light btn-sm" type="button" onClick={stopImpersonation}>Torna ad Admin</button></div>}{user ? (
+  return <>{!startupComplete && startupLoader}<ConfirmDialogHost />{impersonation && <><button className={`impersonation-trigger ${impersonationBannerOpen ? "is-hidden" : ""}`} type="button" aria-label="Apri modalità assistenza" aria-expanded={impersonationBannerOpen} onClick={() => setImpersonationBannerOpen(true)}><span aria-hidden="true">A</span></button><div className={`impersonation-banner ${impersonationBannerOpen ? "is-open" : ""}`} role="status"><span><strong>Modalità assistenza</strong> — Stai operando come {impersonation.targetUsername}</span><div className="impersonation-banner-actions"><button className="btn btn-outline-light btn-sm" type="button" onClick={() => setImpersonationBannerOpen(false)}>Chiudi</button><button className="btn btn-light btn-sm" type="button" onClick={stopImpersonation}>Torna ad Admin</button></div></div></>}{user ? (
     <Home
       user={user}
       users={users}
