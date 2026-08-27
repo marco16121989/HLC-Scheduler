@@ -7,6 +7,7 @@ const doctorTypes = [
   "Collaborazione storica",
   "Nuova collaborazione",
 ];
+const professionalRoles = ["Medico", "Chirurgo", "Anestesista"];
 
 export const Doctors = ({
   doctors,
@@ -19,6 +20,7 @@ export const Doctors = ({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [doctorType, setDoctorType] = useState(doctorTypes[0]);
+  const [professionalRole, setProfessionalRole] = useState(professionalRoles[0]);
   const [notes, setNotes] = useState("");
   const [officeInstructions, setOfficeInstructions] = useState("");
   const [departmentIds, setDepartmentIds] = useState([]);
@@ -27,6 +29,7 @@ export const Doctors = ({
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [nameFilter, setNameFilter] = useState("");
+  const [professionalRoleFilter, setProfessionalRoleFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [hospitalFilter, setHospitalFilter] = useState("all");
 
@@ -51,6 +54,8 @@ export const Doctors = ({
       (value) => value.includes(normalizedNameFilter),
     );
     const matchesType = typeFilter === "all" || doctor.doctorType === typeFilter;
+    const resolvedProfessionalRole = professionalRoles.includes(doctor.professionalRole) ? doctor.professionalRole : professionalRoles[0];
+    const matchesProfessionalRole = professionalRoleFilter === "all" || resolvedProfessionalRole === professionalRoleFilter;
     const selectedHospital = visibleHospitals.find(
       (hospital) => hospital.id === hospitalFilter,
     );
@@ -61,7 +66,7 @@ export const Doctors = ({
       (doctor.departmentIds || []).some((departmentId) =>
         hospitalDepartmentIds.has(departmentId),
       );
-    return matchesName && matchesType && matchesHospital;
+    return matchesName && matchesProfessionalRole && matchesType && matchesHospital;
   });
   const sortedDoctors = [...filteredDoctors].sort((first, second) =>
     (first.lastName || "").localeCompare(second.lastName || ""),
@@ -69,10 +74,10 @@ export const Doctors = ({
   const doctorPagination = usePagination(
     sortedDoctors,
     25,
-    `${normalizedNameFilter}:${typeFilter}:${hospitalFilter}`,
+    `${normalizedNameFilter}:${professionalRoleFilter}:${typeFilter}:${hospitalFilter}`,
   );
   const hasActiveFilters = Boolean(normalizedNameFilter) ||
-    typeFilter !== "all" || hospitalFilter !== "all";
+    professionalRoleFilter !== "all" || typeFilter !== "all" || hospitalFilter !== "all";
   const availableDepartmentIds = new Set(
     visibleHospitals.flatMap((hospital) =>
       hospital.departments.map((department) => department.id),
@@ -85,6 +90,7 @@ export const Doctors = ({
     setPhone("");
     setEmail("");
     setDoctorType(doctorTypes[0]);
+    setProfessionalRole(professionalRoles[0]);
     setNotes("");
     setOfficeInstructions("");
     setDepartmentIds([]);
@@ -154,6 +160,7 @@ export const Doctors = ({
       phone: normalizedPhone,
       email: normalizedEmail,
       doctorType: doctorTypes.includes(doctorType) ? doctorType : doctorTypes[0],
+      professionalRole: professionalRoles.includes(professionalRole) ? professionalRole : professionalRoles[0],
       notes: normalizedNotes,
       officeInstructions: normalizedOfficeInstructions,
       presidentId,
@@ -187,6 +194,7 @@ export const Doctors = ({
         ? doctor.doctorType
         : doctorTypes[0],
     );
+    setProfessionalRole(professionalRoles.includes(doctor.professionalRole) ? doctor.professionalRole : professionalRoles[0]);
     setNotes(doctor.notes || "");
     setOfficeInstructions(doctor.officeInstructions || "");
     setDepartmentIds(
@@ -394,6 +402,26 @@ export const Doctors = ({
                     </div>
 
                     <div className="mt-3">
+                      <label className="form-label" htmlFor="doctor-professional-role">
+                        Professione
+                      </label>
+                      <select
+                        className="form-select"
+                        id="doctor-professional-role"
+                        value={professionalRole}
+                        onChange={(event) => {
+                          setProfessionalRole(event.target.value);
+                          setError("");
+                        }}
+                        required
+                      >
+                        {professionalRoles.map((role) => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="mt-3">
                       <label className="form-label" htmlFor="doctor-notes">
                         Note
                       </label>
@@ -493,7 +521,7 @@ export const Doctors = ({
                 </div>
                 <div className="card-body p-0">
                   <div className="row g-3 p-3 border-bottom doctor-list-filters">
-                    <div className="col-12 col-lg-4">
+                    <div className="col-12 col-lg-3">
                       <label className="form-label" htmlFor="doctor-name-filter">
                         Cerca medico
                       </label>
@@ -506,7 +534,23 @@ export const Doctors = ({
                         placeholder="Nome, cognome o nome completo"
                       />
                     </div>
-                    <div className="col-12 col-md-6 col-lg-4">
+                    <div className="col-12 col-md-6 col-lg-3">
+                      <label className="form-label" htmlFor="doctor-professional-role-filter">
+                        Professione
+                      </label>
+                      <select
+                        className="form-select"
+                        id="doctor-professional-role-filter"
+                        value={professionalRoleFilter}
+                        onChange={(event) => setProfessionalRoleFilter(event.target.value)}
+                      >
+                        <option value="all">Tutte le professioni</option>
+                        {professionalRoles.map((role) => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-12 col-md-6 col-lg-3">
                       <label className="form-label" htmlFor="doctor-type-filter">
                         Tipologia
                       </label>
@@ -522,7 +566,7 @@ export const Doctors = ({
                         ))}
                       </select>
                     </div>
-                    <div className="col-12 col-md-6 col-lg-4">
+                    <div className="col-12 col-md-6 col-lg-3">
                       <label className="form-label" htmlFor="doctor-hospital-filter">
                         Ospedale
                       </label>
@@ -545,6 +589,7 @@ export const Doctors = ({
                         <tr>
                           <th>Cognome</th>
                           <th>Nome</th>
+                          <th>Professione</th>
                           <th>Tipologia</th>
                           <th>Contatti</th>
                           <th>Reparti</th>
@@ -555,7 +600,7 @@ export const Doctors = ({
                       <tbody>
                         {filteredDoctors.length === 0 ? (
                           <tr>
-                            <td className="text-center text-secondary py-4" colSpan="7">
+                            <td className="text-center text-secondary py-4" colSpan="8">
                               {hasActiveFilters
                                 ? "Nessun medico corrisponde ai filtri selezionati."
                                 : "Nessun medico inserito."}
@@ -582,6 +627,11 @@ export const Doctors = ({
                               >
                                 <td className="fw-medium" data-label="Cognome">{doctor.lastName}</td>
                                 <td data-label="Nome">{doctor.firstName}</td>
+                                <td data-label="Professione">
+                                  <span className={`badge ${doctor.professionalRole === "Anestesista" ? "text-bg-success" : doctor.professionalRole === "Chirurgo" ? "text-bg-primary" : "text-bg-secondary"}`}>
+                                    {professionalRoles.includes(doctor.professionalRole) ? doctor.professionalRole : "Medico"}
+                                  </span>
+                                </td>
                                 <td data-label="Tipologia">
                                   <span className="badge text-bg-info">
                                     {doctor.doctorType || "Non specificata"}

@@ -37,22 +37,33 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
         title: item.event || "Presentazione",
         detail: [item.facility, item.city, item.presentationTypes?.join(", ")].filter(Boolean).join(" · "),
       }));
-    const patientEvents = patients
-      .filter((patient) => patient.admissionDate)
-      .map((patient) => {
+    const patientEvents = patients.flatMap((patient) => {
         const doctor = doctors.find((item) => item.id === patient.doctorId);
-        return {
+        const events = [];
+        if (patient.admissionDate) events.push({
           id: `patient-${patient.id}`,
           date: patient.admissionDate.slice(0, 10),
           type: "patient",
           patient,
           title: `${patient.lastName} ${patient.firstName}`,
           detail: [
-            patient.admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza",
+            patient.admissionType === "scheduled" ? "Ricovero programmato" : patient.admissionType === "consultation" ? "Consulto" : "Emergenza",
             !isGvp ? patient.pathology : "",
             doctor ? `Dr. ${doctor.lastName}` : "",
           ].filter(Boolean).join(" · "),
-        };
+        });
+        if (patient.details?.anesthesiologistDate) events.push({
+          id: `patient-anesthesiologist-${patient.id}`,
+          date: patient.details.anesthesiologistDate.slice(0, 10),
+          type: "patient",
+          patient,
+          title: `Visita con l’anestesista — ${patient.lastName} ${patient.firstName}`,
+          detail: [
+            patient.details.anesthesiologistTime ? `Ore ${patient.details.anesthesiologistTime}` : "",
+            patient.details.anesthesiologistName ? `Anestesista: ${patient.details.anesthesiologistName}` : "",
+          ].filter(Boolean).join(" · "),
+        });
+        return events;
       });
     const invitationEvents = invitedEvents
       .filter((item) => item.startsAt)
@@ -179,8 +190,11 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
     ["Nome", selectedPatient.firstName],
     ["Cognome", selectedPatient.lastName],
     ...(!isGvp ? [
-      ["Tipo di accesso", selectedPatient.admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza"],
+      ["Tipo di accesso", selectedPatient.admissionType === "scheduled" ? "Ricovero programmato" : selectedPatient.admissionType === "consultation" ? "Consulto" : "Emergenza"],
       ["Data di accesso", selectedPatient.admissionDate],
+      ["Visita con l’anestesista", patientDetails.anesthesiologistDate],
+      ["Orario visita", patientDetails.anesthesiologistTime],
+      ["Anestesista", patientDetails.anesthesiologistName],
       ["Patologia", selectedPatient.pathology],
       ["Medico responsabile", selectedDoctor ? `${selectedDoctor.lastName} ${selectedDoctor.firstName}` : "Non assegnato"],
       ["CAS", selectedCas?.username || "Non assegnato"],

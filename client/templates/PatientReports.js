@@ -55,8 +55,8 @@ export const PatientReports = ({ patients = [], hospitals = [], users = [], curr
   }), [patients, presidentId, currentUser, year, casFilter]);
 
   const departmentNames = new Map(hospitals.flatMap((hospital) => (hospital.departments || []).map((department) => [department.id, `${department.name} — ${hospital.name}`])));
-  const statusSegments = countBy(visiblePatients, (patient) => patient.status || "In attesa di ricovero");
-  const accessSegments = countBy(visiblePatients, (patient) => patient.admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza");
+  const statusSegments = countBy(visiblePatients, (patient) => patient.status || "Non specificato");
+  const accessSegments = countBy(visiblePatients, (patient) => patient.admissionType === "scheduled" ? "Ricovero programmato" : patient.admissionType === "consultation" ? "Consulto" : "Emergenza");
   const sexSegments = countBy(visiblePatients, (patient) => patient.details?.sex || "Non specificato");
   const departmentSegments = limitSegments(countBy(visiblePatients, (patient) => departmentNames.get(patient.details?.departmentId) || patient.details?.hospitalDepartment || "Nessun reparto"));
   const activeCount = visiblePatients.filter((patient) => ["Ricoverato", "In attesa di ricovero"].includes(patient.status)).length;

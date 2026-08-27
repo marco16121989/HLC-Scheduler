@@ -1499,6 +1499,28 @@ svg.admin-nav-icon {
   width: auto;
 }
 
+.patient-anesthesiologist-box {
+  margin: 0;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--bs-primary) 35%, var(--bs-border-color));
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--bs-primary-bg-subtle) 42%, var(--bs-body-bg));
+}
+
+.patient-anesthesiologist-box legend {
+  float: none;
+  width: auto;
+  margin: 0 0 0.55rem;
+  padding: 0 0.35rem;
+  color: var(--bs-primary-text-emphasis);
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.patient-mobile-location {
+  display: none;
+}
+
 .patient-notes-chat {
   display: grid;
   gap: 0.85rem;
@@ -2109,11 +2131,34 @@ svg.admin-nav-icon {
     grid-column: 1;
     height: 100%;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
     padding: 0.65rem 6.25rem 0.65rem 0.75rem;
     border: 0;
     background: transparent;
     font-size: 0.95rem;
+  }
+
+  .patient-mobile-location {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.7rem;
+    width: 100%;
+    margin-top: 0.25rem;
+    color: var(--bs-secondary-color);
+    font-size: 0.72rem;
+    font-weight: 400;
+    line-height: 1.25;
+  }
+
+  .patient-mobile-location strong {
+    color: var(--bs-body-color);
+    font-weight: 650;
+  }
+
+  .patient-mobile-location > span:nth-child(-n+2) {
+    flex: 1 0 100%;
   }
 
   .patient-list-table tbody td[data-label="Azioni"] {

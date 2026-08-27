@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
 import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPdf.js";
@@ -6,6 +6,10 @@ import { confirmAction } from "./ConfirmDialog.js";
 import { PaginationControls, usePagination } from "./Pagination.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
+const ADMISSION_TYPES = ["emergency", "scheduled", "consultation"];
+const admissionTypeLabel = (value, compact = false) => value === "scheduled"
+  ? (compact ? "Programmato" : "Ricovero programmato")
+  : value === "consultation" ? "Consulto" : "Emergenza";
 
 const formatPatientListName = (patient) => {
   const isFemale = ["Femmina", "Femminile"].includes(patient.details?.sex);
@@ -23,6 +27,13 @@ const NoteButtonContent = ({ unreadCount = 0 }) => <span className="patient-note
   </svg>
   <span>Note</span>
   {unreadCount > 0 && <span className="patient-note-unread" aria-label={`${unreadCount} nuove note`}>{unreadCount}</span>}
+</span>;
+
+const PatientMobileLocation = ({ patient, departmentName, hospitalName }) => <span className="patient-mobile-location">
+  <span><strong>Ospedale:</strong> {hospitalName || patient.details?.hospitalName || "-"}</span>
+  <span><strong>Reparto:</strong> {departmentName || patient.details?.hospitalDepartment || "-"}</span>
+  <span><strong>Camera:</strong> {patient.details?.hospitalRoom || "-"}</span>
+  <span><strong>Letto:</strong> {patient.details?.hospitalBed || "-"}</span>
 </span>;
 
 const PATIENT_STATUSES = [
@@ -221,7 +232,7 @@ const PATIENT_FORM_TABS = [
   ["summary", "Riepilogo"],
   ["main", "Info Principali"],
   ["insertion", "Info Complete"],
-  ["departments", "Storico Reparti"],
+  ["departments", "Trasferimenti"],
 ];
 
 const SIMPLIFIED_FIELD_NAMES = new Set(SIMPLIFIED_FIELDS.map(([name]) => name));
@@ -290,7 +301,7 @@ export const Patients = ({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [admissionType, setAdmissionType] = useState("emergency");
-  const [patientStatus, setPatientStatus] = useState(PATIENT_STATUSES[0]);
+  const [patientStatus, setPatientStatus] = useState("");
   const [transferNotes, setTransferNotes] = useState("");
   const [admissionDate, setAdmissionDate] = useState(getToday);
   const [dischargeDate, setDischargeDate] = useState("");
@@ -321,6 +332,13 @@ export const Patients = ({
   const [recommendedDoctorModalTab, setRecommendedDoctorModalTab] = useState("department");
   const [doctorSearch, setDoctorSearch] = useState("");
   const [departmentSelectionModalOpen, setDepartmentSelectionModalOpen] = useState(false);
+  const [departmentChangeReasonModalOpen, setDepartmentChangeReasonModalOpen] = useState(false);
+  const [departmentChangeMode, setDepartmentChangeMode] = useState(null);
+  const [departmentTransferScopeModalOpen, setDepartmentTransferScopeModalOpen] = useState(false);
+  const [externalDepartmentTransferModalOpen, setExternalDepartmentTransferModalOpen] = useState(false);
+  const [externalDepartmentTransferDestination, setExternalDepartmentTransferDestination] = useState("");
+  const [externalDepartmentTransferError, setExternalDepartmentTransferError] = useState("");
+  const [transferAutoSavePending, setTransferAutoSavePending] = useState(false);
   const [departmentSearch, setDepartmentSearch] = useState("");
   const [departmentChangeDate, setDepartmentChangeDate] = useState(getToday);
   const [casSelectionModalOpen, setCasSelectionModalOpen] = useState(false);
@@ -360,7 +378,7 @@ export const Patients = ({
   const visiblePatients = statusFilter === "all"
     ? roleFilteredPatients
     : roleFilteredPatients.filter(
-        (patient) => (patient.status || PATIENT_STATUSES[0]) === statusFilter,
+        (patient) => (patient.status || "") === statusFilter,
       );
   const sortedVisiblePatients = [...visiblePatients].sort((first, second) =>
     (first.lastName || "").localeCompare(second.lastName || ""),
@@ -519,7 +537,7 @@ export const Patients = ({
     setFirstName("");
     setLastName("");
     setAdmissionType("emergency");
-    setPatientStatus(PATIENT_STATUSES[0]);
+    setPatientStatus("");
     setTransferNotes("");
     setAdmissionDate(getToday());
     setDischargeDate("");
@@ -539,6 +557,13 @@ export const Patients = ({
     setDoctorSelectionModalOpen(false);
     setRecommendedDoctorsModalOpen(false);
     setDepartmentSelectionModalOpen(false);
+    setDepartmentChangeReasonModalOpen(false);
+    setDepartmentChangeMode(null);
+    setDepartmentTransferScopeModalOpen(false);
+    setExternalDepartmentTransferModalOpen(false);
+    setExternalDepartmentTransferDestination("");
+    setExternalDepartmentTransferError("");
+    setTransferAutoSavePending(false);
     setDepartmentChangeDate(getToday());
     setCasSelectionModalOpen(false);
     setGvpSelectionModalOpen(false);
@@ -598,7 +623,63 @@ export const Patients = ({
     setError("");
     setDepartmentSearch("");
     setDepartmentChangeDate(getToday());
+    if (isEditing && selectedDepartment) {
+      setDepartmentChangeReasonModalOpen(true);
+      return;
+    }
+    setDepartmentChangeMode(null);
     setDepartmentSelectionModalOpen(true);
+  };
+
+  const continueDepartmentChange = (mode) => {
+    setDepartmentChangeMode(mode);
+    setDepartmentChangeReasonModalOpen(false);
+    setDepartmentSelectionModalOpen(true);
+  };
+
+  const openDepartmentTransferScope = () => {
+    setDepartmentChangeReasonModalOpen(false);
+    setDepartmentTransferScopeModalOpen(true);
+  };
+
+  const continueInternalDepartmentTransfer = () => {
+    setDepartmentTransferScopeModalOpen(false);
+    continueDepartmentChange("transfer");
+  };
+
+  const openExternalDepartmentTransfer = () => {
+    setDepartmentTransferScopeModalOpen(false);
+    setExternalDepartmentTransferDestination("");
+    setExternalDepartmentTransferError("");
+    setExternalDepartmentTransferModalOpen(true);
+  };
+
+  const saveExternalDepartmentTransfer = () => {
+    const destination = externalDepartmentTransferDestination.trim();
+    if (!destination) {
+      setExternalDepartmentTransferError("Indica dove viene trasferito il paziente.");
+      return;
+    }
+    setDepartmentHistory((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        date: departmentChangeDate || getToday(),
+        changedById: currentUser.id,
+        changedByName: currentUser.username || `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() || currentUser.role,
+        changedByRole: currentUser.role,
+        toDepartmentId: "",
+        toDepartmentName: "Trasferimento esterno",
+        toHospitalName: destination,
+        external: true,
+      },
+    ]);
+    setPatientStatus("Trasferito");
+    setTransferNotes(destination);
+    setTransferAutoSavePending(true);
+    setExternalDepartmentTransferModalOpen(false);
+    setExternalDepartmentTransferDestination("");
+    setExternalDepartmentTransferError("");
   };
 
   const selectPatientDepartment = (department) => {
@@ -607,7 +688,7 @@ export const Patients = ({
       return;
     }
 
-    if (isEditing && selectedDepartment) {
+    if (isEditing && selectedDepartment && departmentChangeMode === "transfer") {
       setDepartmentHistory((current) => [
         ...current,
         {
@@ -621,6 +702,17 @@ export const Patients = ({
           toHospitalName: department.hospitalName,
         },
       ]);
+    } else if (isEditing && selectedDepartment && departmentChangeMode === "correction") {
+      setDepartmentHistory((current) => current.map((movement, index) => index === current.length - 1
+        ? {
+            ...movement,
+            toDepartmentId: department.id,
+            toDepartmentName: department.name,
+            toHospitalName: department.hospitalName,
+            correctedAt: new Date(),
+            correctedById: currentUser.id,
+          }
+        : movement));
     }
 
     setDetails((current) => ({
@@ -641,11 +733,15 @@ export const Patients = ({
     );
     setDoctorId(eligibleDoctors[0]?.id || "");
     setRecommendedDoctorIds(eligibleDoctors.map((availableDoctor) => availableDoctor.id));
+    if (departmentChangeMode === "transfer") setTransferAutoSavePending(true);
     setError("");
     closeDepartmentSelectionModal();
   };
 
-  const closeDepartmentSelectionModal = () => setDepartmentSelectionModalOpen(false);
+  const closeDepartmentSelectionModal = () => {
+    setDepartmentSelectionModalOpen(false);
+    setDepartmentChangeMode(null);
+  };
 
   const closeGvpSelectionModal = () => {
     setGvpSelectionModalOpen(false);
@@ -714,28 +810,11 @@ export const Patients = ({
       return false;
     }
 
-    const isDuplicate = patients.some(
-      (patient) =>
-        patient.firstName.toLowerCase() === normalizedFirstName.toLowerCase() &&
-        patient.lastName.toLowerCase() === normalizedLastName.toLowerCase() &&
-        patient.presidentId === presidentId &&
-        patient.id !== editingId,
-    );
-
-    if (isDuplicate) {
-      setError("Il paziente e gia presente.");
-      setActiveTab("insertion");
-      return false;
-    }
-
     const patientData = {
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
-      admissionType:
-        admissionType === "scheduled" ? "scheduled" : "emergency",
-      status: PATIENT_STATUSES.includes(patientStatus)
-        ? patientStatus
-        : PATIENT_STATUSES[0],
+      admissionType: ADMISSION_TYPES.includes(admissionType) ? admissionType : "emergency",
+      status: PATIENT_STATUSES.includes(patientStatus) ? patientStatus : "",
       transferNotes: patientStatus === "Trasferito" ? transferNotes.trim() : "",
       admissionDate,
       dischargeDate,
@@ -773,6 +852,12 @@ export const Patients = ({
     resetForm();
     return savedPatient;
   };
+
+  useEffect(() => {
+    if (!transferAutoSavePending) return;
+    setTransferAutoSavePending(false);
+    savePatient();
+  }, [transferAutoSavePending]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -826,13 +911,9 @@ export const Patients = ({
     setEditingId(patient.id);
     setFirstName(patient.firstName);
     setLastName(patient.lastName);
-    setAdmissionType(
-      patient.admissionType === "scheduled" ? "scheduled" : "emergency",
-    );
+    setAdmissionType(ADMISSION_TYPES.includes(patient.admissionType) ? patient.admissionType : "emergency");
     setPatientStatus(
-      PATIENT_STATUSES.includes(patient.status)
-        ? patient.status
-        : PATIENT_STATUSES[0],
+      PATIENT_STATUSES.includes(patient.status) ? patient.status : "",
     );
     setTransferNotes(patient.transferNotes || "");
     setAdmissionDate(patient.admissionDate || getToday());
@@ -888,7 +969,7 @@ export const Patients = ({
   };
 
   const updatePatientStatus = (patientId, status) => {
-    if (!PATIENT_STATUSES.includes(status)) return;
+    if (status !== "" && !PATIENT_STATUSES.includes(status)) return;
     if (status === "Trasferito") {
       const patient = patients.find((item) => item.id === patientId);
       if (!patient) return;
@@ -1039,7 +1120,7 @@ export const Patients = ({
     ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
     { label: "DAT compilata?", value: details.datCompleted },
     { label: "DAT registrata?", value: details.datRegistered },
-    { label: "Tipo di accesso", value: admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza" },
+    { label: "Tipo di accesso", value: admissionTypeLabel(admissionType) },
     { label: "Stato", value: patientStatus },
     ...(patientStatus === "Trasferito" ? [{ label: "Dove è stato trasferito", value: transferNotes }] : []),
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
@@ -1064,6 +1145,9 @@ export const Patients = ({
     ...(patientStatus === "Trasferito" ? [{ label: "Dove è stato trasferito", value: transferNotes }] : []),
     { label: "Numero camera", value: details.hospitalRoom },
     { label: "Numero letto", value: details.hospitalBed },
+    { label: "Visita con l’anestesista", value: details.anesthesiologistDate },
+    { label: "Orario visita", value: details.anesthesiologistTime },
+    { label: "Anestesista", value: details.anesthesiologistName },
     { label: "Congregazione", value: details.congregation },
     { label: "Età", value: details.age },
     { label: "Numero di cellulare del paziente", value: details.patientPhone },
@@ -1085,12 +1169,15 @@ export const Patients = ({
     ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
     { label: "DAT compilata?", value: details.datCompleted },
     { label: "DAT registrata?", value: details.datRegistered },
-    { label: "Tipo di accesso", value: admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza" },
+    { label: "Tipo di accesso", value: admissionTypeLabel(admissionType) },
     { label: "Stato", value: patientStatus },
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
     { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ") : "Nessun medico consigliato" },
     { label: "Numero camera", value: details.hospitalRoom },
     { label: "Numero letto", value: details.hospitalBed },
+    { label: "Visita con l’anestesista", value: details.anesthesiologistDate },
+    { label: "Orario visita", value: details.anesthesiologistTime },
+    { label: "Anestesista", value: details.anesthesiologistName },
     { label: "CAS", value: selectedCasUsers.length > 0 ? selectedCasUsers.map((user) => user.username).join(", ") : "Non assegnato" },
     { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato" },
     { label: "Reparto", value: selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Non assegnato" },
@@ -1113,6 +1200,7 @@ export const Patients = ({
                 onChange={(event) => setStatusFilter(event.target.value)}
               >
                 <option value="all">Tutti gli stati</option>
+                <option value="">Senza stato</option>
                 {PATIENT_STATUSES.map((status) => (
                   <option key={status} value={status}>{status}</option>
                 ))}
@@ -1186,6 +1274,7 @@ export const Patients = ({
                       value={patientStatus}
                       onChange={(event) => requestFormStatusChange(event.target.value)}
                     >
+                      <option value="">Nessuno stato</option>
                       {PATIENT_STATUSES.map((status) => (
                         <option key={status} value={status}>{status}</option>
                       ))}
@@ -1325,21 +1414,7 @@ export const Patients = ({
                         </div>}
                       </div>
                       <div className="patient-assignment-row row g-2 w-100">
-                        <div className="col-12 col-md-4">
-                          <label className="form-label" htmlFor="patient-main-pathology">Patologia</label>
-                          <input
-                            className="form-control"
-                            id="patient-main-pathology"
-                            type="text"
-                            value={pathology}
-                            onChange={(event) => {
-                              setPathology(event.target.value);
-                              setError("");
-                            }}
-                            required
-                          />
-                        </div>
-                        <div className="col-12 col-md-4">
+                        <div className="col-12 col-md-6">
                           <label className="form-label" htmlFor="patient-main-admission-date">
                             Data del ricovero
                           </label>
@@ -1355,7 +1430,7 @@ export const Patients = ({
                             required
                           />
                         </div>
-                        <div className="col-12 col-md-4">
+                        <div className="col-12 col-md-6">
                           <label className="form-label" htmlFor="patient-main-discharge-date">
                             Data dimissioni
                           </label>
@@ -1372,13 +1447,59 @@ export const Patients = ({
                           />
                         </div>
                       </div>
+                      <fieldset className="patient-anesthesiologist-box w-100">
+                        <legend>Visita con l’anestesista</legend>
+                        <div className="row g-2">
+                          <PatientDetailField
+                            field={["anesthesiologistDate", "Data", "date"]}
+                            value={details.anesthesiologistDate}
+                            onChange={(name, value) => {
+                              setDetails((current) => ({ ...current, [name]: value }));
+                              setError("");
+                            }}
+                            columnClassName="col-12 col-md-4"
+                          />
+                          <PatientDetailField
+                            field={["anesthesiologistTime", "Orario", "time"]}
+                            value={details.anesthesiologistTime}
+                            onChange={(name, value) => {
+                              setDetails((current) => ({ ...current, [name]: value }));
+                              setError("");
+                            }}
+                            columnClassName="col-12 col-md-4"
+                          />
+                          <PatientDetailField
+                            field={["anesthesiologistName", "Anestesista"]}
+                            value={details.anesthesiologistName}
+                            onChange={(name, value) => {
+                              setDetails((current) => ({ ...current, [name]: value }));
+                              setError("");
+                            }}
+                            columnClassName="col-12 col-md-4"
+                          />
+                        </div>
+                      </fieldset>
                       <div className="patient-assignment-row row g-2 w-100">
+                        <div className="col-12 col-md-4">
+                          <label className="form-label" htmlFor="patient-main-pathology">Patologia</label>
+                          <input
+                            className="form-control"
+                            id="patient-main-pathology"
+                            type="text"
+                            value={pathology}
+                            onChange={(event) => {
+                              setPathology(event.target.value);
+                              setError("");
+                            }}
+                            required
+                          />
+                        </div>
                         {SIMPLIFIED_FIELDS.slice(6, 8).map((field) => (
                           <PatientDetailField
                             key={field[0]}
                             field={field}
                             value={details[field[0]]}
-                            columnClassName="col-12 col-md-6"
+                            columnClassName="col-12 col-md-4"
                             onChange={(name, value) => {
                               setDetails((current) => ({ ...current, [name]: value }));
                               setError("");
@@ -1438,6 +1559,17 @@ export const Patients = ({
                           />
                           <label className="btn btn-outline-primary" htmlFor="patient-main-scheduled">
                             Ricovero programmato
+                          </label>
+                          <input
+                            className="btn-check"
+                            id="patient-main-consultation"
+                            name="admission-type"
+                            type="radio"
+                            checked={admissionType === "consultation"}
+                            onChange={() => setAdmissionType("consultation")}
+                          />
+                          <label className="btn btn-outline-success" htmlFor="patient-main-consultation">
+                            Consulto
                           </label>
                         </div>
                       </fieldset>
@@ -1630,17 +1762,98 @@ export const Patients = ({
                           <div className="form-text">Nessun GVP disponibile per questa presidenza.</div>
                         )}
                       </fieldset>
+                      {departmentChangeReasonModalOpen && (
+                        <>
+                          <button className="entity-modal-backdrop" type="button" aria-label="Annulla cambio ospedale" onClick={() => setDepartmentChangeReasonModalOpen(false)} />
+                          <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="department-change-reason-title">
+                            <section className="card entity-modal-card">
+                              <div className="card-header d-flex align-items-center gap-2">
+                                <h3 className="card-title mb-0" id="department-change-reason-title">Perché stai cambiando ospedale?</h3>
+                                <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setDepartmentChangeReasonModalOpen(false)} />
+                              </div>
+                              <div className="card-body">
+                                <p className="text-secondary">Indica se il paziente è stato trasferito oppure se stai correggendo un dato inserito per errore.</p>
+                                <div className="d-grid gap-3">
+                                  <button className="btn btn-outline-primary text-start p-3" type="button" onClick={openDepartmentTransferScope}>
+                                    <strong className="d-block">È un trasferimento</strong>
+                                    <small>Il nuovo ospedale e reparto verranno aggiunti ai Trasferimenti.</small>
+                                  </button>
+                                  <button className="btn btn-outline-secondary text-start p-3" type="button" onClick={() => continueDepartmentChange("correction")}>
+                                    <strong className="d-block">È una correzione</strong>
+                                    <small>Il dato verrà corretto senza registrare un trasferimento.</small>
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="card-footer d-flex justify-content-end">
+                                <button className="btn btn-outline-secondary" type="button" onClick={() => setDepartmentChangeReasonModalOpen(false)}>Annulla</button>
+                              </div>
+                            </section>
+                          </div>
+                        </>
+                      )}
+                      {departmentTransferScopeModalOpen && (
+                        <>
+                          <button className="entity-modal-backdrop" type="button" aria-label="Annulla trasferimento" onClick={() => setDepartmentTransferScopeModalOpen(false)} />
+                          <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="department-transfer-scope-title">
+                            <section className="card entity-modal-card">
+                              <div className="card-header d-flex align-items-center gap-2">
+                                <h3 className="card-title mb-0" id="department-transfer-scope-title">Dove viene trasferito?</h3>
+                                <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setDepartmentTransferScopeModalOpen(false)} />
+                              </div>
+                              <div className="card-body">
+                                <div className="d-grid gap-3">
+                                  <button className="btn btn-outline-primary text-start p-3" type="button" onClick={continueInternalDepartmentTransfer}>
+                                    <strong className="d-block">In un ospedale del CAS</strong>
+                                    <small>Scegli l’ospedale e il reparto dall’elenco disponibile.</small>
+                                  </button>
+                                  <button className="btn btn-outline-secondary text-start p-3" type="button" onClick={openExternalDepartmentTransfer}>
+                                    <strong className="d-block">Al di fuori degli ospedali del CAS</strong>
+                                    <small>Inserisci manualmente la destinazione del trasferimento.</small>
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="card-footer d-flex justify-content-end">
+                                <button className="btn btn-outline-secondary" type="button" onClick={() => setDepartmentTransferScopeModalOpen(false)}>Annulla</button>
+                              </div>
+                            </section>
+                          </div>
+                        </>
+                      )}
+                      {externalDepartmentTransferModalOpen && (
+                        <>
+                          <button className="entity-modal-backdrop" type="button" aria-label="Annulla trasferimento esterno" onClick={() => setExternalDepartmentTransferModalOpen(false)} />
+                          <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="external-department-transfer-title">
+                            <section className="card entity-modal-card">
+                              <div className="card-header d-flex align-items-center gap-2">
+                                <h3 className="card-title mb-0" id="external-department-transfer-title">Trasferimento esterno</h3>
+                                <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setExternalDepartmentTransferModalOpen(false)} />
+                              </div>
+                              <div className="card-body">
+                                {externalDepartmentTransferError && <div className="alert alert-danger py-2" role="alert">{externalDepartmentTransferError}</div>}
+                                <label className="form-label" htmlFor="external-department-transfer-date">Data del trasferimento</label>
+                                <input className="form-control mb-3" id="external-department-transfer-date" type="date" value={departmentChangeDate} onChange={(event) => setDepartmentChangeDate(event.target.value)} />
+                                <label className="form-label" htmlFor="external-department-transfer-destination">Dove viene trasferito?</label>
+                                <textarea className="form-control" id="external-department-transfer-destination" rows="4" value={externalDepartmentTransferDestination} onChange={(event) => { setExternalDepartmentTransferDestination(event.target.value); setExternalDepartmentTransferError(""); }} placeholder="Indica ospedale, struttura, reparto ed eventuali informazioni utili" maxLength="4000" autoFocus />
+                              </div>
+                              <div className="card-footer d-flex justify-content-end gap-2">
+                                <button className="btn btn-outline-secondary" type="button" onClick={() => setExternalDepartmentTransferModalOpen(false)}>Annulla</button>
+                                <button className="btn btn-primary" type="button" onClick={saveExternalDepartmentTransfer}>Registra trasferimento</button>
+                              </div>
+                            </section>
+                          </div>
+                        </>
+                      )}
                       {departmentSelectionModalOpen && (
                         <>
                           <button className="entity-modal-backdrop" type="button" aria-label="Chiudi selezione reparto" onClick={closeDepartmentSelectionModal} />
                           <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="department-selection-title">
                             <section className="card entity-modal-card">
                               <div className="card-header d-flex align-items-center justify-content-between gap-2">
-                                <h3 className="card-title mb-0" id="department-selection-title">{isEditing && selectedDepartment ? "Cambia reparto" : "Seleziona reparto"}</h3>
+                                <h3 className="card-title mb-0" id="department-selection-title">{departmentChangeMode === "transfer" ? "Registra trasferimento" : departmentChangeMode === "correction" ? "Correggi ospedale o reparto" : "Seleziona reparto"}</h3>
                                 <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeDepartmentSelectionModal} />
                               </div>
                               <div className="card-body">
-                                {isEditing && selectedDepartment && (
+                                {isEditing && selectedDepartment && departmentChangeMode === "transfer" && (
                                   <div className="mb-3">
                                     <label className="form-label" htmlFor="department-change-date">Data del cambio reparto</label>
                                     <input className="form-control" id="department-change-date" type="date" value={departmentChangeDate} onChange={(event) => setDepartmentChangeDate(event.target.value)} required />
@@ -2348,6 +2561,7 @@ export const Patients = ({
                       </tr>
                     ) : (
                       patientPagination.pageItems.map((patient) => {
+                          const patientDepartment = availableDepartments.find((department) => department.id === patient.details?.departmentId);
                           if (isGvp) {
                             return (
                               <tr
@@ -2363,7 +2577,7 @@ export const Patients = ({
                                   }
                                 }}
                               >
-                                <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}</td>
+                                <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}<PatientMobileLocation patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
                                 <td className="text-center patient-actions-column" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-primary btn-sm" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button></div></td>
                               </tr>
                             );
@@ -2389,29 +2603,31 @@ export const Patients = ({
                           >
                             <td className="fw-medium" data-label="Paziente">
                               {formatPatientListName(patient)}
+                              <PatientMobileLocation patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} />
                             </td>
                             <td data-label="Accesso">
                               <span
                                 className={`badge ${
                                   patient.admissionType === "scheduled"
                                     ? "text-bg-primary"
-                                    : "text-bg-danger"
+                                    : patient.admissionType === "consultation"
+                                      ? "text-bg-success"
+                                      : "text-bg-danger"
                                 }`}
                               >
-                                {patient.admissionType === "scheduled"
-                                  ? "Programmato"
-                                  : "Emergenza"}
+                                {admissionTypeLabel(patient.admissionType, true)}
                               </span>
                             </td>
                             <td data-label="Stato">
                               <select
                                 className="form-select form-select-sm patient-list-status"
                                 aria-label={`Stato di ${patient.firstName} ${patient.lastName}`}
-                                value={patient.status || PATIENT_STATUSES[0]}
+                                value={patient.status || ""}
                                 onClick={(event) => event.stopPropagation()}
                                 onKeyDown={(event) => event.stopPropagation()}
                                 onChange={(event) => updatePatientStatus(patient.id, event.target.value)}
                               >
+                                <option value="">Nessuno stato</option>
                                 {PATIENT_STATUSES.map((status) => (
                                   <option key={status} value={status}>{status}</option>
                                 ))}
