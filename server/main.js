@@ -5,6 +5,7 @@ import { check, Match } from "meteor/check";
 import webpush from "web-push";
 import {
   AccessLogsCollection,
+  LoginMessagesCollection,
   AbsencesCollection,
   DepartmentsCollection,
   DoctorsCollection,
@@ -492,7 +493,40 @@ Meteor.publish("hlc-access-logs", async function publishHlcAccessLogs() {
   );
 });
 
+Meteor.publish("hlc-login-messages", async function publishHlcLoginMessages() {
+  if (!this.userId) return this.ready();
+  const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
+  if (actor?.profile?.role === "Admin") {
+    return LoginMessagesCollection.find({}, { sort: { startDate: -1, createdAt: -1 } });
+  }
+  if (!["Presidente", "CAS", "GVP"].includes(actor?.profile?.role)) return this.ready();
+  const today = new Date().toISOString().slice(0, 10);
+  return LoginMessagesCollection.find({ startDate: { $lte: today }, endDate: { $gte: today } }, { sort: { startDate: 1, createdAt: 1 } });
+});
+
 Meteor.methods({
+  async "hlc.createLoginMessage"(data) {
+    requireUser(this);
+    check(data, { text: String, startDate: String, endDate: String });
+    const admin = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1, username: 1 } });
+    if (admin?.profile?.role !== "Admin") throw new Meteor.Error("not-authorized", "Operazione riservata agli amministratori.");
+    const text = data.text.trim();
+    if (!text || text.length > 4000) throw new Meteor.Error("invalid-message", "Inserisci un messaggio valido (massimo 4000 caratteri).");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(data.endDate) || data.startDate > data.endDate) {
+      throw new Meteor.Error("invalid-period", "Il periodo selezionato non è valido.");
+    }
+    return LoginMessagesCollection.insertAsync({ text, startDate: data.startDate, endDate: data.endDate, createdAt: new Date(), createdBy: admin._id, createdByName: admin.username || "Admin" });
+  },
+
+  async "hlc.deleteLoginMessage"(messageId) {
+    requireUser(this);
+    check(messageId, String);
+    const admin = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
+    if (admin?.profile?.role !== "Admin") throw new Meteor.Error("not-authorized", "Operazione riservata agli amministratori.");
+    await LoginMessagesCollection.removeAsync(messageId);
+    return true;
+  },
+
   async "hlc.startImpersonation"(targetUserId) {
     requireUser(this);
     check(targetUserId, String);
@@ -577,6 +611,8 @@ Meteor.methods({
 
   async "hlc.trackAccess"() {
     requireUser(this);
+    const assistanceSession = impersonationSessions.get(this.connection.id);
+    if (assistanceSession?.targetId === this.userId) return null;
     const actor = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
     const duplicateWindow = new Date(Date.now() - 30 * 60 * 1000);
     const recentAccess = await AccessLogsCollection.findOneAsync({
@@ -1569,6 +1605,7 @@ const ensurePerformanceIndexes = async () => {
     EventsCollection.rawCollection().createIndex({ presidentId: 1, "invitees.userId": 1, startsAt: 1 }),
     NotificationsCollection.rawCollection().createIndex({ recipientId: 1, readAt: 1, createdAt: -1 }),
     AbsencesCollection.rawCollection().createIndex({ userId: 1, startDate: 1, endDate: 1 }),
+    LoginMessagesCollection.rawCollection().createIndex({ startDate: 1, endDate: 1 }),
     Meteor.users.rawCollection().createIndex({ "profile.presidentId": 1, "profile.role": 1 }),
     Meteor.users.rawCollection().createIndex({ "profile.associationId": 1, "profile.role": 1 }),
   ]);

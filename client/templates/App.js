@@ -6,6 +6,7 @@ import { Home } from "./Home.js";
 import { Login } from "./Login.js";
 import {
   AccessLogsCollection,
+  LoginMessagesCollection,
   AbsencesCollection,
   DepartmentsCollection,
   DoctorsCollection,
@@ -41,6 +42,8 @@ export const App = () => {
     try { return JSON.parse(globalThis.sessionStorage?.getItem("hlc-impersonation") || "null"); } catch { return null; }
   });
   const [impersonationBannerOpen, setImpersonationBannerOpen] = useState(false);
+  const [loginMessagesToShow, setLoginMessagesToShow] = useState([]);
+  const [loginMessageIndex, setLoginMessageIndex] = useState(0);
   const [logoReady, setLogoReady] = useState(false);
   const [startupExiting, setStartupExiting] = useState(false);
   const [startupComplete, setStartupComplete] = useState(false);
@@ -133,15 +136,16 @@ export const App = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
   };
 
-  const { ready, user, users, hospitals, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, accessLogs } = useTracker(() => {
+  const { ready, user, users, hospitals, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, accessLogs, loginMessages } = useTracker(() => {
     const dataSubscription = Meteor.subscribe("hlc-data");
     const eventSubscription = Meteor.subscribe("hlc-events");
     const notificationSubscription = Meteor.subscribe("hlc-notifications");
     const accessSubscription = Meteor.subscribe("hlc-access-logs");
+    const loginMessagesSubscription = Meteor.subscribe("hlc-login-messages");
     const account = Meteor.user();
 
     return {
-      ready: dataSubscription.ready() && eventSubscription.ready() && notificationSubscription.ready() && accessSubscription.ready(),
+      ready: dataSubscription.ready() && eventSubscription.ready() && notificationSubscription.ready() && accessSubscription.ready() && loginMessagesSubscription.ready(),
       user: account ? toClientRecord(account) : null,
       users: Meteor.users.find({}, { sort: { username: 1 } }).fetch().map(toClientRecord),
       hospitals: HospitalsCollection.find().fetch().map(toClientRecord),
@@ -158,6 +162,7 @@ export const App = () => {
       usefulFiles: UsefulFilesCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
       absences: AbsencesCollection.find({}, { sort: { startDate: 1 } }).fetch().map(toClientRecord),
       accessLogs: AccessLogsCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
+      loginMessages: LoginMessagesCollection.find({}, { sort: { startDate: 1, createdAt: 1 } }).fetch().map(toClientRecord),
     };
   }, []);
 
@@ -174,6 +179,25 @@ export const App = () => {
     globalThis.sessionStorage?.setItem(trackingKey, "tracked");
     Meteor.call("hlc.trackAccess");
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!ready || !user?.id || !["Presidente", "CAS", "GVP"].includes(user.role)) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const activeMessages = loginMessages.filter((message) => message.startDate <= today && message.endDate >= today);
+    setLoginMessagesToShow(activeMessages);
+    setLoginMessageIndex(0);
+  }, [ready, user?.id, user?.role, loginMessages]);
+
+  useEffect(() => {
+    if (loginMessagesToShow.length === 0) return;
+    const availableIds = new Set(loginMessages.map((message) => message.id));
+    setLoginMessagesToShow((current) => current.filter((message) => availableIds.has(message.id)));
+  }, [loginMessages]);
+
+  useEffect(() => {
+    if (loginMessageIndex < loginMessagesToShow.length) return;
+    setLoginMessageIndex(Math.max(0, loginMessagesToShow.length - 1));
+  }, [loginMessageIndex, loginMessagesToShow.length]);
 
   const pushNotifications = usePushNotifications(user?.id);
 
@@ -277,6 +301,16 @@ export const App = () => {
     });
   };
 
+  const currentLoginMessage = loginMessagesToShow[loginMessageIndex];
+  const closeCurrentLoginMessage = () => {
+    if (loginMessageIndex < loginMessagesToShow.length - 1) {
+      setLoginMessageIndex((current) => current + 1);
+      return;
+    }
+    setLoginMessagesToShow([]);
+    setLoginMessageIndex(0);
+  };
+
   if (!startupComplete && !startupExiting) {
     return startupLoader;
   }
@@ -286,7 +320,7 @@ export const App = () => {
     return null;
   }
 
-  return <>{!startupComplete && startupLoader}<ConfirmDialogHost />{impersonation && <><button className={`impersonation-trigger ${impersonationBannerOpen ? "is-hidden" : ""}`} type="button" aria-label="Apri modalità assistenza" aria-expanded={impersonationBannerOpen} onClick={() => setImpersonationBannerOpen(true)}><span aria-hidden="true">A</span></button><div className={`impersonation-banner ${impersonationBannerOpen ? "is-open" : ""}`} role="status"><span><strong>Modalità assistenza</strong> — Stai operando come {impersonation.targetUsername}</span><div className="impersonation-banner-actions"><button className="btn btn-outline-light btn-sm" type="button" onClick={() => setImpersonationBannerOpen(false)}>Chiudi</button><button className="btn btn-light btn-sm" type="button" onClick={stopImpersonation}>Torna ad Admin</button></div></div></>}{user ? (
+  return <>{!startupComplete && startupLoader}<ConfirmDialogHost />{currentLoginMessage && <><div className="login-message-backdrop" /><div className="login-message-shell" role="dialog" aria-modal="true" aria-labelledby="login-message-title"><section className="login-message-card"><button className="login-message-close" type="button" aria-label={loginMessageIndex < loginMessagesToShow.length - 1 ? "Mostra il messaggio successivo" : "Chiudi il messaggio"} onClick={closeCurrentLoginMessage}><span aria-hidden="true">×</span></button><h2 id="login-message-title"><svg className="login-message-alert-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9a1.95 1.95 0 0 1 3.4 0l8 13.9a1.95 1.95 0 0 1-1.7 2.92H4a1.95 1.95 0 0 1-1.7-2.92z" fill="#ffc107" /><path d="M12 8.2v5.6M12 17.1h.01" fill="none" stroke="currentColor" strokeWidth="2.15" strokeLinecap="round" /></svg> Messaggio importante</h2><p className="login-message-text">{currentLoginMessage.text}</p></section></div></>}{impersonation && <><button className={`impersonation-trigger ${impersonationBannerOpen ? "is-hidden" : ""}`} type="button" aria-label="Apri modalità assistenza" aria-expanded={impersonationBannerOpen} onClick={() => setImpersonationBannerOpen(true)}><span aria-hidden="true">A</span></button><div className={`impersonation-banner ${impersonationBannerOpen ? "is-open" : ""}`} role="status"><span><strong>Modalità assistenza</strong> — Stai operando come {impersonation.targetUsername}</span><div className="impersonation-banner-actions"><button className="btn btn-outline-light btn-sm" type="button" onClick={() => setImpersonationBannerOpen(false)}>Chiudi</button><button className="btn btn-light btn-sm" type="button" onClick={stopImpersonation}>Torna ad Admin</button></div></div></>}{user ? (
     <Home
       user={user}
       users={users}
@@ -307,6 +341,7 @@ export const App = () => {
       usefulFiles={usefulFiles}
       absences={absences}
       accessLogs={accessLogs}
+      loginMessages={loginMessages}
       pushNotifications={pushNotifications}
       theme={theme}
       onToggleTheme={toggleTheme}

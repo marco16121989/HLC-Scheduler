@@ -1220,11 +1220,31 @@ svg.admin-nav-icon {
 .donation-hero h2 + p { max-width: 580px; color: var(--bs-secondary-color); line-height: 1.6; }
 .donation-points { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; margin: .8rem 0 1.4rem; }
 .donation-points span { padding: .4rem .7rem; border: 1px solid var(--bs-border-color); border-radius: 999px; background: var(--bs-tertiary-bg); font-size: .78rem; font-weight: 650; }
+.donation-fee-note { max-width: 580px; margin: 0 0 1.25rem; padding: .8rem 1rem; border-radius: .75rem; background: color-mix(in srgb,var(--bs-warning) 14%,var(--bs-body-bg)); color: var(--bs-body-color); font-size: .9rem; line-height: 1.5; }
 .donation-cta { min-width: min(18rem,100%); }
 .donation-configuration-note,.donation-privacy-note { display: block; max-width: 580px; margin-top: .8rem; color: var(--bs-secondary-color); line-height: 1.45; }
 .donation-privacy-note { margin-top: 1.25rem; font-size: .72rem; }
+.admin-login-messages { margin-bottom: 1rem; }
+.admin-login-message-form { margin-top: 1rem; padding: 1rem; border: 1px solid var(--bs-border-color); border-radius: .75rem; background: var(--bs-tertiary-bg); }
+.admin-login-message-dates { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: end; gap: .75rem; margin-top: .75rem; }
+.admin-login-message-dates .btn { min-height: 38px; }
+.admin-login-message-list { display: grid; gap: .6rem; margin-top: 1rem; }
+.admin-login-message-list article { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border: 1px solid var(--bs-border-color); border-radius: .65rem; background: var(--bs-body-bg); }
+.admin-login-message-list article p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.login-message-backdrop { position: fixed; z-index: 12000; inset: 0; background: rgb(7 18 35 / 64%); backdrop-filter: blur(5px); }
+.login-message-shell { position: fixed; z-index: 12010; inset: 0; display: grid; place-items: center; padding: max(1rem,env(safe-area-inset-top)) 1rem max(1rem,env(safe-area-inset-bottom)); }
+.login-message-card { position: relative; display: flex; width: min(760px,100%); min-height: min(430px,calc(100dvh - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; align-items: stretch; justify-content: center; flex-direction: column; padding: clamp(2rem,6vw,4rem); border: 1px solid var(--bs-border-color); border-radius: 1.25rem; background: var(--bs-body-bg); box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 32%); text-align: left; }
+.login-message-close { position: absolute; top: 1rem; right: 1rem; display: grid; width: 2.75rem; height: 2.75rem; padding: 0; place-items: center; border: 0; border-radius: 50%; background: var(--bs-tertiary-bg); color: var(--bs-body-color); font-size: 2rem; line-height: 1; }
+.login-message-close:hover,.login-message-close:focus-visible { background: var(--bs-secondary-bg); color: var(--bs-primary); }
+.login-message-card h2 { margin: .25rem 0 1rem; color: var(--bs-secondary-color); font-size: clamp(1.05rem,2vw,1.3rem); font-weight: 650; }
+.login-message-alert-icon { width: 3.1em; height: 2.8em; margin-right: .5rem; color: #241a00; vertical-align: middle; }
+.login-message-text { width: 100%; margin-bottom: 1.25rem; padding: clamp(1.25rem,3vw,2rem); border: 1px solid color-mix(in srgb,var(--bs-primary) 28%,var(--bs-border-color)); border-left: .35rem solid var(--bs-primary); border-radius: .9rem; background: color-mix(in srgb,var(--bs-primary) 7%,var(--bs-body-bg)); color: var(--bs-body-color); white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(1.05rem,2vw,1.3rem); font-weight: 600; line-height: 1.55; text-align: left; }
+.login-message-card small { color: var(--bs-secondary-color); font-size: .95rem; }
 
 @media (max-width: 767.98px) {
+  .admin-login-message-dates { grid-template-columns: 1fr; }
+  .admin-login-message-list article { flex-direction: column; }
+  .admin-login-message-list article .btn { align-self: flex-end; }
   .patient-departments-tab,
   .patient-departments-content {
     display: none !important;
@@ -3183,6 +3203,7 @@ svg.admin-nav-icon {
 .admin-dashboard-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; }
 .admin-dashboard-header h1 { margin: .15rem 0 .25rem; font-size: clamp(1.65rem, 2.4vw, 2.35rem); font-weight: 750; color: var(--bs-emphasis-color); }
 .admin-dashboard-header p, .admin-card-heading p { margin: 0; color: var(--bs-secondary-color); }
+.admin-dashboard-filters { display: flex; align-items: flex-end; gap: .75rem; }
 .admin-eyebrow { color: #0d6efd; font-size: .76rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .admin-dashboard-updated { padding: .5rem .75rem; border-radius: 999px; background: rgba(25,135,84,.12); color: #198754; font-size: .78rem; font-weight: 700; white-space: nowrap; }
 .admin-president-filter { display: grid; min-width: 245px; gap: .3rem; color: var(--bs-secondary-color); font-size: .75rem; font-weight: 700; }
@@ -3225,7 +3246,9 @@ svg.admin-nav-icon {
 .admin-card-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 .admin-card-heading h2 { margin-bottom: .15rem; }
 .admin-card-heading p { font-size: .8rem; }
+.admin-chart-period-filter { width: min(210px, 100%); flex: 0 0 auto; }
 .admin-bars { display: flex; align-items: flex-end; gap: clamp(2px,.45vw,8px); height: 235px; padding-top: 2rem; border-bottom: 1px solid var(--bs-border-color); }
+.admin-bars-year { gap: clamp(6px, 1.2vw, 20px); }
 .admin-bar-column { display: flex; flex: 1; align-items: center; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
 .admin-bar-column > div { width: 75%; min-height: 2px; border-radius: 4px 4px 0 0; background: linear-gradient(180deg,#4d9aff,#0d6efd); transition: height .25s ease; }
 .admin-bar-column strong { min-height: 1.15rem; color: var(--bs-secondary-color); font-size: .67rem; }
@@ -3322,6 +3345,7 @@ svg.admin-nav-icon {
   .admin-assistance-controls .form-select { min-width: 0; }
   .impersonation-banner { text-align: center; }
   .admin-dashboard-header { display: block; }
+  .admin-dashboard-filters { display: grid; grid-template-columns: 1fr; }
   .admin-president-filter { margin-top: .8rem; min-width: 0; }
   .admin-dashboard-updated { display: inline-block; margin-top: .7rem; }
   .admin-stat-grid { gap: .65rem; }
@@ -3336,5 +3360,6 @@ svg.admin-nav-icon {
   .admin-donut strong { font-size: 1.25rem; }
   .admin-activity-chart { height: 190px; padding-inline: .25rem; gap: .5rem; }
   .admin-card-heading { display: block; }
+  .admin-chart-period-filter { width: 100%; margin-top: .75rem; }
   .admin-inline-legend { margin-top: .6rem; }
 }

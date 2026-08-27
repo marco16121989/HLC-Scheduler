@@ -19,6 +19,7 @@ import { Settings } from "./Settings.js";
 import { Absences } from "./Absences.js";
 import { Events } from "./Events.js";
 import { AdminDashboard } from "./AdminDashboard.js";
+import { AdminTools } from "./AdminTools.js";
 import { Donations } from "./Donations.js";
 
 const ICON_PATHS = {
@@ -42,6 +43,7 @@ const ICON_PATHS = {
   files: ["M4 3h10l6 6v12H4z", "M14 3v6h6", "M8 14h8M8 18h6"],
   info: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 10v7M12 7h.01"],
   settings: ["M4 6h16M4 12h16M4 18h16", "M8 3v6M16 9v6M10 15v6"],
+  adminTools: ["M14.7 6.3a4 4 0 0 0-5 5L3 18l3 3 6.7-6.7a4 4 0 0 0 5-5l-3 3-3-3z", "M16 4l4 4"],
   donation: ["M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"],
 };
 
@@ -71,6 +73,7 @@ export const Home = ({
   usefulFiles = [],
   absences = [],
   accessLogs = [],
+  loginMessages = [],
   pushNotifications,
   theme,
   onToggleTheme,
@@ -217,6 +220,12 @@ export const Home = ({
           <nav className="mt-2">
             <ul className="nav sidebar-menu flex-column" role="menu">
               <li className="sidebar-section-label menu-order-tools">Strumenti</li>
+              {user.role === "Admin" && <li className="nav-item menu-order-tools">
+                <button className={`nav-link w-100 ${activeView === "admin-tools" ? "active" : ""}`} type="button" onClick={() => openView("admin-tools")}>
+                  <MenuIcon name="adminTools" />
+                  <p>Strumenti Admin</p>
+                </button>
+              </li>}
               {user.role !== "Admin" && <li className="nav-item menu-order-tools">
                 <button
                   className={`nav-link w-100 ${activeView === "calendar" ? "active" : ""}`}
@@ -461,6 +470,8 @@ export const Home = ({
             accessLogs={accessLogs}
             users={users}
           />
+        ) : activeView === "admin-tools" && user.role === "Admin" ? (
+          <AdminTools users={users} loginMessages={loginMessages} />
         ) : activeView === "support" ? (
           <SupportRequests requests={supportRequests} currentUser={user} />
         ) : activeView === "donations" && ["Presidente", "CAS", "GVP"].includes(user.role) ? (

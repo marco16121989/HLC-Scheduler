@@ -13,5 +13,6 @@ export const NotificationsCollection = new Mongo.Collection("notifications");
 export const UsefulFilesCollection = new Mongo.Collection("usefulFiles");
 export const AbsencesCollection = new Mongo.Collection("absences");
 export const AccessLogsCollection = new Mongo.Collection("accessLogs");
+export const LoginMessagesCollection = new Mongo.Collection("loginMessages");
 export const PushSubscriptionsCollection = new Mongo.Collection("pushSubscriptions");
 export const PushSettingsCollection = new Mongo.Collection("pushSettings");

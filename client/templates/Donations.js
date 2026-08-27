@@ -26,9 +26,9 @@ export const Donations = () => {
               <span>Importo libero</span>
               <span>Pagamento esterno sicuro</span>
             </div>
+            <p className="donation-fee-note"><strong>Ogni contributo per noi è prezioso, grazie di cuore.</strong> Se ti è possibile, ti consigliamo una donazione da 5 € in su, così le commissioni di Stripe incidono meno e una parte maggiore del tuo sostegno può essere dedicata al progetto. In ogni caso, ogni donazione è importante e ti ringraziamo di cuore ❤️</p>
             {paymentReady ? <a className="btn btn-primary btn-lg donation-cta" href={paymentLink} target="_blank" rel="noreferrer">Fai una donazione</a> : <button className="btn btn-primary btn-lg donation-cta" type="button" disabled>Donazioni presto disponibili</button>}
             {!paymentReady && <small className="donation-configuration-note">La pagina è pronta. Il pagamento verrà attivato dopo la configurazione del collegamento sicuro.</small>}
-            <small className="donation-privacy-note">Il gestionale non trasmette dati di pazienti, ospedali o attività sanitarie al fornitore del pagamento.</small>
           </div>
         </section>
       </div>
