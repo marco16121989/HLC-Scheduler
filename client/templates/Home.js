@@ -19,6 +19,7 @@ import { Settings } from "./Settings.js";
 import { Absences } from "./Absences.js";
 import { Events } from "./Events.js";
 import { AdminDashboard } from "./AdminDashboard.js";
+import { Donations } from "./Donations.js";
 
 const ICON_PATHS = {
   dashboard: ["M3 13h8V3H3z", "M13 21h8V11h-8z", "M13 3h8v6h-8z", "M3 15h8v6H3z"],
@@ -41,6 +42,7 @@ const ICON_PATHS = {
   files: ["M4 3h10l6 6v12H4z", "M14 3v6h6", "M8 14h8M8 18h6"],
   info: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 10v7M12 7h.01"],
   settings: ["M4 6h16M4 12h16M4 18h16", "M8 3v6M16 9v6M10 15v6"],
+  donation: ["M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"],
 };
 
 const MenuIcon = ({ name }) => (
@@ -285,6 +287,12 @@ export const Home = ({
                   <p>Segnalazioni</p>
                 </button>
               </li>}
+              {["Presidente", "CAS", "GVP"].includes(user.role) && <li className="nav-item menu-order-support-item">
+                <button className={`nav-link w-100 ${activeView === "donations" ? "active" : ""}`} type="button" onClick={() => openView("donations")}>
+                  <MenuIcon name="donation" />
+                  <p>Sostieni il progetto</p>
+                </button>
+              </li>}
               {user.role === "Admin" && (
                 <>
               <li className="sidebar-section-label menu-order-admin">Amministrazione</li>
@@ -455,6 +463,8 @@ export const Home = ({
           />
         ) : activeView === "support" ? (
           <SupportRequests requests={supportRequests} currentUser={user} />
+        ) : activeView === "donations" && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
+          <Donations />
         ) : activeView === "absences" && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
           <Absences absences={absences} users={users} currentUser={user} />
         ) : activeView === "settings" ? (
