@@ -1,4 +1,5 @@
 import { Meteor } from "meteor/meteor";
+import { Accounts } from "meteor/accounts-base";
 import { useTracker } from "meteor/react-meteor-data";
 import { useEffect, useRef, useState } from "react";
 import { Home } from "./Home.js";
@@ -36,6 +37,9 @@ const callServer = (method, ...args) => {
 };
 
 export const App = () => {
+  const [impersonation, setImpersonation] = useState(() => {
+    try { return JSON.parse(globalThis.sessionStorage?.getItem("hlc-impersonation") || "null"); } catch { return null; }
+  });
   const [logoReady, setLogoReady] = useState(false);
   const [startupExiting, setStartupExiting] = useState(false);
   const [startupComplete, setStartupComplete] = useState(false);
@@ -57,6 +61,14 @@ export const App = () => {
   const [boldText, setBoldText] = useState(
     () => globalThis.localStorage?.getItem("hlc-bold-text") === "true",
   );
+
+  useEffect(() => {
+    const syncImpersonation = () => {
+      try { setImpersonation(JSON.parse(globalThis.sessionStorage?.getItem("hlc-impersonation") || "null")); } catch { setImpersonation(null); }
+    };
+    globalThis.addEventListener("hlc-impersonation-changed", syncImpersonation);
+    return () => globalThis.removeEventListener("hlc-impersonation-changed", syncImpersonation);
+  }, []);
 
   useEffect(() => {
     const logo = new Image();
@@ -149,6 +161,12 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
+    if (!impersonation || user?.role !== "Admin") return;
+    globalThis.sessionStorage?.removeItem("hlc-impersonation");
+    setImpersonation(null);
+  }, [impersonation, user?.role]);
+
+  useEffect(() => {
     if (!user?.id) return;
     const trackingKey = `hlc-access-session:${user.id}`;
     if (globalThis.sessionStorage?.getItem(trackingKey)) return;
@@ -237,6 +255,26 @@ export const App = () => {
       </div>
     </div>;
 
+  const stopImpersonation = () => {
+    Meteor.call("hlc.stopImpersonation", (error, result) => {
+      if (error) {
+        globalThis.alert(error.reason || "Impossibile tornare all’account Admin.");
+        return;
+      }
+      Accounts.callLoginMethod({
+        methodArguments: [{ hlcImpersonationToken: result?.restoreToken }],
+        userCallback: (loginError) => {
+          if (loginError) {
+            globalThis.alert(loginError.reason || "Impossibile tornare all’account Admin.");
+            return;
+          }
+          globalThis.sessionStorage?.removeItem("hlc-impersonation");
+          setImpersonation(null);
+        },
+      });
+    });
+  };
+
   if (!startupComplete && !startupExiting) {
     return startupLoader;
   }
@@ -246,7 +284,7 @@ export const App = () => {
     return null;
   }
 
-  return <>{!startupComplete && startupLoader}<ConfirmDialogHost />{user ? (
+  return <>{!startupComplete && startupLoader}<ConfirmDialogHost />{impersonation && <div className="impersonation-banner" role="status"><span><strong>Modalità assistenza</strong> — Stai operando come {impersonation.targetUsername}</span><button className="btn btn-light btn-sm" type="button" onClick={stopImpersonation}>Torna ad Admin</button></div>}{user ? (
     <Home
       user={user}
       users={users}

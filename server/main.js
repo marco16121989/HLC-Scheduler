@@ -1,5 +1,6 @@
 import { Meteor } from "meteor/meteor";
 import { Accounts } from "meteor/accounts-base";
+import { Random } from "meteor/random";
 import { check, Match } from "meteor/check";
 import webpush from "web-push";
 import {
@@ -24,6 +25,39 @@ const usefulFileExtensions = new Set([
   "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
   "xls", "xlsx", "ods", "csv", "ppt", "pptx", "odp", "zip",
 ]);
+
+const impersonationSessions = new Map();
+const impersonationLoginTickets = new Map();
+
+Meteor.onConnection((connection) => {
+  connection.onClose(() => {
+    impersonationSessions.delete(connection.id);
+    for (const [token, ticket] of impersonationLoginTickets) {
+      if (ticket.connectionId === connection.id) impersonationLoginTickets.delete(token);
+    }
+  });
+});
+
+Accounts.registerLoginHandler("hlc-impersonation", async function impersonationLogin(options) {
+  const token = options?.hlcImpersonationToken;
+  if (!token) return undefined;
+  check(token, String);
+  const ticket = impersonationLoginTickets.get(token);
+  impersonationLoginTickets.delete(token);
+  if (!ticket || ticket.connectionId !== this.connection.id || ticket.expiresAt < Date.now()) {
+    throw new Meteor.Error("invalid-token", "Token assistenza non valido o scaduto.");
+  }
+  if (ticket.mode === "start") {
+    impersonationSessions.set(this.connection.id, {
+      adminId: ticket.adminId,
+      targetId: ticket.userId,
+      startedAt: new Date(),
+    });
+  } else {
+    impersonationSessions.delete(this.connection.id);
+  }
+  return { userId: ticket.userId };
+});
 
 export const normalizePushSubscription = (subscription) => {
   check(subscription, Object);
@@ -453,6 +487,67 @@ Meteor.publish("hlc-access-logs", async function publishHlcAccessLogs() {
 });
 
 Meteor.methods({
+  async "hlc.startImpersonation"(targetUserId) {
+    requireUser(this);
+    check(targetUserId, String);
+    const admin = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
+    if (admin?.profile?.role !== "Admin") {
+      throw new Meteor.Error("not-authorized", "Operazione riservata agli amministratori.");
+    }
+    const target = await Meteor.users.findOneAsync(targetUserId, { fields: publicUserFields });
+    if (!target || target.profile?.role === "Admin" || target.profile?.disabled) {
+      throw new Meteor.Error("invalid-user", "Utente non disponibile per la modalità assistenza.");
+    }
+    const impersonationToken = Random.secret();
+    impersonationLoginTickets.set(impersonationToken, {
+      mode: "start",
+      connectionId: this.connection.id,
+      adminId: admin._id,
+      userId: target._id,
+      expiresAt: Date.now() + 60_000,
+    });
+    await AccessLogsCollection.insertAsync({
+      userId: admin._id,
+      username: admin.username || "Admin",
+      role: "Admin",
+      action: "impersonation-start",
+      targetUserId: target._id,
+      targetUsername: target.username || target.profile?.role,
+      createdAt: new Date(),
+    });
+    return { impersonationToken, targetUsername: target.username || target.profile?.role };
+  },
+
+  async "hlc.stopImpersonation"() {
+    requireUser(this);
+    const session = impersonationSessions.get(this.connection.id);
+    if (!session || session.targetId !== this.userId) {
+      throw new Meteor.Error("not-authorized", "Modalità assistenza non attiva.");
+    }
+    const admin = await Meteor.users.findOneAsync(session.adminId, { fields: publicUserFields });
+    if (admin?.profile?.role !== "Admin") {
+      impersonationSessions.delete(this.connection.id);
+      throw new Meteor.Error("not-authorized", "Account amministratore non disponibile.");
+    }
+    await AccessLogsCollection.insertAsync({
+      userId: admin._id,
+      username: admin.username || "Admin",
+      role: "Admin",
+      action: "impersonation-stop",
+      targetUserId: session.targetId,
+      createdAt: new Date(),
+    });
+    const restoreToken = Random.secret();
+    impersonationLoginTickets.set(restoreToken, {
+      mode: "restore",
+      connectionId: this.connection.id,
+      adminId: admin._id,
+      userId: admin._id,
+      expiresAt: Date.now() + 60_000,
+    });
+    return { restoreToken };
+  },
+
   "hlc.getPushPublicKey"() {
     requireUser(this);
     if (!vapidPublicKey) throw new Meteor.Error("push-unavailable", "Le notifiche del dispositivo non sono ancora disponibili.");

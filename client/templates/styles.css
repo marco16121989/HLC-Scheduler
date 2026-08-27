@@ -3125,6 +3125,17 @@ svg.admin-nav-icon {
 .admin-stat-blue { --stat-color: #0d6efd; } .admin-stat-violet { --stat-color: #6f42c1; } .admin-stat-green { --stat-color: #198754; } .admin-stat-orange { --stat-color: #fd7e14; }
 .admin-dashboard-card { min-width: 0; padding: 1.2rem 1.3rem; border: 1px solid var(--bs-border-color); border-radius: 14px; background: var(--bs-body-bg); box-shadow: 0 7px 24px rgba(24,39,75,.05); }
 .admin-dashboard-card h2 { margin: 0 0 1rem; color: var(--bs-emphasis-color); font-size: 1.02rem; font-weight: 750; }
+.admin-assistance-card { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; border-color: rgba(13,110,253,.25); background: linear-gradient(135deg,rgba(13,110,253,.07),var(--bs-body-bg) 62%); }
+.admin-assistance-card h2 { margin: .2rem 0 .35rem; }
+.admin-assistance-card p { max-width: 680px; margin: 0; color: var(--bs-secondary-color); }
+.admin-assistance-controls { display: flex; min-width: min(100%,460px); gap: .65rem; }
+.admin-assistance-controls .form-select { min-width: 240px; }
+.admin-assistance-controls .btn { flex: 0 0 auto; }
+.admin-assistance-modal { width: min(620px,calc(100vw - 1.5rem)); }
+.admin-assistance-modal .admin-eyebrow { display: block; margin-bottom: .3rem; }
+.admin-assistance-modal .card-body { max-height: min(60vh,520px); overflow-y: auto; }
+.impersonation-banner { position: fixed; z-index: 11000; top: .65rem; right: .65rem; left: .65rem; display: flex; align-items: center; justify-content: center; gap: 1rem; padding: .65rem 1rem; border: 1px solid rgba(255,255,255,.32); border-radius: 12px; background: #9b3417; box-shadow: 0 10px 30px rgba(67,25,10,.28); color: #fff; }
+.impersonation-banner .btn { font-weight: 700; }
 .admin-access-chart { margin-bottom: 1rem; }
 .admin-card-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 .admin-card-heading h2 { margin-bottom: .15rem; }
@@ -3221,6 +3232,10 @@ svg.admin-nav-icon {
   .admin-dashboard-two-columns { grid-template-columns: 1fr; }
 }
 @media (max-width: 575.98px) {
+  .admin-assistance-card,.admin-assistance-controls,.impersonation-banner { align-items: stretch; flex-direction: column; }
+  .admin-assistance-controls { min-width: 0; }
+  .admin-assistance-controls .form-select { min-width: 0; }
+  .impersonation-banner { text-align: center; }
   .admin-dashboard-header { display: block; }
   .admin-president-filter { margin-top: .8rem; min-width: 0; }
   .admin-dashboard-updated { display: inline-block; margin-top: .7rem; }
