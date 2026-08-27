@@ -86,7 +86,7 @@ export const Departments = ({ departments, setDepartments, hospitals, presidentI
           <div>
             <h1 className="mb-1">Reparti</h1>
             <p className="text-secondary mb-0">
-              Questa sezione contiene un elenco di modelli di reparto, non i reparti effettivi degli ospedali. I modelli possono essere importati durante la creazione di un ospedale.
+              Questa sezione contiene soltanto i modelli generali dei reparti, non i reparti effettivi degli ospedali. Dopo aver creato un modello, il reparto deve essere inserito negli ospedali in cui è realmente presente.
             </p>
           </div>
           <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>

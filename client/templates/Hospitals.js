@@ -14,7 +14,7 @@ const DEFAULT_DEPARTMENTS = [
   "Radiologia interventistica", "Terapia intensiva/Rianimazione", "Urologia",
 ];
 
-export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], presidentId }) => {
+export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], users = [], presidentId }) => {
   const [name, setName] = useState("");
   const [director, setDirector] = useState("");
   const [departments, setDepartments] = useState([]);
@@ -30,6 +30,20 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
   const visibleDepartmentTemplates = departmentTemplates.filter(
     (department) => department.presidentId === presidentId,
   );
+  const visibleCasUsers = users.filter((user) => !user.disabled && user.role === "CAS" && (user.presidentId === presidentId || user.associationId === presidentId));
+  const getDepartmentCasUsers = (hospitalId, departmentId) => visibleCasUsers.filter((casUser) => {
+    const assignments = Array.isArray(casUser.hospitalAssignments)
+      ? casUser.hospitalAssignments
+      : casUser.hospitalId
+        ? [{ hospitalId: casUser.hospitalId, departmentIds: casUser.departmentId ? [casUser.departmentId] : [] }]
+        : [];
+    return assignments.some((assignment) => assignment.hospitalId === hospitalId && (
+      !Array.isArray(assignment.departmentIds) || assignment.departmentIds.length === 0 || assignment.departmentIds.includes(departmentId)
+    ));
+  });
+  const getUncoveredDepartmentCount = (hospital) => (hospital.departments || []).filter(
+    (department) => getDepartmentCasUsers(hospital.id, department.id).length === 0,
+  ).length;
   const resetForm = () => {
     setName("");
     setDirector("");
@@ -216,11 +230,18 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
                     <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setDepartmentListHospital(null)} />
                   </div>
                   <div className="card-body">
+                    {departmentListHospital.departments.length > 0 && (() => {
+                      const uncoveredCount = departmentListHospital.departments.filter((department) => getDepartmentCasUsers(departmentListHospital.id, department.id).length === 0).length;
+                      return <div className={`alert ${uncoveredCount > 0 ? "alert-warning" : "alert-success"} py-2`} role="status"><strong>{uncoveredCount > 0 ? `${uncoveredCount} ${uncoveredCount === 1 ? "reparto scoperto" : "reparti scoperti"}` : "Tutti i reparti sono coperti"}</strong><span className="d-block small">Le assegnazioni sono aggiornate automaticamente dalla sezione CAS.</span></div>;
+                    })()}
                     {departmentListHospital.departments.length > 0 ? <div className="list-group">
-                      {departmentListHospital.departments.map((department) => <div className="list-group-item d-flex align-items-start justify-content-between gap-3" key={department.id}>
-                        <strong>{department.name}</strong>
-                        <span className="text-secondary text-end">{department.head ? `Primario: ${department.head}` : "Primario non indicato"}</span>
-                      </div>)}
+                      {departmentListHospital.departments.map((department) => {
+                        const assignedCasUsers = getDepartmentCasUsers(departmentListHospital.id, department.id);
+                        return <div className={`list-group-item hospital-department-coverage ${assignedCasUsers.length === 0 ? "is-uncovered" : ""}`} key={department.id}>
+                          <div className="hospital-department-coverage-heading"><strong>{department.name}</strong><span className="text-secondary">{department.head ? `Primario: ${department.head}` : "Primario non indicato"}</span></div>
+                          <div className="hospital-department-cas"><span className="hospital-department-cas-label">CAS incaricati</span>{assignedCasUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{assignedCasUsers.map((casUser) => <span className="badge text-bg-success" key={casUser.id}>{casUser.username}</span>)}</div> : <span className="badge text-bg-warning">Reparto scoperto</span>}</div>
+                        </div>;
+                      })}
                     </div> : <p className="text-secondary mb-0">Nessun reparto inserito.</p>}
                   </div>
                   <div className="card-footer text-end">
@@ -386,7 +407,9 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
                             </td>
                           </tr>
                         ) : (
-                          visibleHospitals.map((hospital) => (
+                          visibleHospitals.map((hospital) => {
+                            const uncoveredDepartmentCount = getUncoveredDepartmentCount(hospital);
+                            return (
                             <tr
                               className="hospital-clickable-row"
                               key={hospital.id}
@@ -404,6 +427,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
                                 <div className="d-flex align-items-center gap-2 flex-wrap">
                                   <span>{hospital.name}</span>
                                   <button className="badge text-bg-primary border-0 hospital-department-count" type="button" onClick={(event) => { event.stopPropagation(); setDepartmentListHospital(normalizeHospital(hospital)); }}>{hospital.departments.length} reparti</button>
+                                  {uncoveredDepartmentCount > 0 && <button className="badge text-bg-danger border-0 hospital-department-count" type="button" aria-label={`${uncoveredDepartmentCount} reparti senza CAS in ${hospital.name}`} onClick={(event) => { event.stopPropagation(); setDepartmentListHospital(normalizeHospital(hospital)); }}>{uncoveredDepartmentCount} senza CAS</button>}
                                 </div>
                               </td>
                               <td data-label="Direttore">{hospital.director || "-"}</td>
@@ -422,7 +446,8 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
                                 </button>
                               </td>
                             </tr>
-                          ))
+                            );
+                          })
                         )}
                       </tbody>
                     </table>

@@ -1028,6 +1028,12 @@ svg.admin-nav-icon {
   color: var(--color-muted);
   font-size: 0.8rem;
 }
+.hospital-department-coverage { display: grid; gap: .75rem; border-left: .3rem solid var(--bs-success); }
+.hospital-department-coverage.is-uncovered { border-left-color: var(--bs-warning); background: color-mix(in srgb,var(--bs-warning) 7%,var(--bs-body-bg)); }
+.hospital-department-coverage-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.hospital-department-coverage-heading > span { text-align: right; }
+.hospital-department-cas { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.hospital-department-cas-label { color: var(--bs-secondary-color); font-size: .72rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
 
 .doctor-departments-fieldset {
   min-width: 0;
@@ -1308,12 +1314,12 @@ svg.admin-nav-icon {
     display: none;
   }
 
-  .doctor-list-table tbody td[data-label]:not([data-label="Cognome"]):not([data-label="Nome"]) {
+  .doctor-list-table tbody td[data-label]:not([data-label="Cognome"]):not([data-label="Nome"]):not([data-label="Azioni"]) {
     display: none !important;
   }
 
   .doctor-list-table tbody tr {
-    grid-template-columns: auto minmax(0, 1fr) !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
     cursor: pointer;
   }
 
@@ -1372,7 +1378,11 @@ svg.admin-nav-icon {
   }
 
   .hospital-list-table .hospital-department-count {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.45rem;
+    padding: .25rem .45rem;
+    font-size: .68rem;
   }
 
   .hospital-list-table tbody tr {
@@ -1441,6 +1451,10 @@ svg.admin-nav-icon {
     min-width: 0;
   }
 
+  .hospital-list-table tbody td[data-label="Ospedale"] > div > span:first-child {
+    flex: 1 0 100%;
+  }
+
   .hospital-list-table tbody td[data-label="Ospedale"]::after {
     content: "›";
     flex: 0 0 auto;
@@ -1496,15 +1510,20 @@ svg.admin-nav-icon {
 }
 
 .patient-actions-column {
-  width: 8.5rem;
-  min-width: 8.5rem;
+  width: 16rem;
+  min-width: 16rem;
 }
 
 .patient-row-actions .btn {
   width: 7.5rem;
 }
 
+.patient-row-actions .patient-note-button {
+  width: 7.5rem;
+}
+
 .patient-note-content {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1518,7 +1537,12 @@ svg.admin-nav-icon {
   height: 1rem;
 }
 
+.patient-note-mobile-icon { display: none; }
+
 .patient-note-unread {
+  position: absolute;
+  top: -.55rem;
+  right: -.55rem;
   display: inline-grid;
   min-width: 1.15rem;
   height: 1.15rem;
@@ -2259,9 +2283,38 @@ svg.admin-nav-icon {
   }
 
   .patient-note-icon {
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 2.65rem;
+    height: 1.75rem;
     flex: 0 0 auto;
+  }
+
+  .patient-note-desktop-icon,
+  .patient-note-desktop-label {
+    display: none;
+  }
+
+  .patient-note-mobile-icon {
+    display: block;
+  }
+
+  .patient-list-table tbody td[data-label="Azioni"] .patient-note-button {
+    width: 3.6rem;
+    min-width: 3.6rem;
+    padding-inline: .35rem;
+  }
+
+  .patient-list-table tbody td[data-label="Azioni"] .patient-note-button.btn-warning {
+    border-color: var(--bs-warning);
+    background: var(--bs-warning);
+    color: #241a00;
+  }
+
+  .patient-row-actions:has(.patient-note-button + .patient-note-button) .patient-note-button:first-child {
+    right: 4.35rem;
+  }
+
+  .patient-list-table tbody tr:has(.patient-note-button + .patient-note-button) td[data-label="Paziente"] {
+    padding-right: 8.5rem;
   }
 
   .patient-note-content {
@@ -2913,6 +2966,27 @@ svg.admin-nav-icon {
   .presentation-list-table tbody tr::before { background: #d97706; }
   .doctor-list-table tbody tr::before { background: #6f42c1; }
 
+  .doctor-list-table tbody td[data-label="Azioni"] {
+    display: flex !important;
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    align-items: center;
+    align-self: stretch;
+    justify-content: flex-end;
+    padding: .45rem .6rem .45rem .25rem;
+  }
+
+  .doctor-list-table tbody td[data-label="Azioni"]::before {
+    display: none;
+  }
+
+  .doctor-list-table tbody td[data-label="Azioni"] .btn {
+    min-height: 2.2rem;
+    padding: .3rem .55rem;
+    font-size: .72rem;
+    white-space: nowrap;
+  }
+
   .department-list-table tbody td,
   .presentation-list-table tbody td,
   .doctor-list-table tbody td {
@@ -3363,3 +3437,21 @@ svg.admin-nav-icon {
   .admin-chart-period-filter { width: 100%; margin-top: .75rem; }
   .admin-inline-legend { margin-top: .6rem; }
 }
+.has-page-info { display: inline-block; vertical-align: middle; }
+.page-info-host { display: inline-flex; margin-left: .55rem; vertical-align: middle; }
+.page-info-button { display: inline-grid; width: 1.65rem; height: 1.65rem; padding: 0; place-items: center; border: 1.5px solid var(--bs-primary); border-radius: 50%; background: color-mix(in srgb,var(--bs-primary) 8%,var(--bs-body-bg)); color: var(--bs-primary); font-family: Georgia,serif; font-size: 1rem; font-weight: 800; line-height: 1; transition: transform .15s ease,background-color .15s ease,color .15s ease; }
+.page-info-button:hover,.page-info-button:focus-visible { background: var(--bs-primary); color: #fff; transform: scale(1.07); }
+.page-info-backdrop { position: fixed; z-index: 12500; inset: 0; border: 0; background: rgb(7 18 35 / 62%); backdrop-filter: blur(4px); }
+.page-info-shell { position: fixed; z-index: 12510; inset: 0; display: grid; overflow-y: auto; place-items: center; padding: max(1rem,env(safe-area-inset-top)) 1rem max(1rem,env(safe-area-inset-bottom)); pointer-events: none; }
+.page-info-modal { width: min(720px,100%); max-height: calc(100dvh - 2rem); overflow-y: auto; border: 1px solid var(--bs-border-color); border-radius: 1.1rem; background: var(--bs-body-bg); box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 32%); pointer-events: auto; }
+.page-info-modal > header { display: flex; align-items: center; gap: .8rem; padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--bs-border-color); }
+.page-info-modal > header p { margin: 0 0 .1rem; color: var(--bs-primary); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.page-info-modal > header h2 { margin: 0; font-size: 1.35rem; }
+.page-info-modal > header .btn-close { margin-left: auto; }
+.page-info-symbol { display: grid; width: 2.4rem; height: 2.4rem; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--bs-primary); color: #fff; font-family: Georgia,serif; font-size: 1.35rem; font-weight: 800; }
+.page-info-body { padding: clamp(1.15rem,3vw,1.8rem); }
+.page-info-intro { margin: 0 0 1.25rem; color: var(--bs-secondary-color); font-size: 1rem; line-height: 1.6; }
+.page-info-body section + section { margin-top: 1.35rem; }
+.page-info-body h3 { margin: 0 0 .55rem; font-size: 1rem; }
+.page-info-body ul { display: grid; gap: .5rem; margin: 0; padding-left: 1.2rem; }
+.page-info-body li { padding-left: .15rem; line-height: 1.5; }

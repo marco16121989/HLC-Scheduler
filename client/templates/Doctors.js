@@ -16,6 +16,13 @@ const doctorTypeBadgeClasses = {
 };
 const professionalRoles = ["Medico", "Chirurgo", "Anestesista"];
 
+const getDoctorNotes = (doctor) => Array.isArray(doctor?.doctorNotes)
+  ? doctor.doctorNotes.filter((note) => !String(note.id || "").startsWith("legacy-"))
+  : [];
+const getDoctorGeneralNote = (doctor) => doctor?.notes || (Array.isArray(doctor?.doctorNotes)
+  ? doctor.doctorNotes.find((note) => String(note.id || "").startsWith("legacy-"))?.text || ""
+  : "");
+
 const SearchableDepartmentSelect = ({ options, value, search, onSearchChange, onChange }) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
@@ -66,6 +73,7 @@ export const Doctors = ({
   setDoctors,
   hospitals,
   presidentId,
+  currentUser,
 }) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -86,6 +94,9 @@ export const Doctors = ({
   const [hospitalFilter, setHospitalFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [departmentSearchFilter, setDepartmentSearchFilter] = useState("");
+  const [noteDoctor, setNoteDoctor] = useState(null);
+  const [newDoctorNote, setNewDoctorNote] = useState("");
+  const [doctorNoteError, setDoctorNoteError] = useState("");
 
   const isEditing = editingId !== null;
   const visibleDoctors = doctors.filter(
@@ -266,7 +277,7 @@ export const Doctors = ({
         : doctorTypes[0],
     );
     setProfessionalRole(professionalRoles.includes(doctor.professionalRole) ? doctor.professionalRole : professionalRoles[0]);
-    setNotes(doctor.notes || "");
+    setNotes(getDoctorGeneralNote(doctor));
     setOfficeInstructions(doctor.officeInstructions || "");
     setDepartmentIds(
       (doctor.departmentIds || []).filter((departmentId) =>
@@ -279,6 +290,48 @@ export const Doctors = ({
       )).map((hospital) => hospital.id));
     setError("");
     setModalOpen(true);
+  };
+
+  const openDoctorNotes = (doctor) => {
+    setNoteDoctor(doctor);
+    setNewDoctorNote("");
+    setDoctorNoteError("");
+  };
+
+  const closeDoctorNotes = () => {
+    setNoteDoctor(null);
+    setNewDoctorNote("");
+    setDoctorNoteError("");
+  };
+
+  const saveDoctorNote = () => {
+    const normalizedNote = newDoctorNote.trim();
+    if (!noteDoctor || !normalizedNote) {
+      setDoctorNoteError("Inserisci una nota.");
+      return;
+    }
+    const note = {
+      id: crypto.randomUUID(),
+      text: normalizedNote.slice(0, 4000),
+      authorId: currentUser?.id || "",
+      author: currentUser?.username || currentUser?.role || "Utente",
+      authorRole: currentUser?.role || "",
+      createdAt: new Date().toISOString(),
+    };
+    setDoctors((current) => current.map((doctor) => doctor.id === noteDoctor.id
+      ? { ...doctor, doctorNotes: [...(Array.isArray(doctor.doctorNotes) ? doctor.doctorNotes : []), note] }
+      : doctor));
+    closeDoctorNotes();
+  };
+
+  const deleteDoctorNote = async (note) => {
+    if (!noteDoctor || note.authorId !== currentUser?.id) return;
+    if (!await confirmAction("Eliminare questa nota?")) return;
+    const remainingNotes = (Array.isArray(noteDoctor.doctorNotes) ? noteDoctor.doctorNotes : []).filter((item) => item.id !== note.id);
+    setDoctors((current) => current.map((doctor) => doctor.id === noteDoctor.id
+      ? { ...doctor, doctorNotes: remainingNotes }
+      : doctor));
+    setNoteDoctor((current) => current ? { ...current, doctorNotes: remainingNotes } : current);
   };
 
   const toggleDepartment = (departmentId) => {
@@ -348,6 +401,28 @@ export const Doctors = ({
 
       <div className="app-content">
         <div className="container-fluid">
+          {noteDoctor && <>
+            <button className="entity-modal-backdrop" type="button" aria-label="Chiudi note operative" onClick={closeDoctorNotes} />
+            <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="doctor-notes-title">
+              <section className="card entity-modal-card">
+                <div className="card-header d-flex align-items-center">
+                  <h2 className="card-title" id="doctor-notes-title">Note operative — {noteDoctor.lastName} {noteDoctor.firstName}</h2>
+                  <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeDoctorNotes} />
+                </div>
+                <div className="card-body">
+                  {doctorNoteError && <div className="alert alert-danger py-2" role="alert">{doctorNoteError}</div>}
+                  <h3 className="h6">Note operative esistenti</h3>
+                  {getDoctorNotes(noteDoctor).length === 0 ? <p className="text-secondary">Nessuna nota operativa inserita.</p> : <div className="d-grid gap-2 mb-4">{getDoctorNotes(noteDoctor).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{note.authorId === currentUser?.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteDoctorNote(note)}>Elimina</button>}</div><small className="text-secondary">{note.author || "Utente"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></article>)}</div>}
+                  <label className="form-label" htmlFor="new-doctor-note">Aggiungi una nota operativa</label>
+                  <textarea className="form-control" id="new-doctor-note" rows="5" value={newDoctorNote} onChange={(event) => { setNewDoctorNote(event.target.value); setDoctorNoteError(""); }} maxLength="4000" autoFocus />
+                </div>
+                <div className="card-footer d-flex justify-content-end gap-2">
+                  <button className="btn btn-outline-secondary" type="button" onClick={closeDoctorNotes}>Annulla</button>
+                  <button className="btn btn-primary" type="button" onClick={saveDoctorNote} disabled={!newDoctorNote.trim()}>Aggiungi nota operativa</button>
+                </div>
+              </section>
+            </div>
+          </>}
           <div className="row g-3">
             {modalOpen && (
               <button
@@ -494,7 +569,7 @@ export const Doctors = ({
 
                     <div className="mt-3">
                       <label className="form-label" htmlFor="doctor-notes">
-                        Note
+                        Note generali del medico
                       </label>
                       <textarea
                         className="form-control"
@@ -505,7 +580,10 @@ export const Doctors = ({
                           setNotes(event.target.value);
                           setError("");
                         }}
+                        placeholder="Informazioni generali da conservare nell’anagrafica del medico"
+                        maxLength="4000"
                       />
+                      <div className="form-text">Queste note fanno parte dell’anagrafica e sono separate dalle Note operative.</div>
                     </div>
 
                     <div className="mt-3">
@@ -705,7 +783,7 @@ export const Doctors = ({
                           doctorPagination.pageItems.map((doctor) => {
                               const departmentLabels =
                                 getDepartmentLabels(doctor);
-                              const doctorNote = doctor.notes || "";
+                              const doctorNote = getDoctorGeneralNote(doctor);
 
                               return (
                               <tr
@@ -770,9 +848,9 @@ export const Doctors = ({
                                   <button
                                     className="btn btn-outline-primary btn-sm"
                                     type="button"
-                                    onClick={(event) => { event.stopPropagation(); handleEdit(doctor); }}
+                                    onClick={(event) => { event.stopPropagation(); openDoctorNotes(doctor); }}
                                   >
-                                    Modifica
+                                    Note operative
                                   </button>
                                 </td>
                               </tr>

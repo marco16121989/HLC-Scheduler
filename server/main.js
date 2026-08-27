@@ -493,6 +493,18 @@ Meteor.publish("hlc-access-logs", async function publishHlcAccessLogs() {
   );
 });
 
+const buildPatientCasNoteNotification = ({ recipientId, patientId, patientName, noteAuthor, noteText }) => ({
+  recipientId,
+  type: "patient-cas-note",
+  patientId,
+  patientName,
+  noteAuthor,
+  noteText,
+  message: `${noteAuthor} ha aggiunto una nota CAS per ${patientName}.`,
+  createdAt: new Date(),
+  readAt: null,
+});
+
 Meteor.publish("hlc-login-messages", async function publishHlcLoginMessages() {
   if (!this.userId) return this.ready();
   const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
@@ -748,6 +760,10 @@ Meteor.methods({
     if (!patient || !["Presidente", "CAS", "GVP"].includes(role)) {
       throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
     }
+    if (role === "GVP") {
+      const { casNotes: _privateCasNotes, ...visiblePatient } = patient;
+      return visiblePatient;
+    }
     return patient;
   },
 
@@ -972,6 +988,66 @@ Meteor.methods({
     await PatientsCollection.updateAsync(patientId, {
       $pull: { gvpNotes: { id: noteId, authorId: this.userId } },
     });
+  },
+
+  async "hlc.addPatientCasNote"(patientId, noteText) {
+    requireUser(this);
+    check(patientId, String);
+    check(noteText, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const actorRole = actor?.profile?.role;
+    if (!["Presidente", "CAS"].includes(actorRole)) {
+      throw new Meteor.Error("not-authorized", "Le note CAS sono riservate a CAS e Presidente.");
+    }
+    const presidentId = actorRole === "Presidente"
+      ? actor._id
+      : actor.profile?.presidentId || actor.profile?.associationId || "";
+    const patient = await PatientsCollection.findOneAsync({ _id: patientId, presidentId });
+    if (!patient) throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
+    const normalizedText = noteText.trim().slice(0, 4000);
+    if (!normalizedText) throw new Meteor.Error("note-required", "Inserisci una nota CAS.");
+    const note = {
+      id: `${this.userId}-${Date.now()}`,
+      text: normalizedText,
+      authorId: this.userId,
+      author: actor.username || actorRole,
+      authorRole: actorRole,
+      createdAt: new Date(),
+    };
+    await PatientsCollection.updateAsync(patientId, { $push: { casNotes: note } });
+    for (const recipientId of getPatientCoordinatorIds(patient)) {
+      if (recipientId === this.userId) continue;
+      const recipient = await Meteor.users.findOneAsync(recipientId, { fields: publicUserFields });
+      if (!["Presidente", "CAS"].includes(recipient?.profile?.role)) continue;
+      await insertNotification(buildPatientCasNoteNotification({
+        recipientId: recipient._id,
+        patientId: patient._id,
+        patientName: `${patient.lastName} ${patient.firstName}`.trim(),
+        noteAuthor: actor.username || actorRole,
+        noteText: normalizedText,
+      }));
+    }
+  },
+
+  async "hlc.deletePatientCasNote"(patientId, noteId) {
+    requireUser(this);
+    check(patientId, String);
+    check(noteId, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const actorRole = actor?.profile?.role;
+    if (!["Presidente", "CAS"].includes(actorRole)) {
+      throw new Meteor.Error("not-authorized", "Le note CAS sono riservate a CAS e Presidente.");
+    }
+    const presidentId = actorRole === "Presidente"
+      ? actor._id
+      : actor.profile?.presidentId || actor.profile?.associationId || "";
+    const patient = await PatientsCollection.findOneAsync({
+      _id: patientId,
+      presidentId,
+      casNotes: { $elemMatch: { id: noteId, authorId: this.userId } },
+    });
+    if (!patient) throw new Meteor.Error("not-authorized", "Puoi eliminare soltanto le tue note CAS.");
+    await PatientsCollection.updateAsync(patientId, { $pull: { casNotes: { id: noteId, authorId: this.userId } } });
   },
 
   async "hlc.markNotificationAsRead"(notificationId) {

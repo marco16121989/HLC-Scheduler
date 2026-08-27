@@ -48,6 +48,7 @@ export const App = () => {
   const [startupExiting, setStartupExiting] = useState(false);
   const [startupComplete, setStartupComplete] = useState(false);
   const startupStartedAt = useRef(Date.now());
+  const loginMessagesShownUserRef = useRef("");
   const [theme, setTheme] = useState(() => {
     const savedTheme = globalThis.localStorage?.getItem("hlc-theme");
     if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
@@ -181,7 +182,14 @@ export const App = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!ready || !user?.id || !["Presidente", "CAS", "GVP"].includes(user.role)) return;
+    if (!ready) return;
+    if (!user?.id) {
+      loginMessagesShownUserRef.current = "";
+      return;
+    }
+    if (loginMessagesShownUserRef.current === user.id) return;
+    loginMessagesShownUserRef.current = user.id;
+    if (!["Presidente", "CAS", "GVP"].includes(user.role)) return;
     const today = new Date().toISOString().slice(0, 10);
     const activeMessages = loginMessages.filter((message) => message.startDate <= today && message.endDate >= today);
     setLoginMessagesToShow(activeMessages);

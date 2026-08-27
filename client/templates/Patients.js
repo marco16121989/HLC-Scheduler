@@ -20,13 +20,17 @@ const formatPatientListName = (patient) => {
   return `${patient.firstName} ${patient.lastName}`;
 };
 
-const NoteButtonContent = ({ unreadCount = 0 }) => <span className="patient-note-content">
-  <svg className="patient-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const NoteButtonContent = ({ unreadCount = 0, label = "Note GVP" }) => <span className="patient-note-content">
+  <svg className="patient-note-icon patient-note-mobile-icon" viewBox="0 0 52 34" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+    <path d="M6 3h40a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H37l-7 5v-5H6a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Z" />
+    <text x="26" y="18.2" fill="currentColor" stroke="none" textAnchor="middle" fontSize="10.5" fontWeight="800">{label.replace("Note ", "")}</text>
+  </svg>
+  <svg className="patient-note-icon patient-note-desktop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.8 8.8 0 0 1-3.35-.66L4 20l1.55-4.1A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z" />
     <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" strokeWidth="2.5" />
   </svg>
-  <span>Note</span>
-  {unreadCount > 0 && <span className="patient-note-unread" aria-label={`${unreadCount} nuove note`}>{unreadCount}</span>}
+  <span className="patient-note-desktop-label">{label}</span>
+  {unreadCount > 0 && <span className="patient-note-unread" aria-label={`${unreadCount} nuove ${label}`}>{unreadCount}</span>}
 </span>;
 
 const PatientMobileLocation = ({ patient, departmentName, hospitalName }) => <span className="patient-mobile-location">
@@ -63,6 +67,8 @@ const getGvpNotes = (patient) => {
   }
   return [];
 };
+
+const getCasNotes = (patient) => Array.isArray(patient?.casNotes) ? patient.casNotes : [];
 
 const getNoteRoleBadgeClass = (role) =>
   role === "Presidente"
@@ -351,6 +357,10 @@ export const Patients = ({
   const [newGvpNote, setNewGvpNote] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteError, setNoteError] = useState("");
+  const [casNotePatient, setCasNotePatient] = useState(null);
+  const [newCasNote, setNewCasNote] = useState("");
+  const [casNoteSaving, setCasNoteSaving] = useState(false);
+  const [casNoteError, setCasNoteError] = useState("");
   const [transferTarget, setTransferTarget] = useState(null);
   const [transferDraft, setTransferDraft] = useState("");
   const [transferError, setTransferError] = useState("");
@@ -1107,6 +1117,61 @@ export const Patients = ({
     });
   };
 
+  const openCasNotes = (patient) => {
+    notifications
+      .filter((notification) => notification.type === "patient-cas-note" && notification.patientId === patient.id && !notification.readAt)
+      .forEach((notification) => Meteor.call("hlc.markNotificationAsRead", notification.id));
+    setCasNotePatient(patient);
+    setNewCasNote("");
+    setCasNoteError("");
+    Meteor.call("hlc.getPatientDetails", patient.id, (methodError, fullPatient) => {
+      if (methodError || !fullPatient) {
+        setCasNoteError(methodError?.reason || "Impossibile caricare le note CAS.");
+        return;
+      }
+      setCasNotePatient({ ...fullPatient, id: fullPatient._id || patient.id });
+    });
+  };
+
+  const closeCasNotes = () => {
+    setCasNotePatient(null);
+    setNewCasNote("");
+    setCasNoteError("");
+  };
+
+  const getUnreadCasNoteCount = (patient) => notifications.filter((notification) =>
+    notification.type === "patient-cas-note" && notification.patientId === patient.id && !notification.readAt,
+  ).length;
+
+  const saveCasNote = () => {
+    if (!casNotePatient || casNoteSaving || !newCasNote.trim()) return;
+    setCasNoteSaving(true);
+    setCasNoteError("");
+    Meteor.call("hlc.addPatientCasNote", casNotePatient.id, newCasNote, (methodError) => {
+      setCasNoteSaving(false);
+      if (methodError) {
+        setCasNoteError(methodError.reason || "Impossibile salvare la nota CAS.");
+        return;
+      }
+      closeCasNotes();
+    });
+  };
+
+  const deleteCasNote = async (note) => {
+    if (!casNotePatient || note.authorId !== currentUser.id) return;
+    if (!await confirmAction("Eliminare questa nota CAS?")) return;
+    setCasNoteError("");
+    Meteor.call("hlc.deletePatientCasNote", casNotePatient.id, note.id, (methodError) => {
+      if (methodError) {
+        setCasNoteError(methodError.reason || "Impossibile eliminare la nota CAS.");
+        return;
+      }
+      setCasNotePatient((current) => current
+        ? { ...current, casNotes: getCasNotes(current).filter((item) => item.id !== note.id) }
+        : current);
+    });
+  };
+
   const doctor = doctors.find((item) => item.id === doctorId);
   const recommendedDoctors = visibleDoctors.filter((item) => recommendedDoctorIds.includes(item.id));
   const selectedCasUsers = users.filter((item) => casIds.includes(item.id));
@@ -1225,23 +1290,45 @@ export const Patients = ({
       <div className="app-content patient-page-content">
         <div className="container-fluid">
           {notePatient && <>
-            <button className="entity-modal-backdrop" type="button" aria-label="Chiudi note" onClick={closeNotes} />
+            <button className="entity-modal-backdrop" type="button" aria-label="Chiudi note GVP" onClick={closeNotes} />
             <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="gvp-notes-title">
               <section className="card entity-modal-card">
                 <div className="card-header d-flex align-items-center">
-                  <h2 className="card-title" id="gvp-notes-title">Note — {notePatient.lastName} {notePatient.firstName}</h2>
+                  <h2 className="card-title" id="gvp-notes-title">Note GVP — {notePatient.lastName} {notePatient.firstName}</h2>
                   <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeNotes} />
                 </div>
                 <div className="card-body">
                   {noteError && <div className="alert alert-danger py-2" role="alert">{noteError}</div>}
-                  <h3 className="h6">Note esistenti</h3>
+                  <h3 className="h6">Note GVP esistenti</h3>
                   {getGvpNotes(currentNotePatient).length === 0 ? <p className="text-secondary">Nessuna nota inserita.</p> : <div className="d-grid gap-2 mb-4">{getGvpNotes(currentNotePatient).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{note.authorId === currentUser.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteGvpNote(note)}>Elimina</button>}</div><div className="d-flex align-items-center gap-2"><span className={`badge ${getNoteRoleBadgeClass(note.authorRole)}`}>{note.authorRole || "GVP"}</span><small className="text-secondary">{note.author || "GVP"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></div></article>)}</div>}
-                  <label className="form-label" htmlFor="gvp-patient-notes">Aggiungi una nota</label>
+                  <label className="form-label" htmlFor="gvp-patient-notes">Aggiungi una nota GVP</label>
                   <textarea className="form-control" id="gvp-patient-notes" rows="5" value={newGvpNote} onChange={(event) => setNewGvpNote(event.target.value)} maxLength="4000" autoFocus />
                 </div>
                 <div className="card-footer d-flex justify-content-end gap-2">
                   <button className="btn btn-outline-secondary" type="button" onClick={closeNotes}>Annulla</button>
                   <button className="btn btn-primary" type="button" onClick={saveGvpNotes} disabled={noteSaving || !newGvpNote.trim()}>{noteSaving ? "Salvataggio…" : "Aggiungi nota"}</button>
+                </div>
+              </section>
+            </div>
+          </>}
+          {casNotePatient && <>
+            <button className="entity-modal-backdrop" type="button" aria-label="Chiudi note CAS" onClick={closeCasNotes} />
+            <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="cas-notes-title">
+              <section className="card entity-modal-card">
+                <div className="card-header d-flex align-items-center">
+                  <h2 className="card-title" id="cas-notes-title">Note CAS — {casNotePatient.lastName} {casNotePatient.firstName}</h2>
+                  <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeCasNotes} />
+                </div>
+                <div className="card-body">
+                  {casNoteError && <div className="alert alert-danger py-2" role="alert">{casNoteError}</div>}
+                  <h3 className="h6">Note CAS esistenti</h3>
+                  {getCasNotes(casNotePatient).length === 0 ? <p className="text-secondary">Nessuna nota CAS inserita.</p> : <div className="d-grid gap-2 mb-4">{getCasNotes(casNotePatient).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{note.authorId === currentUser.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteCasNote(note)}>Elimina</button>}</div><div className="d-flex align-items-center gap-2"><span className={`badge ${getNoteRoleBadgeClass(note.authorRole)}`}>{note.authorRole || "CAS"}</span><small className="text-secondary">{note.author || "CAS"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></div></article>)}</div>}
+                  <label className="form-label" htmlFor="cas-patient-notes">Aggiungi una nota CAS</label>
+                  <textarea className="form-control" id="cas-patient-notes" rows="5" value={newCasNote} onChange={(event) => setNewCasNote(event.target.value)} maxLength="4000" autoFocus />
+                </div>
+                <div className="card-footer d-flex justify-content-end gap-2">
+                  <button className="btn btn-outline-secondary" type="button" onClick={closeCasNotes}>Annulla</button>
+                  <button className="btn btn-primary" type="button" onClick={saveCasNote} disabled={casNoteSaving || !newCasNote.trim()}>{casNoteSaving ? "Salvataggio…" : "Aggiungi nota CAS"}</button>
                 </div>
               </section>
             </div>
@@ -2578,7 +2665,7 @@ export const Patients = ({
                                 }}
                               >
                                 <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}<PatientMobileLocation patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
-                                <td className="text-center patient-actions-column" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-primary btn-sm" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button></div></td>
+                                <td className="text-center patient-actions-column" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-primary btn-sm patient-note-button" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button></div></td>
                               </tr>
                             );
                           }
@@ -2652,7 +2739,7 @@ export const Patients = ({
                             <td data-label="GVP">{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{getGvpDisplayName(gvpUser)}</span>)}</div> : <span className="text-secondary">-</span>}</td>
                             <td className="text-center patient-actions-column" data-label="Azioni">
                               <div className="patient-row-actions">
-                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <button className="btn btn-primary btn-sm" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button>}
+                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <><button className="btn btn-primary btn-sm patient-note-button" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note GVP, ${getUnreadNoteCount(patient)} nuove` : "Note GVP"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button><button className="btn btn-warning btn-sm patient-note-button" type="button" aria-label={getUnreadCasNoteCount(patient) > 0 ? `Note CAS, ${getUnreadCasNoteCount(patient)} nuove` : "Note CAS"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openCasNotes(patient); }}><NoteButtonContent label="Note CAS" unreadCount={getUnreadCasNoteCount(patient)} /></button></>}
                               </div>
                             </td>
                           </tr>

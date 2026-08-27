@@ -21,6 +21,7 @@ import { Events } from "./Events.js";
 import { AdminDashboard } from "./AdminDashboard.js";
 import { AdminTools } from "./AdminTools.js";
 import { Donations } from "./Donations.js";
+import { PageInfo } from "./PageInfo.js";
 
 const ICON_PATHS = {
   dashboard: ["M3 13h8V3H3z", "M13 21h8V11h-8z", "M13 3h8v6h-8z", "M3 15h8v6H3z"],
@@ -512,6 +513,7 @@ export const Home = ({
             hospitals={hospitals}
             setHospitals={setHospitals}
             departmentTemplates={departments}
+            users={users}
             presidentId={presidentId}
           />
         ) : activeView === "departments" && presidentId ? (
@@ -527,6 +529,7 @@ export const Home = ({
             setDoctors={setDoctors}
             hospitals={hospitals}
             presidentId={presidentId}
+            currentUser={user}
           />
         ) : activeView === "patients" && presidentId ? (
           <Patients
@@ -586,6 +589,7 @@ export const Home = ({
             </div>
           </div>
         )}
+        <PageInfo activeView={activeView} />
       </main>
 
       <footer className="app-footer">
