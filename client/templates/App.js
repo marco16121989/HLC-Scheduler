@@ -181,7 +181,7 @@ export const App = () => {
   useEffect(() => {
     if (!initialLoadingComplete || startupComplete) return undefined;
     const elapsed = Date.now() - startupStartedAt.current;
-    const remaining = Math.max(0, 3000 - elapsed);
+    const remaining = Math.max(0, 2000 - elapsed);
     let completionTimer;
     const exitTimer = globalThis.setTimeout(() => {
       setStartupExiting(true);
@@ -230,7 +230,9 @@ export const App = () => {
 
   const startupLoader = <div className={`startup-loader ${startupExiting ? "is-exiting" : ""}`} role="status" aria-live="polite">
       <div className="startup-loader-content">
-        <div className="startup-loader-mark" aria-hidden="true">HLC</div>
+        <div className="startup-loader-emblem" aria-hidden="true"><span>HLC</span></div>
+        <div className="startup-loader-brand">HLC Scheduler</div>
+        <div className="startup-loader-tagline">Coordinamento. Cura. Precisione.</div>
         <div className="startup-progress" aria-label="Caricamento in corso"><span /></div>
       </div>
     </div>;
