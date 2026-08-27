@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Meteor } from "meteor/meteor";
 import {
   DETAIL_SECTIONS,
   SIMPLIFIED_FIELDS,
@@ -14,7 +15,7 @@ const dateKey = (date) => {
 };
 const parseDate = (value) => value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null;
 
-export const Calendar = ({ presentations, patients, doctors, users = [], invitedEvents = [], currentUser }) => {
+export const Calendar = ({ presentations, patients, doctors, users = [], invitedEvents = [], currentUser, presidentId }) => {
   const [displayedMonth, setDisplayedMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -28,7 +29,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
 
   const calendarEvents = useMemo(() => {
     const presentationEvents = presentations
-      .filter((item) => item.presentationDate)
+      .filter((item) => item.presidentId === presidentId && item.presentationDate)
       .map((item) => ({
         id: `presentation-${item.id}`,
         date: item.presentationDate.slice(0, 10),
@@ -72,7 +73,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
         };
       });
     return [...presentationEvents, ...patientEvents, ...invitationEvents].sort((a, b) => a.title.localeCompare(b.title));
-  }, [presentations, patients, doctors, invitedEvents, isGvp]);
+  }, [presentations, patients, doctors, invitedEvents, isGvp, presidentId]);
 
   const filteredEvents = eventFilter === "all"
     ? calendarEvents
@@ -123,8 +124,14 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
 
   const openEvent = (event) => {
     if (event.type === "patient" && event.patient) {
-      setPatientModalTab("info");
-      setSelectedPatient(event.patient);
+      Meteor.call("hlc.getPatientDetails", event.patient.id, (methodError, fullPatient) => {
+        if (methodError || !fullPatient) {
+          globalThis.alert(methodError?.reason || "Impossibile caricare la scheda del paziente.");
+          return;
+        }
+        setPatientModalTab("info");
+        setSelectedPatient({ ...fullPatient, id: fullPatient._id || event.patient.id });
+      });
     }
   };
 
@@ -245,7 +252,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
       <div className="app-content-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3 flex-wrap">
-            <div><h1 className="mb-0">Calendario</h1><div className="text-secondary small">Eventi disponibili per {currentUser.username}</div></div>
+            <div><h1 className="mb-1">Calendario</h1><p className="text-secondary mb-0">Consulta in un’unica vista ricoveri, presentazioni ed eventi disponibili per {currentUser.username}.</p></div>
             <div className="d-flex flex-wrap gap-2">
               {!isGvp && <div className="btn-group" role="group" aria-label="Filtro eventi">
                 {[['all', 'Tutti'], ['event', 'Eventi'], ['presentation', 'Presentazioni'], ['patient', 'Pazienti']].map(([filter, label]) => <button className={`btn ${eventFilter === filter ? "btn-secondary" : "btn-outline-secondary"}`} type="button" key={filter} onClick={() => setEventFilter(filter)}>{label}</button>)}

@@ -179,7 +179,50 @@ const replaceRecords = async (collection, records, scope = {}) => {
   for (const record of scopedRecords) {
     const cleaned = cleanRecord(record);
     const { _id, ...fields } = cleaned;
-    await collection.upsertAsync(_id, { $set: fields });
+    await collection.upsertAsync(
+      { _id, ...(scope.presidentId ? { presidentId: scope.presidentId } : {}) },
+      { $set: fields },
+    );
+  }
+};
+
+const validatePatientAssignments = async (records, presidentId) => {
+  if (!presidentId) return;
+  const casIds = [...new Set(records.map((record) => record.casId).filter(Boolean))];
+  const gvpIds = [...new Set(records.flatMap((record) => getAssignedGvpIds(record)))];
+  const assignedIds = [...new Set([...casIds, ...gvpIds])];
+  if (assignedIds.length > 0) {
+    const assignedUsers = await Meteor.users.find(
+      { _id: { $in: assignedIds } },
+      { fields: publicUserFields },
+    ).fetchAsync();
+    const usersById = new Map(assignedUsers.map((user) => [user._id, user]));
+    const belongsToOrganization = async (id, expectedRole) => {
+      const user = usersById.get(id);
+      return user?.profile?.role === expectedRole &&
+        await getActorPresidentId(user) === presidentId;
+    };
+    const casChecks = await Promise.all(casIds.map((id) => belongsToOrganization(id, "CAS")));
+    const gvpChecks = await Promise.all(gvpIds.map((id) => belongsToOrganization(id, "GVP")));
+    const invalidCas = casChecks.some((isValid) => !isValid);
+    const invalidGvp = gvpChecks.some((isValid) => !isValid);
+    if (invalidCas || invalidGvp) {
+      throw new Meteor.Error("not-authorized", "Assegnazione a un utente esterno all’organizzazione.");
+    }
+  }
+
+  const doctorIds = [...new Set(records.flatMap((record) => [
+    record.doctorId,
+    ...(Array.isArray(record.recommendedDoctorIds) ? record.recommendedDoctorIds : []),
+  ]).filter(Boolean))];
+  if (doctorIds.length > 0) {
+    const allowedDoctorCount = await DoctorsCollection.find({
+      _id: { $in: doctorIds },
+      presidentId,
+    }).countAsync();
+    if (allowedDoctorCount !== doctorIds.length) {
+      throw new Meteor.Error("not-authorized", "Medico esterno all’organizzazione.");
+    }
   }
 };
 
@@ -307,7 +350,6 @@ Meteor.publish("hlc-data", async function publishHlcData() {
           status: 1,
           transferNotes: 1,
           departmentHistory: 1,
-          gvpNotes: 1,
           "details.sex": 1,
           "details.departmentId": 1,
           "details.hospitalDepartment": 1,
@@ -342,9 +384,28 @@ Meteor.publish("hlc-data", async function publishHlcData() {
     HospitalsCollection.find(dataSelector),
     DepartmentsCollection.find(dataSelector),
     DoctorsCollection.find(dataSelector),
-    PatientsCollection.find(dataSelector),
-    // Le presentazioni sono eventi condivisi e visibili a tutti gli utenti autenticati.
-    PresentationsCollection.find({}),
+    PatientsCollection.find(dataSelector, { fields: {
+      presidentId: 1,
+      casId: 1,
+      gvpId: 1,
+      gvpIds: 1,
+      firstName: 1,
+      lastName: 1,
+      admissionDate: 1,
+      dischargeDate: 1,
+      admissionType: 1,
+      status: 1,
+      transferNotes: 1,
+      pathology: 1,
+      doctorId: 1,
+      "details.sex": 1,
+      "details.maidenName": 1,
+      "details.departmentId": 1,
+      "details.hospitalRoom": 1,
+      "details.hospitalBed": 1,
+    } }),
+    // Le presentazioni sono condivise soltanto all'interno della stessa organizzazione.
+    PresentationsCollection.find(dataSelector),
     SupportRequestsCollection.find(role === "Admin" ? {} : { createdBy: actor._id }),
     UsefulFilesCollection.find(dataSelector, { sort: { createdAt: -1 } }),
     AbsencesCollection.find({ userId: { $in: absenceUserIds } }, { sort: { startDate: 1 } }),
@@ -529,6 +590,23 @@ Meteor.methods({
     await UsefulFilesCollection.removeAsync(fileId);
   },
 
+  async "hlc.getPatientDetails"(patientId) {
+    requireUser(this);
+    check(patientId, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    const presidentId = await getActorPresidentId(actor);
+    const patient = await PatientsCollection.findOneAsync({
+      _id: patientId,
+      presidentId,
+      ...(role === "GVP" ? { $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] } : {}),
+    });
+    if (!patient || !["Presidente", "CAS", "GVP"].includes(role)) {
+      throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
+    }
+    return patient;
+  },
+
   async "hlc.createEvent"(data) {
     requireUser(this);
     check(data, {
@@ -606,8 +684,11 @@ Meteor.methods({
     requireUser(this);
     check(eventId, String);
     check(response, Match.OneOf("accepted", "declined"));
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const presidentId = await getActorPresidentId(actor);
     const event = await EventsCollection.findOneAsync({
       _id: eventId,
+      presidentId,
       "invitees.userId": this.userId,
     });
     if (!event) throw new Meteor.Error("not-authorized", "Invito non disponibile.");
@@ -629,7 +710,13 @@ Meteor.methods({
   async "hlc.deleteEvent"(eventId) {
     requireUser(this);
     check(eventId, String);
-    const event = await EventsCollection.findOneAsync({ _id: eventId, createdBy: this.userId });
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const presidentId = await getActorPresidentId(actor);
+    const event = await EventsCollection.findOneAsync({
+      _id: eventId,
+      presidentId,
+      createdBy: this.userId,
+    });
     if (!event) throw new Meteor.Error("not-authorized", "Puoi eliminare soltanto gli eventi che hai creato.");
     await EventsCollection.removeAsync(eventId);
     await NotificationsCollection.removeAsync({ eventId, type: "event-invitation" });
@@ -923,6 +1010,9 @@ Meteor.methods({
     ) {
       throw new Meteor.Error("not-authorized", "Dati fuori dalla tua organizzazione.");
     }
+    if (kind === "patients" && !this.hlcPatientAssignmentsAlreadyValidated) {
+      await validatePatientAssignments(records, presidentId);
+    }
 
     const collections = {
       hospitals: HospitalsCollection,
@@ -945,7 +1035,7 @@ Meteor.methods({
         fields: { firstName: 1, lastName: 1, presidentId: 1, casId: 1, gvpId: 1, gvpIds: 1 },
       }).fetchAsync();
       const previousPatients = await PatientsCollection.find(
-        { _id: { $in: recordIds } },
+        { _id: { $in: recordIds }, ...(presidentId ? { presidentId } : {}) },
         { fields: { casId: 1, gvpId: 1, gvpIds: 1, status: 1 } },
       ).fetchAsync();
       const previousPatientsById = new Map(previousPatients.map((patient) => [patient._id, patient]));
@@ -1058,6 +1148,129 @@ Meteor.methods({
         }
       }
     }
+  },
+
+  async "hlc.applyRecordChanges"(kind, changes) {
+    requireUser(this);
+    check(kind, Match.OneOf("hospitals", "departments", "doctors", "presentations"));
+    check(changes, { upserts: [Object], removedIds: [String] });
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : role === "CAS"
+        ? actor.profile?.presidentId || actor.profile?.associationId || ""
+        : "";
+    if (role !== "Admin" && !presidentId) {
+      throw new Meteor.Error("not-authorized", "Operazione non autorizzata.");
+    }
+    if (presidentId && changes.upserts.some((record) => record.presidentId !== presidentId)) {
+      throw new Meteor.Error("not-authorized", "Dati fuori dalla tua organizzazione.");
+    }
+    const collections = {
+      hospitals: HospitalsCollection,
+      departments: DepartmentsCollection,
+      doctors: DoctorsCollection,
+      presentations: PresentationsCollection,
+    };
+    const collection = collections[kind];
+    for (const record of changes.upserts) {
+      const cleaned = cleanRecord(record);
+      const { _id, ...fields } = cleaned;
+      if (!_id) throw new Meteor.Error("invalid-record", "Identificativo record mancante.");
+      await collection.upsertAsync(
+        { _id, ...(presidentId ? { presidentId } : {}) },
+        { $set: fields },
+      );
+    }
+    if (changes.removedIds.length > 0) {
+      await collection.removeAsync({
+        _id: { $in: [...new Set(changes.removedIds)] },
+        ...(presidentId ? { presidentId } : {}),
+      });
+    }
+  },
+
+  async "hlc.applyPatientChanges"(changes) {
+    requireUser(this);
+    check(changes, { upserts: [Object], removedIds: [String] });
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : role === "CAS"
+        ? actor.profile?.presidentId || actor.profile?.associationId || ""
+        : "";
+    if (!presidentId) throw new Meteor.Error("not-authorized", "Operazione non autorizzata.");
+    const currentRecords = await PatientsCollection.find({ presidentId }).fetchAsync();
+    const recordsById = new Map(currentRecords.map((record) => [record._id, { ...record, id: record._id }]));
+    const changedRecords = [];
+    for (const removedId of changes.removedIds) recordsById.delete(removedId);
+    for (const record of changes.upserts) {
+      if (record.presidentId !== presidentId) {
+        throw new Meteor.Error("not-authorized", "Dati fuori dalla tua organizzazione.");
+      }
+      const recordId = record.id || record._id;
+      const existing = recordsById.get(recordId) || {};
+      const mergedRecord = {
+        ...existing,
+        ...record,
+        id: recordId,
+        details: record.details === undefined ? existing.details : record.details,
+        departmentHistory: record.departmentHistory === undefined ? existing.departmentHistory : record.departmentHistory,
+        notes: record.notes === undefined ? existing.notes : record.notes,
+      };
+      recordsById.set(recordId, mergedRecord);
+      changedRecords.push(mergedRecord);
+    }
+    await validatePatientAssignments(changedRecords, presidentId);
+    this.hlcPatientAssignmentsAlreadyValidated = true;
+    try {
+      return await Meteor.server.method_handlers["hlc.replaceRecords"].apply(this, ["patients", [...recordsById.values()]]);
+    } finally {
+      delete this.hlcPatientAssignmentsAlreadyValidated;
+    }
+  },
+
+  async "hlc.updateCasHospitalAssignments"(casUserId, requestedAssignments) {
+    requireUser(this);
+    check(casUserId, String);
+    check(requestedAssignments, [Object]);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const actorRole = actor?.profile?.role;
+    const presidentId = await getActorPresidentId(actor);
+    const canManageCas = actorRole === "Presidente" ||
+      (actorRole === "CAS" && actor.profile?.canInsertCas === true && casUserId !== actor._id);
+    if (!canManageCas || !presidentId) {
+      throw new Meteor.Error("not-authorized", "Non puoi modificare i reparti di questo CAS.");
+    }
+    const casUser = await Meteor.users.findOneAsync({
+      _id: casUserId,
+      "profile.role": "CAS",
+      $or: [
+        { "profile.presidentId": presidentId },
+        { "profile.associationId": presidentId },
+      ],
+    });
+    if (!casUser) throw new Meteor.Error("not-authorized", "CAS non disponibile.");
+
+    const allowedHospitals = await HospitalsCollection.find({ presidentId }).fetchAsync();
+    const hospitalAssignments = requestedAssignments.flatMap((assignment) => {
+      check(assignment.hospitalId, String);
+      check(assignment.departmentIds, [String]);
+      const hospital = allowedHospitals.find((item) => item._id === assignment.hospitalId);
+      if (!hospital) return [];
+      const validDepartmentIds = [...new Set(assignment.departmentIds)].filter((departmentId) =>
+        (hospital.departments || []).some((department) => department.id === departmentId),
+      );
+      return [{ hospitalId: hospital._id, departmentIds: validDepartmentIds }];
+    });
+    const firstAssignment = hospitalAssignments[0];
+    await Meteor.users.updateAsync(casUserId, { $set: {
+      "profile.hospitalAssignments": hospitalAssignments,
+      "profile.hospitalId": firstAssignment?.hospitalId || "",
+      "profile.departmentId": firstAssignment?.departmentIds[0] || "",
+    } });
   },
 
   async "hlc.syncUsers"(records) {
@@ -1233,7 +1446,25 @@ Meteor.methods({
   },
 });
 
+const ensurePerformanceIndexes = async () => {
+  await Promise.all([
+    PatientsCollection.rawCollection().createIndex({ presidentId: 1, status: 1, lastName: 1 }),
+    PatientsCollection.rawCollection().createIndex({ presidentId: 1, casId: 1, status: 1 }),
+    PatientsCollection.rawCollection().createIndex({ presidentId: 1, gvpIds: 1, status: 1 }),
+    PatientsCollection.rawCollection().createIndex({ presidentId: 1, admissionDate: 1 }),
+    DoctorsCollection.rawCollection().createIndex({ presidentId: 1, lastName: 1, firstName: 1 }),
+    PresentationsCollection.rawCollection().createIndex({ presidentId: 1, presentationDate: -1 }),
+    EventsCollection.rawCollection().createIndex({ presidentId: 1, createdBy: 1, startsAt: 1 }),
+    EventsCollection.rawCollection().createIndex({ presidentId: 1, "invitees.userId": 1, startsAt: 1 }),
+    NotificationsCollection.rawCollection().createIndex({ recipientId: 1, readAt: 1, createdAt: -1 }),
+    AbsencesCollection.rawCollection().createIndex({ userId: 1, startDate: 1, endDate: 1 }),
+    Meteor.users.rawCollection().createIndex({ "profile.presidentId": 1, "profile.role": 1 }),
+    Meteor.users.rawCollection().createIndex({ "profile.associationId": 1, "profile.role": 1 }),
+  ]);
+};
+
 Meteor.startup(async () => {
+  await ensurePerformanceIndexes();
   await initializeWebPush();
   const adminUsername = formatUserName(
     process.env.HLC_ADMIN_USERNAME || "marco.mattiazzo",

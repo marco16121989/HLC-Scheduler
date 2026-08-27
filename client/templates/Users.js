@@ -410,6 +410,14 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     };
 
     if (isEditing) {
+      if (role === "CAS") {
+        try {
+          await Meteor.callAsync("hlc.updateCasHospitalAssignments", editingId, hospitalAssignments);
+        } catch (methodError) {
+          setError(methodError.reason || "Impossibile salvare ospedali e reparti del CAS.");
+          return;
+        }
+      }
       setUsers((current) =>
         current.map((user) => {
           if (user.id === editingId) {
@@ -597,7 +605,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
           if (!hospital) return [];
           const departments = (hospital.departments || []).filter((department) =>
             assignment.departmentIds.includes(department.id),
-          );
+          ).sort((first, second) => (first.name || "").localeCompare(second.name || "", "it-IT"));
           return departments.length > 0
             ? departments.map((department) => `${hospital.name} / ${department.name}`)
             : [`${hospital.name} / Intero ospedale`];
@@ -696,17 +704,20 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       <div className="app-content-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
-            <h1 className="mb-0">
-              {managedRole
-                ? managedRole
-                : isPresidentManager
-                ? "La mia squadra"
-                : isCasManager
-                  ? "GVP assegnati e liberi"
-                  : manager?.role === "Admin"
-                    ? "Presidenti"
-                    : "Utenti"}
-            </h1>
+            <div>
+              <h1 className="mb-1">
+                {managedRole
+                  ? managedRole
+                  : isPresidentManager
+                  ? "La mia squadra"
+                  : isCasManager
+                    ? "GVP assegnati e liberi"
+                    : manager?.role === "Admin"
+                      ? "Presidenti"
+                      : "Utenti"}
+              </h1>
+              <p className="text-secondary mb-0">Gestisci gli utenti, i ruoli e le assegnazioni della squadra.</p>
+            </div>
             {canCreateManagedRole && (
               <button
                 className="btn btn-primary users-mobile-insert"
@@ -869,7 +880,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                   </label>
                                   {assignment && (hospital.departments || []).length > 0 && (
                                     <div className="profile-departments">
-                                      {hospital.departments.map((department) => (
+                                      {[...hospital.departments].sort((first, second) => (first.name || "").localeCompare(second.name || "", "it-IT")).map((department) => (
                                         <label className="form-check" key={department.id}>
                                           <input className="form-check-input" type="checkbox" checked={assignment.departmentIds.includes(department.id)} onChange={() => toggleDepartment(hospital.id, department.id)} />
                                           <span className="form-check-label">{department.name}</span>

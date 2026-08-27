@@ -192,7 +192,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], p
       <div className="app-content-header hospital-page-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
-            <h1 className="mb-0">Ospedali</h1>
+            <div><h1 className="mb-1">Ospedali</h1><p className="text-secondary mb-0">Gestisci le strutture ospedaliere e i relativi reparti.</p></div>
             <button
               className="btn btn-primary"
               type="button"

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { confirmAction } from "./ConfirmDialog.js";
+import { PaginationControls, usePagination } from "./Pagination.js";
 
 const emptyForm = () => ({
   title: "",
@@ -38,6 +39,26 @@ const formatEventPeriod = (startsAt, endsAt) => {
   return `${date}, ${time.format(start)} – ${time.format(end)}`;
 };
 
+const EventResponseDonut = ({ invitees }) => {
+  const total = invitees.length;
+  const accepted = invitees.filter((item) => item.status === "accepted").length;
+  const declined = invitees.filter((item) => item.status === "declined").length;
+  const pending = invitees.filter((item) => item.status === "pending").length;
+  const acceptedEnd = total ? (accepted / total) * 360 : 0;
+  const declinedEnd = total ? acceptedEnd + (declined / total) * 360 : 0;
+  const background = total
+    ? `conic-gradient(var(--bs-success) 0deg ${acceptedEnd}deg, var(--bs-danger) ${acceptedEnd}deg ${declinedEnd}deg, var(--bs-warning) ${declinedEnd}deg 360deg)`
+    : "var(--bs-secondary-bg)";
+  return <div className="event-response-chart" role="img" aria-label={`${accepted} partecipano, ${declined} non partecipano, ${pending} in attesa`}>
+    <div className="event-response-donut" style={{ background }}><div className="event-response-donut-center"><strong>{accepted}</strong><span>su {total}</span></div></div>
+    <div className="event-response-legend">
+      <span><i className="accepted" />Partecipano <strong>{accepted}</strong></span>
+      <span><i className="declined" />Non partecipano <strong>{declined}</strong></span>
+      <span><i className="pending" />In attesa <strong>{pending}</strong></span>
+    </div>
+  </div>;
+};
+
 export const Events = ({ events = [], users = [], currentUser, presidentId }) => {
   const [form, setForm] = useState(emptyForm);
   const [modalOpen, setModalOpen] = useState(false);
@@ -51,6 +72,7 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
   ), [users, currentUser.id, presidentId]);
   const casUsers = organizationUsers.filter((user) => user.role === "CAS");
   const gvpUsers = organizationUsers.filter((user) => user.role === "GVP");
+  const eventPagination = usePagination(events, 12);
 
   const closeModal = () => {
     setForm(emptyForm());
@@ -110,7 +132,7 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
   return <>
     <div className="app-content-header">
       <div className="container-fluid d-flex align-items-center justify-content-between gap-3">
-        <h1 className="mb-0">Eventi</h1>
+        <div><h1 className="mb-1">Eventi</h1><p className="text-secondary mb-0">Crea eventi, gestisci gli invitati e consulta le risposte ricevute.</p></div>
         {canCreate && <button className="btn btn-primary" type="button" onClick={() => setModalOpen(true)}>Crea evento</button>}
       </div>
     </div>
@@ -151,26 +173,20 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
           </section>
         </div>
 
-        {events.length === 0 ? <section className="card"><div className="card-body text-center text-secondary py-5">Nessun evento disponibile.</div></section> : <div className="event-card-grid">{events.map((event) => {
+        {events.length === 0 ? <section className="card"><div className="card-body text-center text-secondary py-5">Nessun evento disponibile.</div></section> : <><div className="event-card-grid">{eventPagination.pageItems.map((event) => {
           const isOwner = event.createdBy === currentUser.id;
           const invitation = event.invitees?.find((item) => item.userId === currentUser.id);
           const invitees = event.invitees || [];
-          const responseCount = (role, status) => invitees.filter((item) => item.role === role && item.status === status).length;
           return <article className="card event-card" key={event.id}>
             <div className="card-body">
               <div className="d-flex align-items-start justify-content-between gap-3">
-                <div><h2 className="h5 mb-1">{event.title}</h2><div className="text-secondary small">Creato da {event.creatorName}</div></div>
+                <div className="min-w-0"><div className="event-card-heading"><h2 className="h5 mb-0">{event.title}</h2><time dateTime={event.startsAt}>{formatEventPeriod(event.startsAt, event.endsAt)}</time>{event.location && <span className="event-card-location">{event.location}</span>}</div><div className="text-secondary small mt-1">Creato da {event.creatorName}</div></div>
                 {invitation && <span className={`badge ${statusClass[invitation.status] || statusClass.pending}`}>{statusLabel[invitation.status] || statusLabel.pending}</span>}
               </div>
-              <div className="event-meta mt-3"><strong>{formatEventPeriod(event.startsAt, event.endsAt)}</strong>{event.location && <span>{event.location}</span>}</div>
               {event.description && <p className="event-description mt-3 mb-0">{event.description}</p>}
-              {isOwner && <details className="event-invitee-details mt-4">
-                <summary>
-                  <span className="event-invitee-summary-title">Risposte degli invitati</span>
-                  <span className="event-invitee-summary-counts">
-                    <span><strong>CAS</strong>: {responseCount("CAS", "accepted")} sì · {responseCount("CAS", "declined")} no · {responseCount("CAS", "pending")} in attesa</span>
-                    <span><strong>GVP</strong>: {responseCount("GVP", "accepted")} sì · {responseCount("GVP", "declined")} no · {responseCount("GVP", "pending")} in attesa</span>
-                  </span>
+              {isOwner && <details className="event-response-details">
+                <summary aria-label="Mostra o nascondi l’elenco degli invitati">
+                  <EventResponseDonut invitees={invitees} />
                 </summary>
                 <div className="table-responsive mt-3"><table className="table table-sm align-middle mb-0"><thead><tr><th>Invitato</th><th>Ruolo</th><th>Risposta</th></tr></thead><tbody>{invitees.map((invitee) => <tr key={invitee.userId}><td>{invitee.username}</td><td>{invitee.role}</td><td><span className={`badge ${statusClass[invitee.status] || statusClass.pending}`}>{statusLabel[invitee.status] || statusLabel.pending}</span></td></tr>)}</tbody></table></div>
               </details>}
@@ -179,7 +195,7 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
               {isOwner ? <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => removeEvent(event)}>Elimina evento</button> : <><button className={`btn btn-sm ${invitation?.status === "declined" ? "btn-danger" : "btn-outline-danger"}`} type="button" onClick={() => respond(event.id, "declined")}>Non partecipo</button><button className={`btn btn-sm ${invitation?.status === "accepted" ? "btn-success" : "btn-outline-success"}`} type="button" onClick={() => respond(event.id, "accepted")}>Partecipo</button></>}
             </div>
           </article>;
-        })}</div>}
+        })}</div><PaginationControls {...eventPagination} /></>}
       </div>
     </div>
   </>;

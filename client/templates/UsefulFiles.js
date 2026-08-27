@@ -92,7 +92,7 @@ export const UsefulFiles = ({ files, currentUser }) => {
   };
 
   return <>
-    <div className="app-content-header"><div className="container-fluid"><h1 className="mb-0">File Utili</h1></div></div>
+    <div className="app-content-header"><div className="container-fluid"><h1 className="mb-1">File Utili</h1><p className="text-secondary mb-0">Carica, consulta e scarica i documenti utili all’attività.</p></div></div>
     <div className="app-content"><div className="container-fluid"><div className="row g-3">
       {canUpload && <div className="col-12"><section className="card"><div className="card-header"><h2 className="card-title">Carica file</h2></div><div className="card-body">
         {error && <div className="alert alert-danger py-2" role="alert">{error}</div>}

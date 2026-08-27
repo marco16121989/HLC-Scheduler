@@ -2,7 +2,8 @@ export const Info = () => (
   <>
     <div className="app-content-header">
       <div className="container-fluid">
-        <h1 className="mb-0">Info</h1>
+        <h1 className="mb-1">Info</h1>
+        <p className="text-secondary mb-0">Consulta le informazioni sul software e sulla versione in uso.</p>
       </div>
     </div>
     <div className="app-content">

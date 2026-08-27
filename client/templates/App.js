@@ -195,7 +195,17 @@ export const App = () => {
 
   const makeSetter = (kind, current) => (update) => {
     const next = typeof update === "function" ? update(current) : update;
-    callServer("hlc.replaceRecords", kind, next);
+    const currentById = new Map(current.map((record) => [record.id, record]));
+    const nextIds = new Set(next.map((record) => record.id));
+    const upserts = next.filter((record) =>
+      !currentById.has(record.id) || JSON.stringify(currentById.get(record.id)) !== JSON.stringify(record),
+    );
+    const removedIds = current.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+    if (kind === "patients") {
+      callServer("hlc.applyPatientChanges", { upserts, removedIds });
+    } else {
+      callServer("hlc.applyRecordChanges", kind, { upserts, removedIds });
+    }
   };
   const setUsers = (update) => {
     const next = typeof update === "function" ? update(users) : update;
@@ -209,7 +219,13 @@ export const App = () => {
     const writableRecords = user?.role === "Admin"
       ? next
       : next.filter((record) => record.presidentId === organizationId);
-    callServer("hlc.replaceRecords", "presentations", writableRecords);
+    const currentById = new Map(presentations.map((record) => [record.id, record]));
+    const nextIds = new Set(writableRecords.map((record) => record.id));
+    const upserts = writableRecords.filter((record) =>
+      !currentById.has(record.id) || JSON.stringify(currentById.get(record.id)) !== JSON.stringify(record),
+    );
+    const removedIds = presentations.filter((record) => !nextIds.has(record.id)).map((record) => record.id);
+    callServer("hlc.applyRecordChanges", "presentations", { upserts, removedIds });
   };
 
   const startupLoader = <div className={`startup-loader ${startupExiting ? "is-exiting" : ""}`} role="status" aria-live="polite">

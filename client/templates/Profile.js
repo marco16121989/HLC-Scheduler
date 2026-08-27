@@ -122,7 +122,7 @@ export const Profile = ({ currentUser, hospitals = [] }) => {
 
   return (
     <>
-      <div className="app-content-header"><div className="container-fluid"><h1 className="mb-0">Il mio profilo</h1></div></div>
+      <div className="app-content-header"><div className="container-fluid"><h1 className="mb-1">Il mio profilo</h1><p className="text-secondary mb-0">Aggiorna i tuoi dati personali e le strutture di riferimento.</p></div></div>
       <div className="app-content"><div className="container-fluid"><div className="row justify-content-center"><div className="col-12 col-xl-9">
         <section className="card profile-card">
           <div className="card-header d-flex align-items-center gap-3">

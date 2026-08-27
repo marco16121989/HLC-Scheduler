@@ -475,6 +475,7 @@ export const Home = ({
             users={users}
             invitedEvents={events}
             currentUser={user}
+            presidentId={presidentId}
           />
         ) : activeView === "events" && presidentId ? (
           <Events events={events} users={users} currentUser={user} presidentId={presidentId} />
@@ -560,6 +561,7 @@ export const Home = ({
               />
               <h1>HLC Scheduler</h1>
               <p>Benvenuto, {user.firstName || user.username}</p>
+              <p className="text-secondary">Accedi rapidamente alle attività, alle scadenze e alle informazioni principali.</p>
             </div>
           </div>
         )}

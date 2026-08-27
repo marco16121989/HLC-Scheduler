@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
 import { createPopulatedPresentationPdf } from "../utils/populatePresentationPdf.js";
+import { PaginationControls, usePagination } from "./Pagination.js";
 
 const PRESENTATION_TYPES = ["In presenza", "Online", "PowerPoint", "Espositori"];
 const SPECIALIZATIONS = [
@@ -67,6 +68,10 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
   const [error, setError] = useState("");
   const isEditing = editingId !== null;
   const visiblePresentations = presentations.filter((item) => item.presidentId === presidentId);
+  const sortedPresentations = [...visiblePresentations].sort((first, second) =>
+    (second.presentationDate || "").localeCompare(first.presentationDate || ""),
+  );
+  const presentationPagination = usePagination(sortedPresentations, 20);
 
   const resetForm = () => {
     setForm(emptyPresentation(currentUser));
@@ -146,7 +151,7 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
     <>
       <div className="app-content-header">
         <div className="container-fluid d-flex align-items-center justify-content-between gap-3">
-          <h1 className="mb-0">Presentazioni</h1>
+          <div><h1 className="mb-1">Presentazioni</h1><p className="text-secondary mb-0">Programma e consulta le presentazioni dell’organizzazione.</p></div>
           <button className="btn btn-primary" type="button" onClick={() => { resetForm(); setModalOpen(true); }}>Crea presentazione</button>
         </div>
       </div>
@@ -228,10 +233,10 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
             <div className="card-header mobile-list-header"><h2 className="card-title">Elenco presentazioni</h2></div>
             <div className="card-body p-0"><div className="table-responsive"><table className="table table-hover align-middle mb-0 mobile-card-table presentation-list-table">
               <thead><tr><th>Data</th><th>Evento</th><th>Tipo</th><th>Presenti</th><th>Struttura</th><th className="text-end">Azioni</th></tr></thead>
-              <tbody>{visiblePresentations.length === 0 ? <tr><td className="text-center text-secondary py-4" colSpan="6">Nessuna presentazione inserita.</td></tr> : [...visiblePresentations].sort((a, b) => (b.presentationDate || "").localeCompare(a.presentationDate || "")).map((item) => (
+              <tbody>{visiblePresentations.length === 0 ? <tr><td className="text-center text-secondary py-4" colSpan="6">Nessuna presentazione inserita.</td></tr> : presentationPagination.pageItems.map((item) => (
                 <tr className="presentation-clickable-row" key={item.id} role="button" tabIndex="0" onClick={() => handleEdit(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleEdit(item); } }}><td data-label="Data">{item.presentationDate ? new Intl.DateTimeFormat("it-IT").format(new Date(`${item.presentationDate}T00:00:00`)) : "-"}</td><td className="fw-medium" data-label="Evento">{item.event}</td><td data-label="Tipo">{item.presentationTypes?.join(", ") || "-"}</td><td data-label="Presenti">{item.attendeesCount || "-"}</td><td data-label="Struttura">{item.facility || "-"}</td><td className="text-end" data-label="Azioni"><button className="btn btn-outline-primary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); handleEdit(item); }}>Modifica</button></td></tr>
               ))}</tbody>
-            </table></div></div>
+            </table></div><PaginationControls {...presentationPagination} /></div>
           </section>
         </div>
       </div>

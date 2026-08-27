@@ -48,7 +48,7 @@ export const Absences = ({ absences = [], users = [], currentUser }) => {
   };
 
   return <>
-    <div className="app-content-header"><div className="container-fluid"><h1 className="mb-0">Periodi di assenza</h1></div></div>
+    <div className="app-content-header"><div className="container-fluid"><h1 className="mb-1">Periodi di assenza</h1><p className="text-secondary mb-0">Registra e consulta i periodi in cui gli utenti non sono disponibili.</p></div></div>
     <div className="app-content"><div className="container-fluid"><div className="row g-3">
       <div className="col-12 col-lg-5"><section className="card">
         <div className="card-header"><h2 className="card-title">{isEditing ? "Modifica assenza" : "Inserisci assenza"}</h2></div>

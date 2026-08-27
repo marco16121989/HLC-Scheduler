@@ -3,6 +3,7 @@ import { Meteor } from "meteor/meteor";
 import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
 import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPdf.js";
 import { confirmAction } from "./ConfirmDialog.js";
+import { PaginationControls, usePagination } from "./Pagination.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 
@@ -212,10 +213,10 @@ export const SIMPLIFIED_FIELDS = [
 ];
 
 const PATIENT_FORM_TABS = [
-  ["main", "Info Principali"],
-  ["departments", "Reparti Coinvolti"],
   ["summary", "Riepilogo"],
+  ["main", "Info Principali"],
   ["insertion", "Info Complete"],
+  ["departments", "Storico Reparti"],
 ];
 
 const SIMPLIFIED_FIELD_NAMES = new Set(SIMPLIFIED_FIELDS.map(([name]) => name));
@@ -290,6 +291,7 @@ export const Patients = ({
   const [dischargeDate, setDischargeDate] = useState("");
   const [pathology, setPathology] = useState("");
   const [doctorId, setDoctorId] = useState("");
+  const [recommendedDoctorIds, setRecommendedDoctorIds] = useState([]);
   const [casId, setCasId] = useState(
     currentUser.role === "CAS" ? currentUser.id : "",
   );
@@ -306,13 +308,18 @@ export const Patients = ({
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [doctorSelectionModalOpen, setDoctorSelectionModalOpen] = useState(false);
+  const [doctorModalTab, setDoctorModalTab] = useState("department");
+  const [recommendedDoctorsModalOpen, setRecommendedDoctorsModalOpen] = useState(false);
+  const [recommendedDoctorModalTab, setRecommendedDoctorModalTab] = useState("department");
   const [doctorSearch, setDoctorSearch] = useState("");
   const [departmentSelectionModalOpen, setDepartmentSelectionModalOpen] = useState(false);
   const [departmentSearch, setDepartmentSearch] = useState("");
   const [departmentChangeDate, setDepartmentChangeDate] = useState(getToday);
   const [casSelectionModalOpen, setCasSelectionModalOpen] = useState(false);
+  const [casModalTab, setCasModalTab] = useState("recommended");
   const [casSearch, setCasSearch] = useState("");
   const [gvpSelectionModalOpen, setGvpSelectionModalOpen] = useState(false);
+  const [gvpModalTab, setGvpModalTab] = useState("recommended");
   const [gvpSearch, setGvpSearch] = useState("");
   const [notePatient, setNotePatient] = useState(null);
   const [newGvpNote, setNewGvpNote] = useState("");
@@ -347,19 +354,22 @@ export const Patients = ({
     : roleFilteredPatients.filter(
         (patient) => (patient.status || PATIENT_STATUSES[0]) === statusFilter,
       );
-  const currentNotePatient = notePatient
-    ? visiblePatients.find((patient) => patient.id === notePatient.id) || notePatient
-    : null;
+  const sortedVisiblePatients = [...visiblePatients].sort((first, second) =>
+    (first.lastName || "").localeCompare(second.lastName || ""),
+  );
+  const patientPagination = usePagination(
+    sortedVisiblePatients,
+    25,
+    `${statusFilter}:${casFilter}:${gvpPatientScope}`,
+  );
+  const currentNotePatient = notePatient;
   const visibleDoctors = doctors.filter(
     (doctor) => doctor.presidentId === presidentId,
   );
-  const filteredDoctors = visibleDoctors.filter((doctor) =>
-    `${doctor.lastName || ""} ${doctor.firstName || ""}`
-      .toLowerCase()
-      .includes(doctorSearch.trim().toLowerCase()),
+  const visibleHospitals = hospitals.filter(
+    (hospital) => hospital.presidentId === presidentId,
   );
-  const availableDepartments = hospitals
-    .filter((hospital) => hospital.presidentId === presidentId)
+  const availableDepartments = visibleHospitals
     .flatMap((hospital) => (hospital.departments || []).map((department) => ({
       ...department,
       hospitalId: hospital.id,
@@ -376,6 +386,56 @@ export const Patients = ({
       user.role === "CAS" &&
       (user.presidentId || user.associationId) === presidentId,
   );
+  const isCasAssignedToDepartment = (user, department) => {
+    if (!department) return false;
+    const assignments = Array.isArray(user.hospitalAssignments)
+      ? user.hospitalAssignments
+      : user.hospitalId
+        ? [{ hospitalId: user.hospitalId, departmentIds: user.departmentId ? [user.departmentId] : [] }]
+        : [];
+    return assignments.some((assignment) => {
+      const assignmentDepartmentIds = Array.isArray(assignment.departmentIds)
+        ? assignment.departmentIds
+        : [];
+      return assignment.hospitalId === department.hospitalId &&
+        (assignmentDepartmentIds.length === 0 || assignmentDepartmentIds.includes(department.id));
+    });
+  };
+  const departmentCasUsers = selectedDepartment
+    ? visibleCasUsers.filter((user) => isCasAssignedToDepartment(user, selectedDepartment))
+    : [];
+  const departmentDoctors = selectedDepartment
+    ? visibleDoctors.filter((availableDoctor) =>
+        (Array.isArray(availableDoctor.departmentIds)
+          ? availableDoctor.departmentIds
+          : availableDoctor.departmentId ? [availableDoctor.departmentId] : []
+        ).includes(selectedDepartment.id),
+      )
+    : [];
+  const filteredDoctors = departmentDoctors.filter((doctor) =>
+    `${doctor.lastName || ""} ${doctor.firstName || ""}`
+      .toLowerCase()
+      .includes(doctorSearch.trim().toLowerCase()),
+  );
+  const searchedVisibleDoctors = visibleDoctors.filter((doctor) =>
+    `${doctor.lastName || ""} ${doctor.firstName || ""}`
+      .toLowerCase()
+      .includes(doctorSearch.trim().toLowerCase()),
+  );
+  const doctorsByHospital = visibleHospitals.map((hospital) => {
+    const hospitalDepartmentIds = new Set((hospital.departments || []).map((department) => department.id));
+    return {
+      hospital,
+      doctors: searchedVisibleDoctors.filter((doctor) =>
+        (Array.isArray(doctor.departmentIds)
+          ? doctor.departmentIds
+          : doctor.departmentId ? [doctor.departmentId] : []
+        ).some((departmentId) => hospitalDepartmentIds.has(departmentId)),
+      ),
+    };
+  }).filter((group) => group.doctors.length > 0);
+  const assignedDoctorIds = new Set(doctorsByHospital.flatMap((group) => group.doctors.map((doctor) => doctor.id)));
+  const doctorsWithoutHospital = searchedVisibleDoctors.filter((doctor) => !assignedDoctorIds.has(doctor.id));
   const visibleGvpUsers = users.filter(
     (user) =>
       user.role === "GVP" &&
@@ -402,7 +462,8 @@ export const Patients = ({
     Number(isAbsentOnAdmissionDate(first.id)) - Number(isAbsentOnAdmissionDate(second.id)) ||
     (first.username || "").localeCompare(second.username || "", "it-IT");
   const orderedCasUsers = [...visibleCasUsers].sort(availableFirst);
-  const filteredCasUsers = orderedCasUsers.filter((user) =>
+  const recommendedCasUsers = [...departmentCasUsers].sort(availableFirst);
+  const filteredCasUsers = (casModalTab === "recommended" ? recommendedCasUsers : orderedCasUsers).filter((user) =>
     (user.username || "").toLowerCase().includes(casSearch.trim().toLowerCase()),
   );
   const getGvpDisplayName = (user) => {
@@ -414,18 +475,21 @@ export const Patients = ({
     return user.username || "";
   };
   const normalizedGvpSearch = gvpSearch.trim().toLowerCase();
-  const associatedGvpUsers = visibleGvpUsers.filter((user) => gvpIds.includes(user.id)).filter((user) => {
+  const isGvpAssignedToCas = (user, selectedCasId) => Boolean(selectedCasId) && [
+    ...(Array.isArray(user.casIds) ? user.casIds : []),
+    user.casId,
+    user.associationId,
+  ].filter(Boolean).includes(selectedCasId);
+  const recommendedGvpUsers = visibleGvpUsers.filter((user) => isGvpAssignedToCas(user, casId));
+  const gvpUsersForActiveTab = gvpModalTab === "recommended" ? recommendedGvpUsers : visibleGvpUsers;
+  const associatedGvpUsers = gvpUsersForActiveTab.filter((user) => gvpIds.includes(user.id)).filter((user) => {
     if (!normalizedGvpSearch) return true;
     return `${getGvpDisplayName(user)}`.toLowerCase().includes(normalizedGvpSearch);
   }).sort(availableFirst);
-  const unassociatedGvpUsers = visibleGvpUsers.filter((user) => !gvpIds.includes(user.id)).filter((user) => {
+  const unassociatedGvpUsers = gvpUsersForActiveTab.filter((user) => !gvpIds.includes(user.id)).filter((user) => {
     if (!normalizedGvpSearch) return true;
     return `${getGvpDisplayName(user)}`.toLowerCase().includes(normalizedGvpSearch);
   }).sort(availableFirst);
-  const editingPatientNotes = getGvpNotes(
-    patients.find((patient) => patient.id === editingId),
-  );
-
   const resetForm = () => {
     setFirstName("");
     setLastName("");
@@ -436,6 +500,7 @@ export const Patients = ({
     setDischargeDate("");
     setPathology("");
     setDoctorId("");
+    setRecommendedDoctorIds([]);
     setCasId(currentUser.role === "CAS" ? currentUser.id : "");
     setGvpIds([]);
     setNotes("");
@@ -446,6 +511,7 @@ export const Patients = ({
     setError("");
     setActiveTab("main");
     setDoctorSelectionModalOpen(false);
+    setRecommendedDoctorsModalOpen(false);
     setDepartmentSelectionModalOpen(false);
     setDepartmentChangeDate(getToday());
     setCasSelectionModalOpen(false);
@@ -461,24 +527,46 @@ export const Patients = ({
   const openGvpSelectionModal = () => {
     setError("");
     setGvpSearch("");
+    setGvpModalTab("recommended");
     setGvpSelectionModalOpen(true);
   };
 
   const openCasSelectionModal = () => {
+    if (!selectedDepartment) return;
     setError("");
     setCasSearch("");
+    setCasModalTab("recommended");
     setCasSelectionModalOpen(true);
   };
 
   const closeCasSelectionModal = () => setCasSelectionModalOpen(false);
 
   const openDoctorSelectionModal = () => {
+    if (!selectedDepartment) return;
     setError("");
     setDoctorSearch("");
+    setDoctorModalTab("department");
     setDoctorSelectionModalOpen(true);
   };
 
   const closeDoctorSelectionModal = () => setDoctorSelectionModalOpen(false);
+
+  const openRecommendedDoctorsModal = () => {
+    if (!selectedDepartment) return;
+    setError("");
+    setDoctorSearch("");
+    setRecommendedDoctorModalTab("department");
+    setRecommendedDoctorsModalOpen(true);
+  };
+
+  const closeRecommendedDoctorsModal = () => setRecommendedDoctorsModalOpen(false);
+
+  const toggleRecommendedDoctor = (selectedDoctorId) => {
+    setRecommendedDoctorIds((current) => current.includes(selectedDoctorId)
+      ? current.filter((id) => id !== selectedDoctorId)
+      : [...current, selectedDoctorId]);
+    setError("");
+  };
 
   const openDepartmentSelectionModal = () => {
     setError("");
@@ -515,6 +603,23 @@ export const Patients = ({
       hospitalName: department.hospitalName,
       hospitalDepartment: department.name,
     }));
+
+    const eligibleCasUsers = visibleCasUsers.filter((user) => isCasAssignedToDepartment(user, department));
+    const preferredCas = eligibleCasUsers.find((user) => user.id === currentUser.id) || eligibleCasUsers[0];
+    setCasId(preferredCas?.id || "");
+    setGvpIds(preferredCas
+      ? visibleGvpUsers.filter((user) => isGvpAssignedToCas(user, preferredCas.id)).map((user) => user.id)
+      : []);
+
+    const eligibleDoctors = visibleDoctors.filter((availableDoctor) =>
+      (Array.isArray(availableDoctor.departmentIds)
+        ? availableDoctor.departmentIds
+        : availableDoctor.departmentId ? [availableDoctor.departmentId] : []
+      ).includes(department.id),
+    );
+    setDoctorId(eligibleDoctors[0]?.id || "");
+    setRecommendedDoctorIds(eligibleDoctors.map((availableDoctor) => availableDoctor.id));
+    setError("");
     closeDepartmentSelectionModal();
   };
 
@@ -536,12 +641,17 @@ export const Patients = ({
     const normalizedLastName = lastName.trim();
     const normalizedPathology = pathology.trim();
     const normalizedNotes = notes.trim();
-    const validDoctorId = visibleDoctors.some(
+    const validDoctorId = selectedDepartment && visibleDoctors.some(
       (doctor) => doctor.id === doctorId,
     )
       ? doctorId
       : "";
-    const validCasId = visibleCasUsers.some((user) => user.id === casId)
+    const validRecommendedDoctorIds = selectedDepartment
+      ? recommendedDoctorIds.filter((selectedDoctorId) =>
+          visibleDoctors.some((doctor) => doctor.id === selectedDoctorId),
+        )
+      : [];
+    const validCasId = selectedDepartment && visibleCasUsers.some((user) => user.id === casId)
       ? casId
       : "";
     const validGvpIds = gvpIds.filter((gvpUserId) => users.some(
@@ -608,6 +718,7 @@ export const Patients = ({
       dischargeDate,
       pathology: normalizedPathology,
       doctorId: validDoctorId,
+      recommendedDoctorIds: validRecommendedDoctorIds,
       casId: validCasId,
       gvpIds: validGvpIds,
       gvpId: validGvpIds[0] || "",
@@ -687,7 +798,7 @@ export const Patients = ({
     }
   };
 
-  const handleEdit = (patient) => {
+  const populatePatientForm = (patient) => {
     setEditingId(patient.id);
     setFirstName(patient.firstName);
     setLastName(patient.lastName);
@@ -704,6 +815,7 @@ export const Patients = ({
     setDischargeDate(patient.dischargeDate || "");
     setPathology(patient.pathology || "");
     setDoctorId(patient.doctorId || "");
+    setRecommendedDoctorIds(Array.isArray(patient.recommendedDoctorIds) ? patient.recommendedDoctorIds : []);
     setCasId(patient.casId || "");
     setGvpIds(getPatientGvpIds(patient));
     setNotes(patient.notes || "");
@@ -720,6 +832,16 @@ export const Patients = ({
     setError("");
     setActiveTab("summary");
     setModalOpen(true);
+  };
+
+  const handleEdit = (patient) => {
+    Meteor.call("hlc.getPatientDetails", patient.id, (methodError, fullPatient) => {
+      if (methodError || !fullPatient) {
+        globalThis.alert(methodError?.reason || "Impossibile caricare la scheda del paziente.");
+        return;
+      }
+      populatePatientForm({ ...fullPatient, id: fullPatient._id || patient.id });
+    });
   };
 
   const handleDelete = async () => {
@@ -823,6 +945,13 @@ export const Patients = ({
     setNotePatient(patient);
     setNewGvpNote("");
     setNoteError("");
+    Meteor.call("hlc.getPatientDetails", patient.id, (methodError, fullPatient) => {
+      if (methodError || !fullPatient) {
+        setNoteError(methodError?.reason || "Impossibile caricare le note.");
+        return;
+      }
+      setNotePatient({ ...fullPatient, id: fullPatient._id || patient.id });
+    });
   };
 
   const closeNotes = () => {
@@ -864,11 +993,16 @@ export const Patients = ({
     Meteor.call("hlc.deletePatientNote", notePatient.id, note.id, (methodError) => {
       if (methodError) {
         setNoteError(methodError.reason || "Impossibile eliminare la nota.");
+        return;
       }
+      setNotePatient((current) => current
+        ? { ...current, gvpNotes: getGvpNotes(current).filter((item) => item.id !== note.id) }
+        : current);
     });
   };
 
   const doctor = doctors.find((item) => item.id === doctorId);
+  const recommendedDoctors = visibleDoctors.filter((item) => recommendedDoctorIds.includes(item.id));
   const selectedCasUser = users.find((item) => item.id === casId);
   const selectedGvpUsers = users.filter((item) => gvpIds.includes(item.id));
 
@@ -883,6 +1017,7 @@ export const Patients = ({
     { label: "Stato", value: patientStatus },
     ...(patientStatus === "Trasferito" ? [{ label: "Dove è stato trasferito", value: transferNotes }] : []),
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
+    { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ") : "Nessun medico consigliato" },
     { label: "Reparto", value: selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Non assegnato" },
     { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
     { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato" },
@@ -927,6 +1062,7 @@ export const Patients = ({
     { label: "Tipo di accesso", value: admissionType === "scheduled" ? "Ricovero programmato" : "Emergenza" },
     { label: "Stato", value: patientStatus },
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
+    { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ") : "Nessun medico consigliato" },
     { label: "Numero camera", value: details.hospitalRoom },
     { label: "Numero letto", value: details.hospitalBed },
     { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
@@ -942,7 +1078,7 @@ export const Patients = ({
       <div className="app-content-header patient-page-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
-            <h1 className="mb-0">Pazienti</h1>
+            <div><h1 className="mb-1">Pazienti</h1><p className="text-secondary mb-0">Gestisci le informazioni, le assegnazioni e lo storico dei pazienti.</p></div>
             <div className="d-flex align-items-center gap-2 flex-nowrap patient-header-actions">
               <select
                 className="form-select w-auto flex-shrink-0"
@@ -1297,27 +1433,7 @@ export const Patients = ({
                         </div>
                       )}
                       <div className="patient-assignment-row row g-3 w-100">
-                        <div className="col-12 col-md-3">
-                          <div className="form-label">Medico responsabile</div>
-                          <button className="btn btn-outline-primary w-100" type="button" onClick={openDoctorSelectionModal} disabled={visibleDoctors.length === 0}>
-                            {doctor ? `${doctor.lastName} ${doctor.firstName}` : "Seleziona medico"}
-                          </button>
-                        </div>
-                        <div className="col-12 col-md-3">
-                          <div className="form-label">CAS</div>
-                          <button className="btn btn-outline-primary w-100" type="button" onClick={openCasSelectionModal} disabled={visibleCasUsers.length === 0}>
-                            {selectedCasUser ? selectedCasUser.username : "Seleziona CAS"}
-                          </button>
-                        </div>
-                        <div className="col-12 col-md-3">
-                          <div className="form-label">GVP assegnati</div>
-                          <button className="btn btn-outline-primary w-100" type="button" onClick={openGvpSelectionModal} disabled={visibleGvpUsers.length === 0}>
-                            {selectedGvpUsers.length > 0
-                              ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ")
-                              : "Seleziona GVP"}
-                          </button>
-                        </div>
-                        <div className="col-12 col-md-3">
+                        <div className="col-12 col-md-6 col-xl">
                           <div className="form-label">Reparto</div>
                           {isEditing && selectedDepartment ? (
                             <button
@@ -1335,6 +1451,34 @@ export const Patients = ({
                               {selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Seleziona reparto"}
                             </button>
                           )}
+                        </div>
+                        <div className="col-12 col-md-6 col-xl">
+                          <div className="form-label">Medico responsabile</div>
+                          <button className="btn btn-outline-primary w-100" type="button" onClick={openDoctorSelectionModal} disabled={!selectedDepartment || visibleDoctors.length === 0}>
+                            {!selectedDepartment ? "Seleziona prima il reparto" : doctor ? `${doctor.lastName} ${doctor.firstName}` : "Seleziona medico"}
+                          </button>
+                        </div>
+                        <div className="col-12 col-md-6 col-xl">
+                          <div className="form-label">Medici consigliati</div>
+                          <button className="btn btn-outline-primary w-100" type="button" onClick={openRecommendedDoctorsModal} disabled={!selectedDepartment || visibleDoctors.length === 0}>
+                            {!selectedDepartment ? "Seleziona prima il reparto" : recommendedDoctors.length > 0
+                              ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ")
+                              : "Seleziona medici"}
+                          </button>
+                        </div>
+                        <div className="col-12 col-md-6 col-xl">
+                          <div className="form-label">CAS</div>
+                          <button className="btn btn-outline-primary w-100" type="button" onClick={openCasSelectionModal} disabled={!selectedDepartment || visibleCasUsers.length === 0}>
+                            {!selectedDepartment ? "Seleziona prima il reparto" : selectedCasUser ? selectedCasUser.username : "Seleziona CAS"}
+                          </button>
+                        </div>
+                        <div className="col-12 col-md-6 col-xl">
+                          <div className="form-label">GVP assegnati</div>
+                          <button className="btn btn-outline-primary w-100" type="button" onClick={openGvpSelectionModal} disabled={visibleGvpUsers.length === 0}>
+                            {selectedGvpUsers.length > 0
+                              ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ")
+                              : "Seleziona GVP"}
+                          </button>
                         </div>
                       </div>
                       <div className="row g-3 w-100">
@@ -1507,24 +1651,78 @@ export const Patients = ({
                                 <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeDoctorSelectionModal} />
                               </div>
                               <div className="card-body">
+                                <div className="nav nav-tabs mb-3" role="tablist" aria-label="Tipologia elenco medici">
+                                  <button className={`nav-link ${doctorModalTab === "department" ? "active" : ""}`} type="button" role="tab" aria-selected={doctorModalTab === "department"} onClick={() => setDoctorModalTab("department")}>Medici del reparto</button>
+                                  <button className={`nav-link ${doctorModalTab === "all" ? "active" : ""}`} type="button" role="tab" aria-selected={doctorModalTab === "all"} onClick={() => setDoctorModalTab("all")}>Tutti i medici</button>
+                                </div>
                                 <label className="form-label" htmlFor="doctor-search">Cerca per nome</label>
                                 <input className="form-control mb-3" id="doctor-search" type="search" value={doctorSearch} onChange={(event) => setDoctorSearch(event.target.value)} placeholder="Inserisci nome o cognome" autoFocus />
-                                <div className="d-grid gap-2">
-                                  {filteredDoctors.map((availableDoctor) => (
-                                    <button
-                                      className={`btn text-start ${doctorId === availableDoctor.id ? "btn-primary" : "btn-outline-secondary"}`}
-                                      type="button"
-                                      key={availableDoctor.id}
-                                      onClick={() => {
-                                        setDoctorId(availableDoctor.id);
-                                        closeDoctorSelectionModal();
-                                      }}
-                                    >
-                                      {availableDoctor.lastName} {availableDoctor.firstName}
-                                    </button>
-                                  ))}
-                                  {filteredDoctors.length === 0 && <div className="text-secondary">Nessun medico trovato.</div>}
+                                {doctorModalTab === "department" ? (
+                                  <div className="d-grid gap-2">
+                                    {filteredDoctors.map((availableDoctor) => (
+                                      <button className={`btn text-start ${doctorId === availableDoctor.id ? "btn-primary" : "btn-outline-secondary"}`} type="button" key={availableDoctor.id} onClick={() => { setDoctorId(availableDoctor.id); closeDoctorSelectionModal(); }}>
+                                        {availableDoctor.lastName} {availableDoctor.firstName}
+                                      </button>
+                                    ))}
+                                    {filteredDoctors.length === 0 && <div className="text-secondary border rounded p-3">Nessun medico associato a questo reparto. Puoi sceglierne uno dalla tab “Tutti i medici”.</div>}
+                                  </div>
+                                ) : (
+                                  <div className="d-grid gap-3">
+                                    {doctorsByHospital.map(({ hospital, doctors: hospitalDoctors }) => (
+                                      <section className="border rounded p-3" key={hospital.id}>
+                                        <h4 className="h6 mb-2">{hospital.name}</h4>
+                                        <div className="d-grid gap-2">
+                                          {hospitalDoctors.map((availableDoctor) => (
+                                            <button className={`btn text-start ${doctorId === availableDoctor.id ? "btn-primary" : "btn-outline-secondary"}`} type="button" key={availableDoctor.id} onClick={() => { setDoctorId(availableDoctor.id); closeDoctorSelectionModal(); }}>
+                                              {availableDoctor.lastName} {availableDoctor.firstName}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </section>
+                                    ))}
+                                    {doctorsWithoutHospital.length > 0 && <section className="border rounded p-3"><h4 className="h6 mb-2">Senza ospedale associato</h4><div className="d-grid gap-2">{doctorsWithoutHospital.map((availableDoctor) => <button className={`btn text-start ${doctorId === availableDoctor.id ? "btn-primary" : "btn-outline-secondary"}`} type="button" key={availableDoctor.id} onClick={() => { setDoctorId(availableDoctor.id); closeDoctorSelectionModal(); }}>{availableDoctor.lastName} {availableDoctor.firstName}</button>)}</div></section>}
+                                    {doctorsByHospital.length === 0 && doctorsWithoutHospital.length === 0 && <div className="text-secondary">Nessun medico trovato.</div>}
+                                  </div>
+                                )}
+                              </div>
+                            </section>
+                          </div>
+                        </>
+                      )}
+                      {recommendedDoctorsModalOpen && (
+                        <>
+                          <button className="entity-modal-backdrop" type="button" aria-label="Chiudi selezione medici consigliati" onClick={closeRecommendedDoctorsModal} />
+                          <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="recommended-doctors-title">
+                            <section className="card entity-modal-card">
+                              <div className="card-header d-flex align-items-center justify-content-between gap-2">
+                                <h3 className="card-title mb-0" id="recommended-doctors-title">Medici consigliati</h3>
+                                <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeRecommendedDoctorsModal} />
+                              </div>
+                              <div className="card-body">
+                                <div className="nav nav-tabs mb-3" role="tablist" aria-label="Tipologia elenco medici consigliati">
+                                  <button className={`nav-link ${recommendedDoctorModalTab === "department" ? "active" : ""}`} type="button" role="tab" aria-selected={recommendedDoctorModalTab === "department"} onClick={() => setRecommendedDoctorModalTab("department")}>Medici del reparto</button>
+                                  <button className={`nav-link ${recommendedDoctorModalTab === "all" ? "active" : ""}`} type="button" role="tab" aria-selected={recommendedDoctorModalTab === "all"} onClick={() => setRecommendedDoctorModalTab("all")}>Tutti i medici</button>
                                 </div>
+                                <label className="form-label" htmlFor="recommended-doctor-search">Cerca per nome</label>
+                                <input className="form-control mb-3" id="recommended-doctor-search" type="search" value={doctorSearch} onChange={(event) => setDoctorSearch(event.target.value)} placeholder="Inserisci nome o cognome" autoFocus />
+                                {recommendedDoctorModalTab === "department" ? (
+                                  <div className="d-grid gap-2 border rounded p-3">
+                                    {filteredDoctors.map((availableDoctor) => <label className="form-check" key={availableDoctor.id}><input className="form-check-input" type="checkbox" checked={recommendedDoctorIds.includes(availableDoctor.id)} onChange={() => toggleRecommendedDoctor(availableDoctor.id)} /><span className="form-check-label">{availableDoctor.lastName} {availableDoctor.firstName}</span></label>)}
+                                    {filteredDoctors.length === 0 && <div className="text-secondary">Nessun medico associato a questo reparto. Puoi usare la tab “Tutti i medici”.</div>}
+                                  </div>
+                                ) : (
+                                  <div className="d-grid gap-3">
+                                    {doctorsByHospital.map(({ hospital, doctors: hospitalDoctors }) => {
+                                      const selectableDoctors = hospitalDoctors;
+                                      return selectableDoctors.length > 0 && <section className="border rounded p-3" key={hospital.id}><h4 className="h6 mb-2">{hospital.name}</h4><div className="d-grid gap-2">{selectableDoctors.map((availableDoctor) => <label className="form-check" key={availableDoctor.id}><input className="form-check-input" type="checkbox" checked={recommendedDoctorIds.includes(availableDoctor.id)} onChange={() => toggleRecommendedDoctor(availableDoctor.id)} /><span className="form-check-label">{availableDoctor.lastName} {availableDoctor.firstName}</span></label>)}</div></section>;
+                                    })}
+                                    {doctorsWithoutHospital.length > 0 && <section className="border rounded p-3"><h4 className="h6 mb-2">Senza ospedale associato</h4><div className="d-grid gap-2">{doctorsWithoutHospital.map((availableDoctor) => <label className="form-check" key={availableDoctor.id}><input className="form-check-input" type="checkbox" checked={recommendedDoctorIds.includes(availableDoctor.id)} onChange={() => toggleRecommendedDoctor(availableDoctor.id)} /><span className="form-check-label">{availableDoctor.lastName} {availableDoctor.firstName}</span></label>)}</div></section>}
+                                    {searchedVisibleDoctors.length === 0 && <div className="text-secondary">Nessun medico trovato.</div>}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="card-footer d-flex justify-content-end">
+                                <button className="btn btn-primary" type="button" onClick={closeRecommendedDoctorsModal}>Conferma</button>
                               </div>
                             </section>
                           </div>
@@ -1540,6 +1738,10 @@ export const Patients = ({
                                 <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeCasSelectionModal} />
                               </div>
                               <div className="card-body">
+                                <div className="nav nav-tabs mb-3" role="tablist" aria-label="Tipologia elenco CAS">
+                                  <button className={`nav-link ${casModalTab === "recommended" ? "active" : ""}`} type="button" role="tab" aria-selected={casModalTab === "recommended"} onClick={() => setCasModalTab("recommended")}>CAS consigliati</button>
+                                  <button className={`nav-link ${casModalTab === "all" ? "active" : ""}`} type="button" role="tab" aria-selected={casModalTab === "all"} onClick={() => setCasModalTab("all")}>Tutti i CAS</button>
+                                </div>
                                 <label className="form-label" htmlFor="cas-search">Cerca per nome</label>
                                 <input className="form-control mb-3" id="cas-search" type="search" value={casSearch} onChange={(event) => setCasSearch(event.target.value)} placeholder="Inserisci il nome" autoFocus />
                                 <div className="d-grid gap-2">
@@ -1550,6 +1752,7 @@ export const Patients = ({
                                       key={casUser.id}
                                       onClick={() => {
                                         setCasId(casUser.id);
+                                        setGvpIds(visibleGvpUsers.filter((user) => isGvpAssignedToCas(user, casUser.id)).map((user) => user.id));
                                         closeCasSelectionModal();
                                       }}
                                     >
@@ -1557,7 +1760,7 @@ export const Patients = ({
                                       {isAbsentOnAdmissionDate(casUser.id) ? ` — ${getAbsenceLabel(casUser.id)}` : ""}
                                     </button>
                                   ))}
-                                  {filteredCasUsers.length === 0 && <div className="text-secondary">Nessun CAS trovato.</div>}
+                                  {filteredCasUsers.length === 0 && <div className="text-secondary">{casModalTab === "recommended" ? "Nessun CAS associato a questo reparto. Puoi usare la tab “Tutti i CAS”." : "Nessun CAS trovato."}</div>}
                                 </div>
                               </div>
                             </section>
@@ -1574,6 +1777,10 @@ export const Patients = ({
                                 <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeGvpSelectionModal} />
                               </div>
                               <div className="card-body">
+                                <div className="nav nav-tabs mb-3" role="tablist" aria-label="Tipologia elenco GVP">
+                                  <button className={`nav-link ${gvpModalTab === "recommended" ? "active" : ""}`} type="button" role="tab" aria-selected={gvpModalTab === "recommended"} onClick={() => setGvpModalTab("recommended")}>GVP del CAS</button>
+                                  <button className={`nav-link ${gvpModalTab === "all" ? "active" : ""}`} type="button" role="tab" aria-selected={gvpModalTab === "all"} onClick={() => setGvpModalTab("all")}>Tutti i GVP</button>
+                                </div>
                                 <label className="form-label" htmlFor="main-gvp-search">Cerca per nome</label>
                                 <input className="form-control mb-3" id="main-gvp-search" type="search" value={gvpSearch} onChange={(event) => setGvpSearch(event.target.value)} placeholder="Inserisci il nome" autoFocus />
                                 <div className="d-grid gap-2 border rounded p-3">
@@ -1583,7 +1790,7 @@ export const Patients = ({
                                       <span className="form-check-label">{getGvpDisplayName(gvpUser)}{isAbsentOnAdmissionDate(gvpUser.id) && <span className="badge text-bg-warning ms-2">{getAbsenceLabel(gvpUser.id)}</span>}</span>
                                     </label>
                                   ))}
-                                  {associatedGvpUsers.length + unassociatedGvpUsers.length === 0 && <div className="text-secondary">Nessun GVP trovato.</div>}
+                                  {associatedGvpUsers.length + unassociatedGvpUsers.length === 0 && <div className="text-secondary">{gvpModalTab === "recommended" ? "Nessun GVP assegnato al CAS selezionato. Puoi usare la tab “Tutti i GVP”." : "Nessun GVP trovato."}</div>}
                                 </div>
                               </div>
                               <div className="card-footer d-flex justify-content-end">
@@ -2111,11 +2318,7 @@ export const Patients = ({
                         </td>
                       </tr>
                     ) : (
-                      [...visiblePatients]
-                        .sort((first, second) =>
-                          first.lastName.localeCompare(second.lastName),
-                        )
-                        .map((patient) => {
+                      patientPagination.pageItems.map((patient) => {
                           if (isGvp) {
                             return (
                               <tr
@@ -2216,6 +2419,7 @@ export const Patients = ({
                   </tbody>
                 </table>
               </div>
+              <PaginationControls {...patientPagination} />
             </div>
           </section>
         </div>

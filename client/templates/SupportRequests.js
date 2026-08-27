@@ -31,7 +31,7 @@ export const SupportRequests = ({ requests, currentUser }) => {
   });
 
   return <>
-    <div className="app-content-header"><div className="container-fluid"><h1 className="mb-0">Segnalazioni e richieste</h1></div></div>
+    <div className="app-content-header"><div className="container-fluid"><h1 className="mb-1">Segnalazioni e richieste</h1><p className="text-secondary mb-0">Invia richieste di assistenza e monitora le segnalazioni aperte.</p></div></div>
     <div className="app-content"><div className="container-fluid"><div className="row g-3">
       {currentUser.role !== "Admin" && <div className="col-12 col-xl-5"><section className="card"><div className="card-header"><h2 className="card-title">Nuovo messaggio</h2></div><form onSubmit={submit}>
         <div className="card-body">{feedback.message && <div className={`alert alert-${feedback.type}`} role="status">{feedback.message}</div>}<div className="row g-3">

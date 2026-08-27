@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
+import { PaginationControls, usePagination } from "./Pagination.js";
 
 const doctorTypes = [
   "Consulente",
@@ -62,6 +63,14 @@ export const Doctors = ({
       );
     return matchesName && matchesType && matchesHospital;
   });
+  const sortedDoctors = [...filteredDoctors].sort((first, second) =>
+    (first.lastName || "").localeCompare(second.lastName || ""),
+  );
+  const doctorPagination = usePagination(
+    sortedDoctors,
+    25,
+    `${normalizedNameFilter}:${typeFilter}:${hospitalFilter}`,
+  );
   const hasActiveFilters = Boolean(normalizedNameFilter) ||
     typeFilter !== "all" || hospitalFilter !== "all";
   const availableDepartmentIds = new Set(
@@ -101,11 +110,9 @@ export const Doctors = ({
 
     if (
       !normalizedFirstName ||
-      !normalizedLastName ||
-      !normalizedPhone ||
-      !normalizedEmail
+      !normalizedLastName
     ) {
-      setError("Inserisci nome, cognome, telefono ed email del medico.");
+      setError("Inserisci nome e cognome del medico.");
       return;
     }
 
@@ -130,7 +137,7 @@ export const Doctors = ({
       return;
     }
 
-    const emailExists = doctors.some(
+    const emailExists = normalizedEmail && doctors.some(
       (doctor) =>
         doctor.email?.toLowerCase() === normalizedEmail &&
         doctor.id !== editingId,
@@ -248,7 +255,7 @@ export const Doctors = ({
       <div className="app-content-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
-            <h1 className="mb-0">Medici</h1>
+            <div><h1 className="mb-1">Medici</h1><p className="text-secondary mb-0">Gestisci i contatti dei medici e le indicazioni sugli studi in cui ricevono.</p></div>
             <button
               className="btn btn-primary"
               type="button"
@@ -335,7 +342,7 @@ export const Doctors = ({
 
                     <div className="mt-3">
                       <label className="form-label" htmlFor="doctor-phone">
-                        Telefono
+                        Telefono <span className="text-secondary">(facoltativo)</span>
                       </label>
                       <input
                         className="form-control"
@@ -347,13 +354,12 @@ export const Doctors = ({
                           setError("");
                         }}
                         autoComplete="tel"
-                        required
                       />
                     </div>
 
                     <div className="mt-3">
                       <label className="form-label" htmlFor="doctor-email">
-                        Email
+                        Email <span className="text-secondary">(facoltativa)</span>
                       </label>
                       <input
                         className="form-control"
@@ -365,7 +371,6 @@ export const Doctors = ({
                           setError("");
                         }}
                         autoComplete="email"
-                        required
                       />
                     </div>
 
@@ -381,7 +386,6 @@ export const Doctors = ({
                           setDoctorType(event.target.value);
                           setError("");
                         }}
-                        required
                       >
                         {doctorTypes.map((type) => (
                           <option key={type} value={type}>{type}</option>
@@ -558,11 +562,7 @@ export const Doctors = ({
                             </td>
                           </tr>
                         ) : (
-                          [...filteredDoctors]
-                            .sort((first, second) =>
-                              first.lastName.localeCompare(second.lastName),
-                            )
-                            .map((doctor) => {
+                          doctorPagination.pageItems.map((doctor) => {
                               const departmentLabels =
                                 getDepartmentLabels(doctor);
 
@@ -636,6 +636,7 @@ export const Doctors = ({
                       </tbody>
                     </table>
                   </div>
+                  <PaginationControls {...doctorPagination} />
                 </div>
               </section>
             </div>

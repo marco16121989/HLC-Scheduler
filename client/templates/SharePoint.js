@@ -4,7 +4,7 @@ export const SharePoint = () => (
   <>
     <div className="app-content-header">
       <div className="container-fluid d-flex align-items-center justify-content-between gap-3">
-        <h1 className="mb-0">Share Point</h1>
+        <div><h1 className="mb-1">Share Point</h1><p className="text-secondary mb-0">Accedi allo spazio condiviso per consultare documenti e risorse.</p></div>
         <a className="btn btn-outline-primary" href={SHAREPOINT_URL} target="_blank" rel="noreferrer">
           Apri in una nuova scheda
         </a>

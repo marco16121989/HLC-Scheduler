@@ -5,7 +5,7 @@ export const Settings = ({ theme, onToggleTheme, fontSize, onFontSizeChange, hig
   const fontSizeIndex = Math.max(0, fontSizes.indexOf(fontSize));
 
   return <>
-    <div className="app-content-header"><div className="container-fluid"><h1 className="mb-0">Impostazioni</h1></div></div>
+    <div className="app-content-header"><div className="container-fluid"><h1 className="mb-1">Impostazioni</h1><p className="text-secondary mb-0">Personalizza l’aspetto e il comportamento dell’applicazione.</p></div></div>
     <div className="app-content"><div className="container-fluid"><div className="row justify-content-center"><div className="col-12 col-lg-8">
       <section className="card settings-card">
         <div className="card-header settings-card-header"><h2 className="card-title mb-1">Aspetto</h2><p className="settings-card-description mb-0">Personalizza la visualizzazione del software.</p></div>
