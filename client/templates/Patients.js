@@ -40,6 +40,11 @@ const getPatientGvpIds = (patient) =>
       ? [patient.gvpId]
       : [];
 
+const getPatientCasIds = (patient) => [...new Set([
+  ...(Array.isArray(patient?.casIds) ? patient.casIds : []),
+  patient?.casId,
+].filter(Boolean))];
+
 const getGvpNotes = (patient) => {
   if (Array.isArray(patient?.gvpNotes)) return patient.gvpNotes;
   if (typeof patient?.gvpNotes === "string" && patient.gvpNotes.trim()) {
@@ -295,6 +300,9 @@ export const Patients = ({
   const [casId, setCasId] = useState(
     currentUser.role === "CAS" ? currentUser.id : "",
   );
+  const [casIds, setCasIds] = useState(
+    currentUser.role === "CAS" ? [currentUser.id] : [],
+  );
   const [gvpIds, setGvpIds] = useState([]);
   const [casFilter, setCasFilter] = useState(
     currentUser.role === "CAS" ? currentUser.id : "all",
@@ -343,11 +351,11 @@ export const Patients = ({
   const roleFilteredPatients = isGvp
     ? organizationPatients.filter((patient) => {
         const patientGvpIds = getPatientGvpIds(patient);
-        const isMine = patientGvpIds.includes(currentUser.id) || patient.casId === currentUser.id;
+        const isMine = patientGvpIds.includes(currentUser.id) || getPatientCasIds(patient).includes(currentUser.id);
         return gvpPatientScope === "all" ? true : isMine;
       })
     : currentUser.role === "CAS" && casFilter !== "all"
-      ? organizationPatients.filter((patient) => patient.casId === casFilter)
+      ? organizationPatients.filter((patient) => getPatientCasIds(patient).includes(casFilter))
       : organizationPatients;
   const visiblePatients = statusFilter === "all"
     ? roleFilteredPatients
@@ -480,7 +488,24 @@ export const Patients = ({
     user.casId,
     user.associationId,
   ].filter(Boolean).includes(selectedCasId);
-  const recommendedGvpUsers = visibleGvpUsers.filter((user) => isGvpAssignedToCas(user, casId));
+  const isGvpAssignedToDepartment = (user, department) => {
+    if (!department) return false;
+    const assignments = Array.isArray(user.hospitalAssignments)
+      ? user.hospitalAssignments
+      : user.hospitalId
+        ? [{ hospitalId: user.hospitalId, departmentIds: user.departmentId ? [user.departmentId] : [] }]
+        : [];
+    return assignments.some((assignment) => {
+      const assignmentDepartmentIds = Array.isArray(assignment.departmentIds)
+        ? assignment.departmentIds
+        : [];
+      return assignment.hospitalId === department.hospitalId &&
+        (assignmentDepartmentIds.length === 0 || assignmentDepartmentIds.includes(department.id));
+    });
+  };
+  const recommendedGvpUsers = visibleGvpUsers.filter((user) =>
+    casIds.some((selectedCasId) => isGvpAssignedToCas(user, selectedCasId)) || isGvpAssignedToDepartment(user, selectedDepartment),
+  );
   const gvpUsersForActiveTab = gvpModalTab === "recommended" ? recommendedGvpUsers : visibleGvpUsers;
   const associatedGvpUsers = gvpUsersForActiveTab.filter((user) => gvpIds.includes(user.id)).filter((user) => {
     if (!normalizedGvpSearch) return true;
@@ -502,6 +527,7 @@ export const Patients = ({
     setDoctorId("");
     setRecommendedDoctorIds([]);
     setCasId(currentUser.role === "CAS" ? currentUser.id : "");
+    setCasIds(currentUser.role === "CAS" ? [currentUser.id] : []);
     setGvpIds([]);
     setNotes("");
     setNewGvpNote("");
@@ -604,12 +630,8 @@ export const Patients = ({
       hospitalDepartment: department.name,
     }));
 
-    const eligibleCasUsers = visibleCasUsers.filter((user) => isCasAssignedToDepartment(user, department));
-    const preferredCas = eligibleCasUsers.find((user) => user.id === currentUser.id) || eligibleCasUsers[0];
-    setCasId(preferredCas?.id || "");
-    setGvpIds(preferredCas
-      ? visibleGvpUsers.filter((user) => isGvpAssignedToCas(user, preferredCas.id)).map((user) => user.id)
-      : []);
+    setCasId("");
+    setCasIds([]);
 
     const eligibleDoctors = visibleDoctors.filter((availableDoctor) =>
       (Array.isArray(availableDoctor.departmentIds)
@@ -651,9 +673,10 @@ export const Patients = ({
           visibleDoctors.some((doctor) => doctor.id === selectedDoctorId),
         )
       : [];
-    const validCasId = selectedDepartment && visibleCasUsers.some((user) => user.id === casId)
-      ? casId
-      : "";
+    const validCasIds = selectedDepartment
+      ? casIds.filter((selectedCasId) => visibleCasUsers.some((user) => user.id === selectedCasId))
+      : [];
+    const validCasId = validCasIds[0] || "";
     const validGvpIds = gvpIds.filter((gvpUserId) => users.some(
       (user) =>
         user.id === gvpUserId &&
@@ -720,6 +743,7 @@ export const Patients = ({
       doctorId: validDoctorId,
       recommendedDoctorIds: validRecommendedDoctorIds,
       casId: validCasId,
+      casIds: validCasIds,
       gvpIds: validGvpIds,
       gvpId: validGvpIds[0] || "",
       notes: normalizedNotes,
@@ -817,6 +841,7 @@ export const Patients = ({
     setDoctorId(patient.doctorId || "");
     setRecommendedDoctorIds(Array.isArray(patient.recommendedDoctorIds) ? patient.recommendedDoctorIds : []);
     setCasId(patient.casId || "");
+    setCasIds(getPatientCasIds(patient));
     setGvpIds(getPatientGvpIds(patient));
     setNotes(patient.notes || "");
     setDetails({
@@ -931,7 +956,7 @@ export const Patients = ({
 
   const openNotes = (patient) => {
     const isAssigned = currentUser.role === "CAS"
-      ? patient.casId === currentUser.id
+      ? getPatientCasIds(patient).includes(currentUser.id)
       : currentUser.role === "GVP" && getPatientGvpIds(patient).includes(currentUser.id);
     if (isAssigned) {
       notifications
@@ -962,7 +987,7 @@ export const Patients = ({
 
   const getUnreadNoteCount = (patient) => {
     const isAssigned = currentUser.role === "CAS"
-      ? patient.casId === currentUser.id
+      ? getPatientCasIds(patient).includes(currentUser.id)
       : currentUser.role === "GVP" && getPatientGvpIds(patient).includes(currentUser.id);
     if (!isAssigned) return 0;
     return notifications.filter((notification) =>
@@ -1003,7 +1028,8 @@ export const Patients = ({
 
   const doctor = doctors.find((item) => item.id === doctorId);
   const recommendedDoctors = visibleDoctors.filter((item) => recommendedDoctorIds.includes(item.id));
-  const selectedCasUser = users.find((item) => item.id === casId);
+  const selectedCasUsers = users.filter((item) => casIds.includes(item.id));
+  const selectedCasUser = selectedCasUsers[0];
   const selectedGvpUsers = users.filter((item) => gvpIds.includes(item.id));
 
   const summaryEntries = [
@@ -1019,7 +1045,7 @@ export const Patients = ({
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
     { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ") : "Nessun medico consigliato" },
     { label: "Reparto", value: selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Non assegnato" },
-    { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
+    { label: "CAS", value: selectedCasUsers.length > 0 ? selectedCasUsers.map((user) => user.username).join(", ") : "Non assegnato" },
     { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato" },
     ...DETAIL_SECTIONS.flatMap((section) =>
       section.fields.map((field) => ({
@@ -1065,7 +1091,7 @@ export const Patients = ({
     { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ") : "Nessun medico consigliato" },
     { label: "Numero camera", value: details.hospitalRoom },
     { label: "Numero letto", value: details.hospitalBed },
-    { label: "CAS", value: selectedCasUser?.username || "Non assegnato" },
+    { label: "CAS", value: selectedCasUsers.length > 0 ? selectedCasUsers.map((user) => user.username).join(", ") : "Non assegnato" },
     { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato" },
     { label: "Reparto", value: selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Non assegnato" },
     ...SIMPLIFIED_FIELDS
@@ -1469,7 +1495,7 @@ export const Patients = ({
                         <div className="col-12 col-md-6 col-xl">
                           <div className="form-label">CAS</div>
                           <button className="btn btn-outline-primary w-100" type="button" onClick={openCasSelectionModal} disabled={!selectedDepartment || visibleCasUsers.length === 0}>
-                            {!selectedDepartment ? "Seleziona prima il reparto" : selectedCasUser ? selectedCasUser.username : "Seleziona CAS"}
+                            {!selectedDepartment ? "Seleziona prima il reparto" : selectedCasUsers.length > 0 ? selectedCasUsers.map((user) => user.username).join(", ") : "Seleziona CAS"}
                           </button>
                         </div>
                         <div className="col-12 col-md-6 col-xl">
@@ -1746,22 +1772,20 @@ export const Patients = ({
                                 <input className="form-control mb-3" id="cas-search" type="search" value={casSearch} onChange={(event) => setCasSearch(event.target.value)} placeholder="Inserisci il nome" autoFocus />
                                 <div className="d-grid gap-2">
                                   {filteredCasUsers.map((casUser) => (
-                                    <button
-                                      className={`btn text-start ${casId === casUser.id ? "btn-primary" : "btn-outline-secondary"}`}
-                                      type="button"
-                                      key={casUser.id}
-                                      onClick={() => {
-                                        setCasId(casUser.id);
-                                        setGvpIds(visibleGvpUsers.filter((user) => isGvpAssignedToCas(user, casUser.id)).map((user) => user.id));
-                                        closeCasSelectionModal();
-                                      }}
-                                    >
-                                      {casUser.username}{casUser.id === currentUser.id ? " (io)" : ""}
-                                      {isAbsentOnAdmissionDate(casUser.id) ? ` — ${getAbsenceLabel(casUser.id)}` : ""}
-                                    </button>
+                                    <label className="form-check border rounded p-2 ps-5" key={casUser.id}>
+                                      <input className="form-check-input" type="checkbox" checked={casIds.includes(casUser.id)} onChange={() => {
+                                        const nextCasIds = casIds.includes(casUser.id) ? casIds.filter((id) => id !== casUser.id) : [...casIds, casUser.id];
+                                        setCasIds(nextCasIds);
+                                        setCasId(nextCasIds[0] || "");
+                                      }} />
+                                      <span className="form-check-label">{casUser.username}{casUser.id === currentUser.id ? " (io)" : ""}{isAbsentOnAdmissionDate(casUser.id) ? ` — ${getAbsenceLabel(casUser.id)}` : ""}</span>
+                                    </label>
                                   ))}
                                   {filteredCasUsers.length === 0 && <div className="text-secondary">{casModalTab === "recommended" ? "Nessun CAS associato a questo reparto. Puoi usare la tab “Tutti i CAS”." : "Nessun CAS trovato."}</div>}
                                 </div>
+                              </div>
+                              <div className="card-footer d-flex justify-content-end">
+                                <button className="btn btn-primary" type="button" onClick={closeCasSelectionModal}>Conferma</button>
                               </div>
                             </section>
                           </div>
@@ -1778,7 +1802,7 @@ export const Patients = ({
                               </div>
                               <div className="card-body">
                                 <div className="nav nav-tabs mb-3" role="tablist" aria-label="Tipologia elenco GVP">
-                                  <button className={`nav-link ${gvpModalTab === "recommended" ? "active" : ""}`} type="button" role="tab" aria-selected={gvpModalTab === "recommended"} onClick={() => setGvpModalTab("recommended")}>GVP del CAS</button>
+                                  <button className={`nav-link ${gvpModalTab === "recommended" ? "active" : ""}`} type="button" role="tab" aria-selected={gvpModalTab === "recommended"} onClick={() => setGvpModalTab("recommended")}>GVP consigliati</button>
                                   <button className={`nav-link ${gvpModalTab === "all" ? "active" : ""}`} type="button" role="tab" aria-selected={gvpModalTab === "all"} onClick={() => setGvpModalTab("all")}>Tutti i GVP</button>
                                 </div>
                                 <label className="form-label" htmlFor="main-gvp-search">Cerca per nome</label>
@@ -1787,10 +1811,15 @@ export const Patients = ({
                                   {[...associatedGvpUsers, ...unassociatedGvpUsers].map((gvpUser) => (
                                     <label className="form-check" key={gvpUser.id}>
                                       <input className="form-check-input" type="checkbox" checked={gvpIds.includes(gvpUser.id)} onChange={() => toggleGvpSelection(gvpUser)} />
-                                      <span className="form-check-label">{getGvpDisplayName(gvpUser)}{isAbsentOnAdmissionDate(gvpUser.id) && <span className="badge text-bg-warning ms-2">{getAbsenceLabel(gvpUser.id)}</span>}</span>
+                                      <span className="form-check-label">
+                                        {getGvpDisplayName(gvpUser)}
+                                        {gvpModalTab === "recommended" && casIds.some((selectedCasId) => isGvpAssignedToCas(gvpUser, selectedCasId)) && <span className="badge text-bg-info ms-2">CAS</span>}
+                                        {gvpModalTab === "recommended" && isGvpAssignedToDepartment(gvpUser, selectedDepartment) && <span className="badge text-bg-secondary ms-2">Reparto</span>}
+                                        {isAbsentOnAdmissionDate(gvpUser.id) && <span className="badge text-bg-warning ms-2">{getAbsenceLabel(gvpUser.id)}</span>}
+                                      </span>
                                     </label>
                                   ))}
-                                  {associatedGvpUsers.length + unassociatedGvpUsers.length === 0 && <div className="text-secondary">{gvpModalTab === "recommended" ? "Nessun GVP assegnato al CAS selezionato. Puoi usare la tab “Tutti i GVP”." : "Nessun GVP trovato."}</div>}
+                                  {associatedGvpUsers.length + unassociatedGvpUsers.length === 0 && <div className="text-secondary">{gvpModalTab === "recommended" ? "Nessun GVP associato al CAS o al reparto selezionato. Puoi usare la tab “Tutti i GVP”." : "Nessun GVP trovato."}</div>}
                                 </div>
                               </div>
                               <div className="card-footer d-flex justify-content-end">
@@ -2339,9 +2368,7 @@ export const Patients = ({
                               </tr>
                             );
                           }
-                          const casUser = users.find(
-                            (item) => item.id === patient.casId,
-                          );
+                          const casUsers = users.filter((item) => getPatientCasIds(patient).includes(item.id));
                           const gvpUsers = users.filter((item) =>
                             getPatientGvpIds(patient).includes(item.id),
                           );
@@ -2400,7 +2427,7 @@ export const Patients = ({
                                 : "-"}
                             </td>
                             <td data-label="CAS">
-                              {casUser?.username || (
+                              {casUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{casUsers.map((casUser) => <span className="badge text-bg-success" key={casUser.id}>{casUser.username}</span>)}</div> : (
                                 <span className="badge text-bg-warning">
                                   Non assegnato
                                 </span>

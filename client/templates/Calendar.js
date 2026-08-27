@@ -160,7 +160,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
     : null;
   const patientDetails = selectedPatient?.details || {};
   const selectedCas = selectedPatient
-    ? users.find((user) => user.id === selectedPatient.casId)
+    ? users.find((user) => user.id === (selectedPatient.casIds?.[0] || selectedPatient.casId))
     : null;
   const selectedGvpIds = selectedPatient
     ? (Array.isArray(selectedPatient.gvpIds)

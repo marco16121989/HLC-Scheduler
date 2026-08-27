@@ -48,8 +48,9 @@ export const PatientReports = ({ patients = [], hospitals = [], users = [], curr
       const ids = Array.isArray(patient.gvpIds) ? patient.gvpIds : patient.gvpId ? [patient.gvpId] : [];
       if (!ids.includes(currentUser.id)) return false;
     }
-    if (casFilter === "none" && patient.casId) return false;
-    if (!["all", "none"].includes(casFilter) && patient.casId !== casFilter) return false;
+    const patientCasIds = [...new Set([...(patient.casIds || []), patient.casId].filter(Boolean))];
+    if (casFilter === "none" && patientCasIds.length > 0) return false;
+    if (!["all", "none"].includes(casFilter) && !patientCasIds.includes(casFilter)) return false;
     return year === "all" || patient.admissionDate?.startsWith(year);
   }), [patients, presidentId, currentUser, year, casFilter]);
 

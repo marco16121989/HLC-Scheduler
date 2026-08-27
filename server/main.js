@@ -135,8 +135,13 @@ export const getAssignedGvpIds = (patient) => [...new Set([
   patient?.gvpId,
 ].filter(Boolean))];
 
-export const getPatientCoordinatorIds = (patient) => [...new Set([
+export const getAssignedCasIds = (patient) => [...new Set([
+  ...(Array.isArray(patient?.casIds) ? patient.casIds : []),
   patient?.casId,
+].filter(Boolean))];
+
+export const getPatientCoordinatorIds = (patient) => [...new Set([
+  ...getAssignedCasIds(patient),
   patient?.presidentId,
 ].filter(Boolean))];
 
@@ -188,7 +193,7 @@ const replaceRecords = async (collection, records, scope = {}) => {
 
 const validatePatientAssignments = async (records, presidentId) => {
   if (!presidentId) return;
-  const casIds = [...new Set(records.map((record) => record.casId).filter(Boolean))];
+  const casIds = [...new Set(records.flatMap((record) => getAssignedCasIds(record)))];
   const gvpIds = [...new Set(records.flatMap((record) => getAssignedGvpIds(record)))];
   const assignedIds = [...new Set([...casIds, ...gvpIds])];
   if (assignedIds.length > 0) {
@@ -340,6 +345,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         { fields: {
           presidentId: 1,
           casId: 1,
+          casIds: 1,
           gvpId: 1,
           gvpIds: 1,
           firstName: 1,
@@ -387,6 +393,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
     PatientsCollection.find(dataSelector, { fields: {
       presidentId: 1,
       casId: 1,
+      casIds: 1,
       gvpId: 1,
       gvpIds: 1,
       firstName: 1,
@@ -1032,11 +1039,11 @@ Meteor.methods({
         _id: { $nin: recordIds },
       };
       deletedPatients = await PatientsCollection.find(deletedPatientSelector, {
-        fields: { firstName: 1, lastName: 1, presidentId: 1, casId: 1, gvpId: 1, gvpIds: 1 },
+        fields: { firstName: 1, lastName: 1, presidentId: 1, casId: 1, casIds: 1, gvpId: 1, gvpIds: 1 },
       }).fetchAsync();
       const previousPatients = await PatientsCollection.find(
         { _id: { $in: recordIds }, ...(presidentId ? { presidentId } : {}) },
-        { fields: { casId: 1, gvpId: 1, gvpIds: 1, status: 1 } },
+        { fields: { casId: 1, casIds: 1, gvpId: 1, gvpIds: 1, status: 1 } },
       ).fetchAsync();
       const previousPatientsById = new Map(previousPatients.map((patient) => [patient._id, patient]));
       for (const record of records) {
@@ -1045,7 +1052,7 @@ Meteor.methods({
         const previous = previousPatientsById.get(recordId);
         const previousIds = getAssignedGvpIds(previous);
         previousPatientAssignments.set(recordId, new Set(previousIds.filter(Boolean)));
-        previousPatientCasAssignments.set(recordId, previous?.casId || "");
+        previousPatientCasAssignments.set(recordId, new Set(getAssignedCasIds(previous)));
         previousPatientStatuses.set(recordId, previous?.status || "");
       }
     }
@@ -1079,8 +1086,10 @@ Meteor.methods({
         const removedGvpIds = [...previousIds]
           .filter((gvpId) => !currentIds.includes(gvpId));
 
-        if (role === "Presidente" && isNewCasAssignment(previousPatientCasAssignments.get(recordId), record.casId)) {
-          const recipient = await Meteor.users.findOneAsync(record.casId, { fields: publicUserFields });
+        const previousCasIds = previousPatientCasAssignments.get(recordId) || new Set();
+        const newlyAssignedCasIds = getAssignedCasIds(record).filter((assignedCasId) => !previousCasIds.has(assignedCasId));
+        for (const assignedCasId of role === "Presidente" ? newlyAssignedCasIds : []) {
+          const recipient = await Meteor.users.findOneAsync(assignedCasId, { fields: publicUserFields });
           if (recipient?.profile?.role === "CAS") {
             const patientName = `${record.lastName || ""} ${record.firstName || ""}`.trim();
             await insertNotification({
@@ -1450,6 +1459,7 @@ const ensurePerformanceIndexes = async () => {
   await Promise.all([
     PatientsCollection.rawCollection().createIndex({ presidentId: 1, status: 1, lastName: 1 }),
     PatientsCollection.rawCollection().createIndex({ presidentId: 1, casId: 1, status: 1 }),
+    PatientsCollection.rawCollection().createIndex({ presidentId: 1, casIds: 1, status: 1 }),
     PatientsCollection.rawCollection().createIndex({ presidentId: 1, gvpIds: 1, status: 1 }),
     PatientsCollection.rawCollection().createIndex({ presidentId: 1, admissionDate: 1 }),
     DoctorsCollection.rawCollection().createIndex({ presidentId: 1, lastName: 1, firstName: 1 }),

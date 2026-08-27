@@ -327,7 +327,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
         ))
       : [];
     const validCasId = validCasIds[0] || "";
-    const hospitalAssignments = role === "CAS"
+    const hospitalAssignments = ["CAS", "GVP"].includes(role)
       ? formHospitalAssignments.flatMap((assignment) => {
           const hospital = availableHospitals.find(
             (item) => item.id === assignment.hospitalId,
@@ -597,7 +597,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   };
 
   const getHospitalLabels = (user) =>
-    user.role === "CAS"
+    ["CAS", "GVP"].includes(user.role)
       ? getHospitalAssignments(user).flatMap((assignment) => {
           const hospital = hospitals.find(
             (candidate) => candidate.id === assignment.hospitalId,
@@ -859,9 +859,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                       </div>
                     )}
 
-                    {form.role === "CAS" && (
+                    {["CAS", "GVP"].includes(form.role) && (
                       <fieldset className="mb-3">
-                        <legend className="form-label">Ospedali e reparti</legend>
+                        <legend className="form-label">Ospedali e reparti associati</legend>
                         {availableHospitals.length === 0 ? (
                           <p className="text-secondary small mb-0">
                             Nessun ospedale disponibile.
@@ -894,7 +894,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                           </div>
                         )}
                         <div className="form-text">
-                          Se non selezioni reparti, il CAS viene associato all'intero ospedale.
+                          Se non selezioni reparti, il {form.role} viene associato all'intero ospedale.
                         </div>
                       </fieldset>
                     )}
@@ -1186,7 +1186,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                   )}
                                 </td>}
                                 <td data-label="Sede">
-                                  {user.role === "CAS" ? (
+                                  {["CAS", "GVP"].includes(user.role) ? (
                                     hospitalLabels.length > 0 ? (
                                       <div className="d-flex flex-wrap gap-1">
                                         {hospitalLabels.map((label) => (
