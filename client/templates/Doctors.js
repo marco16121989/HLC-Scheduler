@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
 import { PaginationControls, usePagination } from "./Pagination.js";
 
@@ -6,8 +6,60 @@ const doctorTypes = [
   "Consulente",
   "Collaborazione storica",
   "Nuova collaborazione",
+  "Non collabora",
 ];
+const doctorTypeBadgeClasses = {
+  Consulente: "text-bg-info",
+  "Collaborazione storica": "text-bg-primary",
+  "Nuova collaborazione": "text-bg-success",
+  "Non collabora": "text-bg-danger",
+};
 const professionalRoles = ["Medico", "Chirurgo", "Anestesista"];
+
+const SearchableDepartmentSelect = ({ options, value, search, onSearchChange, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const selected = options.find((option) => option.id === value);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!rootRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, [open]);
+
+  return <div className="select2-style" ref={rootRef}>
+    <button className={`form-select text-start select2-style-control ${open ? "is-open" : ""}`} id="doctor-department-filter" type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
+      {value === "all" ? "Tutti i reparti" : selected ? `${selected.name} — ${selected.hospitalName}` : "Reparto selezionato"}
+    </button>
+    {open && <div className="select2-style-dropdown">
+      <input className="form-control select2-style-search" type="search" value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Cerca reparto o ospedale" aria-label="Cerca reparto o ospedale" autoFocus />
+      <div className="select2-style-options" role="listbox">
+        <button className={`select2-style-option ${value === "all" ? "is-selected" : ""}`} type="button" role="option" aria-selected={value === "all"} onClick={() => { onSearchChange(""); onChange("all"); setOpen(false); }}>Tutti i reparti</button>
+        {options.map((option) => <button className={`select2-style-option ${value === option.id ? "is-selected" : ""}`} type="button" role="option" aria-selected={value === option.id} key={option.id} onClick={() => { onSearchChange(""); onChange(option.id); setOpen(false); }}><strong>{option.name}</strong><small>{option.hospitalName}</small></button>)}
+        {options.length === 0 && <div className="select2-style-empty">Nessun reparto trovato.</div>}
+      </div>
+    </div>}
+  </div>;
+};
+
+const DoctorNotePreview = ({ note }) => {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = note.length > 30;
+
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const timerId = globalThis.setTimeout(() => setExpanded(false), 10_000);
+    return () => globalThis.clearTimeout(timerId);
+  }, [expanded]);
+
+  return <span className="doctor-note-preview">
+    <span>{isLong && !expanded ? `${note.slice(0, 30)}…` : note}</span>
+    {isLong && <button className="doctor-note-more" type="button" aria-label={expanded ? "Riduci nota" : "Mostra nota completa"} aria-expanded={expanded} onClick={(event) => { event.stopPropagation(); setExpanded((current) => !current); }}>…</button>}
+  </span>;
+};
 
 export const Doctors = ({
   doctors,
@@ -32,6 +84,8 @@ export const Doctors = ({
   const [professionalRoleFilter, setProfessionalRoleFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [hospitalFilter, setHospitalFilter] = useState("all");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [departmentSearchFilter, setDepartmentSearchFilter] = useState("");
 
   const isEditing = editingId !== null;
   const visibleDoctors = doctors.filter(
@@ -40,6 +94,15 @@ export const Doctors = ({
   const visibleHospitals = hospitals.filter(
     (hospital) => hospital.presidentId === presidentId,
   );
+  const normalizedDepartmentSearch = departmentSearchFilter.trim().toLocaleLowerCase("it-IT");
+  const filterDepartments = visibleHospitals
+    .filter((hospital) => hospitalFilter === "all" || hospital.id === hospitalFilter)
+    .flatMap((hospital) => (hospital.departments || []).map((department) => ({
+      ...department,
+      hospitalName: hospital.name,
+    })))
+    .filter((department) => !normalizedDepartmentSearch || `${department.name || ""} ${department.hospitalName || ""}`.toLocaleLowerCase("it-IT").includes(normalizedDepartmentSearch))
+    .sort((first, second) => (first.name || "").localeCompare(second.name || "", "it-IT"));
   const normalizedNameFilter = nameFilter.trim().toLowerCase().replace(/\s+/g, " ");
   const filteredDoctors = visibleDoctors.filter((doctor) => {
     const normalizedFirstName = (doctor.firstName || "").trim().toLowerCase();
@@ -66,7 +129,15 @@ export const Doctors = ({
       (doctor.departmentIds || []).some((departmentId) =>
         hospitalDepartmentIds.has(departmentId),
       );
-    return matchesName && matchesProfessionalRole && matchesType && matchesHospital;
+    const matchesDepartment = departmentFilter === "all" || (doctor.departmentIds || []).includes(departmentFilter);
+    const matchesDepartmentSearch = !normalizedDepartmentSearch || visibleHospitals.some((hospital) =>
+      (hospitalFilter === "all" || hospital.id === hospitalFilter) &&
+      (hospital.departments || []).some((department) =>
+        (doctor.departmentIds || []).includes(department.id) &&
+        `${department.name || ""} ${hospital.name || ""}`.toLocaleLowerCase("it-IT").includes(normalizedDepartmentSearch),
+      ),
+    );
+    return matchesName && matchesProfessionalRole && matchesType && matchesHospital && matchesDepartment && matchesDepartmentSearch;
   });
   const sortedDoctors = [...filteredDoctors].sort((first, second) =>
     (first.lastName || "").localeCompare(second.lastName || ""),
@@ -74,10 +145,10 @@ export const Doctors = ({
   const doctorPagination = usePagination(
     sortedDoctors,
     25,
-    `${normalizedNameFilter}:${professionalRoleFilter}:${typeFilter}:${hospitalFilter}`,
+    `${normalizedNameFilter}:${professionalRoleFilter}:${typeFilter}:${hospitalFilter}:${departmentFilter}:${normalizedDepartmentSearch}`,
   );
   const hasActiveFilters = Boolean(normalizedNameFilter) ||
-    professionalRoleFilter !== "all" || typeFilter !== "all" || hospitalFilter !== "all";
+    professionalRoleFilter !== "all" || typeFilter !== "all" || hospitalFilter !== "all" || departmentFilter !== "all" || Boolean(normalizedDepartmentSearch);
   const availableDepartmentIds = new Set(
     visibleHospitals.flatMap((hospital) =>
       hospital.departments.map((department) => department.id),
@@ -521,7 +592,7 @@ export const Doctors = ({
                 </div>
                 <div className="card-body p-0">
                   <div className="row g-3 p-3 border-bottom doctor-list-filters">
-                    <div className="col-12 col-lg-3">
+                    <div className="col-12 col-lg-4">
                       <label className="form-label" htmlFor="doctor-name-filter">
                         Cerca medico
                       </label>
@@ -534,7 +605,7 @@ export const Doctors = ({
                         placeholder="Nome, cognome o nome completo"
                       />
                     </div>
-                    <div className="col-12 col-md-6 col-lg-3">
+                    <div className="col-12 col-md-6 col-lg-2">
                       <label className="form-label" htmlFor="doctor-professional-role-filter">
                         Professione
                       </label>
@@ -550,7 +621,7 @@ export const Doctors = ({
                         ))}
                       </select>
                     </div>
-                    <div className="col-12 col-md-6 col-lg-3">
+                    <div className="col-12 col-md-6 col-lg-2">
                       <label className="form-label" htmlFor="doctor-type-filter">
                         Tipologia
                       </label>
@@ -566,7 +637,7 @@ export const Doctors = ({
                         ))}
                       </select>
                     </div>
-                    <div className="col-12 col-md-6 col-lg-3">
+                    <div className="col-12 col-md-6 col-lg-2">
                       <label className="form-label" htmlFor="doctor-hospital-filter">
                         Ospedale
                       </label>
@@ -574,13 +645,37 @@ export const Doctors = ({
                         className="form-select"
                         id="doctor-hospital-filter"
                         value={hospitalFilter}
-                        onChange={(event) => setHospitalFilter(event.target.value)}
+                        onChange={(event) => {
+                          const nextHospitalId = event.target.value;
+                          setHospitalFilter(nextHospitalId);
+                          if (departmentFilter !== "all") {
+                            const departmentBelongsToHospital = visibleHospitals
+                              .find((hospital) => hospital.id === nextHospitalId)
+                              ?.departments?.some((department) => department.id === departmentFilter);
+                            if (nextHospitalId !== "all" && !departmentBelongsToHospital) setDepartmentFilter("all");
+                          }
+                        }}
                       >
                         <option value="all">Tutti gli ospedali</option>
                         {visibleHospitals.map((hospital) => (
                           <option key={hospital.id} value={hospital.id}>{hospital.name}</option>
                         ))}
                       </select>
+                    </div>
+                    <div className="col-12 col-md-6 col-lg-2">
+                      <label className="form-label" htmlFor="doctor-department-filter">
+                        Reparto
+                      </label>
+                      <SearchableDepartmentSelect
+                        options={filterDepartments}
+                        value={departmentFilter}
+                        search={departmentSearchFilter}
+                        onSearchChange={(value) => {
+                          setDepartmentSearchFilter(value);
+                          setDepartmentFilter("all");
+                        }}
+                        onChange={setDepartmentFilter}
+                      />
                     </div>
                   </div>
                   <div className="table-responsive">
@@ -610,6 +705,7 @@ export const Doctors = ({
                           doctorPagination.pageItems.map((doctor) => {
                               const departmentLabels =
                                 getDepartmentLabels(doctor);
+                              const doctorNote = doctor.notes || "";
 
                               return (
                               <tr
@@ -633,7 +729,7 @@ export const Doctors = ({
                                   </span>
                                 </td>
                                 <td data-label="Tipologia">
-                                  <span className="badge text-bg-info">
+                                  <span className={`badge ${doctorTypeBadgeClasses[doctor.doctorType] || "text-bg-secondary"}`}>
                                     {doctor.doctorType || "Non specificata"}
                                   </span>
                                 </td>
@@ -666,7 +762,7 @@ export const Doctors = ({
                                   )}
                                 </td>
                                 <td className="doctor-notes-cell" data-label="Note">
-                                  {doctor.notes || (
+                                  {doctorNote ? <DoctorNotePreview note={doctorNote} /> : (
                                     <span className="text-secondary">-</span>
                                   )}
                                 </td>

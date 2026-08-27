@@ -1196,6 +1196,22 @@ svg.admin-nav-icon {
   max-width: 100%;
 }
 
+.select2-style { position: relative; }
+.select2-style-control { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select2-style-control.is-open { border-color: var(--bs-primary); box-shadow: 0 0 0 .2rem rgb(13 110 253 / 18%); }
+.select2-style-dropdown { position: absolute; z-index: 1200; top: calc(100% + .3rem); right: 0; width: min(24rem,calc(100vw - 2rem)); padding: .5rem; border: 1px solid var(--bs-border-color); border-radius: .6rem; background: var(--bs-body-bg); box-shadow: 0 .75rem 2rem rgb(0 0 0 / 18%); }
+.select2-style-search { margin-bottom: .45rem; }
+.select2-style-options { max-height: 15rem; overflow-y: auto; overscroll-behavior: contain; }
+.select2-style-option { display: grid; width: 100%; padding: .55rem .65rem; border: 0; border-radius: .4rem; background: transparent; color: var(--bs-body-color); text-align: left; }
+.select2-style-option:hover,.select2-style-option:focus-visible { background: var(--bs-tertiary-bg); }
+.select2-style-option.is-selected { background: var(--bs-primary); color: #fff; }
+.select2-style-option small { color: var(--bs-secondary-color); }
+.select2-style-option.is-selected small { color: rgb(255 255 255 / 80%); }
+.select2-style-empty { padding: .75rem .65rem; color: var(--bs-secondary-color); font-size: .85rem; }
+.doctor-note-preview { display: inline; overflow-wrap: anywhere; }
+.doctor-note-more { display: inline-grid; width: 1.55rem; height: 1.35rem; margin-left: .3rem; padding: 0; place-items: center; border: 1px solid var(--bs-border-color); border-radius: 999px; background: var(--bs-tertiary-bg); color: var(--bs-emphasis-color); font-size: .8rem; font-weight: 800; line-height: 1; vertical-align: middle; }
+.doctor-note-more:hover,.doctor-note-more:focus-visible { border-color: var(--bs-primary); background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
+
 @media (max-width: 767.98px) {
   .patient-departments-tab,
   .patient-departments-content {
@@ -2824,7 +2840,7 @@ svg.admin-nav-icon {
     display: none;
   }
 
-  .doctor-list-filters .form-label {
+.doctor-list-filters .form-label {
     display: none;
   }
 
