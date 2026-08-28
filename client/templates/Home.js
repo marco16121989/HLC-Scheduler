@@ -22,6 +22,8 @@ import { AdminDashboard } from "./AdminDashboard.js";
 import { AdminTools } from "./AdminTools.js";
 import { Donations } from "./Donations.js";
 import { PageInfo } from "./PageInfo.js";
+import { Permissions } from "./Permissions.js";
+import { getPagePermission } from "/imports/constants/pagePermissions";
 
 const ICON_PATHS = {
   dashboard: ["M3 13h8V3H3z", "M13 21h8V11h-8z", "M13 3h8v6h-8z", "M3 15h8v6H3z"],
@@ -44,6 +46,7 @@ const ICON_PATHS = {
   files: ["M4 3h10l6 6v12H4z", "M14 3v6h6", "M8 14h8M8 18h6"],
   info: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 10v7M12 7h.01"],
   settings: ["M4 6h16M4 12h16M4 18h16", "M8 3v6M16 9v6M10 15v6"],
+  permissions: ["M12 3 4 6v6c0 4.5 3.2 7.5 8 9 4.8-1.5 8-4.5 8-9V6z", "M9 12l2 2 4-4"],
   adminTools: ["M14.7 6.3a4 4 0 0 0-5 5L3 18l3 3 6.7-6.7a4 4 0 0 0 5-5l-3 3-3-3z", "M16 4l4 4"],
   donation: ["M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"],
 };
@@ -101,10 +104,13 @@ export const Home = ({
       : user.role === "CAS" || user.role === "GVP"
         ? user.presidentId || user.associationId
         : "";
+  const canViewPage = (pageId) => getPagePermission(user, pageId).view;
+  const canEditPage = (pageId) => getPagePermission(user, pageId).edit;
   const closeMobileSidebar = () => {
     if (globalThis.innerWidth < 992) setSidebarOpen(false);
   };
   const openView = (view) => {
+    if (view !== "permissions" && !["home", "settings", "info", "notifications"].includes(view) && !canViewPage(view)) return;
     if (view !== activeView) {
       globalThis.history?.pushState({ ...(globalThis.history.state || {}), hlcApp: true, hlcView: view }, "");
     }
@@ -249,7 +255,7 @@ export const Home = ({
                   <p>Strumenti Admin</p>
                 </button>
               </li>}
-              {user.role !== "Admin" && <li className="nav-item menu-order-tools">
+              {user.role !== "Admin" && canViewPage("calendar") && <li className="nav-item menu-order-tools">
                 <button
                   className={`nav-link w-100 ${activeView === "calendar" ? "active" : ""}`}
                   type="button"
@@ -259,19 +265,19 @@ export const Home = ({
                   <p>Calendario</p>
                 </button>
               </li>}
-              {user.role !== "Admin" && <li className="nav-item menu-order-tools">
+              {user.role !== "Admin" && canViewPage("events") && <li className="nav-item menu-order-tools">
                 <button className={`nav-link w-100 ${activeView === "events" ? "active" : ""}`} type="button" onClick={() => openView("events")}>
                   <MenuIcon name="events" />
                   <p>Eventi</p>
                 </button>
               </li>}
-              {["Presidente", "CAS", "GVP"].includes(user.role) && <li className="nav-item menu-order-tools">
+              {["Presidente", "CAS", "GVP"].includes(user.role) && canViewPage("absences") && <li className="nav-item menu-order-tools">
                 <button className={`nav-link w-100 ${activeView === "absences" ? "active" : ""}`} type="button" onClick={() => openView("absences")}>
                   <MenuIcon name="absence" />
                   <p>Periodi di assenza</p>
                 </button>
               </li>}
-              {user.role !== "Admin" && <li className="nav-item menu-order-tools">
+              {user.role !== "Admin" && canViewPage("useful-files") && <li className="nav-item menu-order-tools">
                 <button className={`nav-link w-100 ${activeView === "useful-files" ? "active" : ""}`} type="button" onClick={() => openView("useful-files")}>
                   <MenuIcon name="files" />
                   <p>File Utili</p>
@@ -289,7 +295,7 @@ export const Home = ({
                   <p>Info</p>
                 </button>
               </li>
-              {(user.role === "Admin" || user.role === "GVP") && <li className="nav-item menu-order-tools">
+              {(user.role === "Admin" || user.role === "GVP") && canViewPage("profile") && <li className="nav-item menu-order-tools">
                 <button
                   className={`nav-link w-100 ${activeView === "profile" ? "active" : ""}`}
                   type="button"
@@ -313,13 +319,13 @@ export const Home = ({
                 </a>
               </li>}
               <li className="sidebar-section-label menu-order-support">Assistenza</li>
-              {user.role !== "GVP" && <li className="nav-item menu-order-support-item">
+              {user.role !== "GVP" && canViewPage("support") && <li className="nav-item menu-order-support-item">
                 <button className={`nav-link w-100 ${activeView === "support" ? "active" : ""}`} type="button" onClick={() => openView("support")}>
                   <MenuIcon name="support" />
                   <p>Segnalazioni</p>
                 </button>
               </li>}
-              {["Presidente", "CAS", "GVP"].includes(user.role) && <li className="nav-item menu-order-support-item">
+              {["Presidente", "CAS", "GVP"].includes(user.role) && canViewPage("donations") && <li className="nav-item menu-order-support-item">
                 <button className={`nav-link w-100 ${activeView === "donations" ? "active" : ""}`} type="button" onClick={() => openView("donations")}>
                   <MenuIcon name="donation" />
                   <p>Sostieni il progetto</p>
@@ -346,8 +352,8 @@ export const Home = ({
               </li>
               </>
               )}
-              {(user.role === "Presidente" || user.role === "CAS" || (user.role === "GVP" && user.canInsertGvp)) && <li className="sidebar-section-label menu-order-team">Squadra</li>}
-              {(user.role === "Presidente" || user.role === "CAS") && (
+              {(user.role === "Presidente" || canViewPage("cas") || canViewPage("gvp")) && <li className="sidebar-section-label menu-order-team">Squadra</li>}
+              {(user.role === "Presidente" || user.role === "CAS") && canViewPage("cas") && (
                 <li className="nav-item menu-order-team">
                   <button
                     className={`nav-link w-100 ${activeView === "cas" ? "active" : ""}`}
@@ -359,7 +365,7 @@ export const Home = ({
                   </button>
                 </li>
               )}
-              {user.role === "GVP" && user.canInsertGvp && (
+              {user.role === "GVP" && canViewPage("gvp") && (
                 <li className="nav-item menu-order-team">
                   <button
                     className={`nav-link w-100 ${activeView === "gvp" ? "active" : ""}`}
@@ -371,7 +377,7 @@ export const Home = ({
                   </button>
                 </li>
               )}
-              {(user.role === "Presidente" || user.role === "CAS") && (
+              {(user.role === "Presidente" || user.role === "CAS") && canViewPage("gvp") && (
                 <li className="nav-item menu-order-team">
                   <button
                     className={`nav-link w-100 ${activeView === "gvp" ? "active" : ""}`}
@@ -393,12 +399,18 @@ export const Home = ({
                   <p>Profilo</p>
                 </button>
               </li>}
+              {user.role === "Presidente" && <li className="nav-item menu-order-team">
+                <button className={`nav-link w-100 ${activeView === "permissions" ? "active" : ""}`} type="button" onClick={() => openView("permissions")}>
+                  <MenuIcon name="permissions" />
+                  <p>Permessi</p>
+                </button>
+              </li>}
               {(user.role === "Presidente" || user.role === "CAS") && (
                 <>
                   <li className="sidebar-section-label menu-order-health">Gestione sanitaria</li>
                   <li className="nav-item menu-order-health">
                     <button
-                      className={`nav-link w-100 ${activeView === "hospitals" ? "active" : ""}`}
+                      className={`nav-link w-100 ${!canViewPage("hospitals") ? "d-none" : ""} ${activeView === "hospitals" ? "active" : ""}`}
                       type="button"
                       onClick={() => openView("hospitals")}
                     >
@@ -408,7 +420,7 @@ export const Home = ({
                   </li>
                   <li className="nav-item menu-order-health">
                     <button
-                      className={`nav-link w-100 ${activeView === "departments" ? "active" : ""}`}
+                      className={`nav-link w-100 ${!canViewPage("departments") ? "d-none" : ""} ${activeView === "departments" ? "active" : ""}`}
                       type="button"
                       onClick={() => openView("departments")}
                     >
@@ -418,7 +430,7 @@ export const Home = ({
                   </li>
                   <li className="nav-item menu-order-health">
                     <button
-                      className={`nav-link w-100 ${activeView === "presentations" ? "active" : ""}`}
+                      className={`nav-link w-100 ${!canViewPage("presentations") ? "d-none" : ""} ${activeView === "presentations" ? "active" : ""}`}
                       type="button"
                       onClick={() => openView("presentations")}
                     >
@@ -428,14 +440,14 @@ export const Home = ({
                   </li>
                   <li className="sidebar-section-label menu-order-reports">Report</li>
                   <li className="nav-item menu-order-reports">
-                    <button className={`nav-link w-100 ${activeView === "presentation-reports" ? "active" : ""}`} type="button" onClick={() => openView("presentation-reports")}>
+                    <button className={`nav-link w-100 ${!canViewPage("presentation-reports") ? "d-none" : ""} ${activeView === "presentation-reports" ? "active" : ""}`} type="button" onClick={() => openView("presentation-reports")}>
                       <MenuIcon name="presentationReports" />
                       <p>Report presentazioni</p>
                     </button>
                   </li>
                   <li className="nav-item menu-order-health">
                     <button
-                      className={`nav-link w-100 ${activeView === "doctors" ? "active" : ""}`}
+                      className={`nav-link w-100 ${!canViewPage("doctors") ? "d-none" : ""} ${activeView === "doctors" ? "active" : ""}`}
                       type="button"
                       onClick={() => openView("doctors")}
                     >
@@ -445,7 +457,7 @@ export const Home = ({
                   </li>
                   <li className="nav-item menu-order-health">
                     <button
-                      className={`nav-link w-100 ${activeView === "patients" ? "active" : ""}`}
+                      className={`nav-link w-100 ${!canViewPage("patients") ? "d-none" : ""} ${activeView === "patients" ? "active" : ""}`}
                       type="button"
                       onClick={() => openView("patients")}
                     >
@@ -454,7 +466,7 @@ export const Home = ({
                     </button>
                   </li>
                   <li className="nav-item menu-order-reports">
-                    <button className={`nav-link w-100 ${activeView === "patient-reports" ? "active" : ""}`} type="button" onClick={() => openView("patient-reports")}>
+                    <button className={`nav-link w-100 ${!canViewPage("patient-reports") ? "d-none" : ""} ${activeView === "patient-reports" ? "active" : ""}`} type="button" onClick={() => openView("patient-reports")}>
                       <MenuIcon name="reports" />
                       <p>Report pazienti</p>
                     </button>
@@ -466,7 +478,7 @@ export const Home = ({
                 <li className="sidebar-section-label menu-order-health">Gestione sanitaria</li>
                 <li className="nav-item menu-order-health">
                   <button
-                    className={`nav-link w-100 ${activeView === "hospitals" ? "active" : ""}`}
+                    className={`nav-link w-100 ${!canViewPage("hospitals") ? "d-none" : ""} ${activeView === "hospitals" ? "active" : ""}`}
                     type="button"
                     onClick={() => openView("hospitals")}
                   >
@@ -476,7 +488,7 @@ export const Home = ({
                 </li>
                 <li className="nav-item menu-order-health">
                   <button
-                    className={`nav-link w-100 ${activeView === "doctors" ? "active" : ""}`}
+                    className={`nav-link w-100 ${!canViewPage("doctors") ? "d-none" : ""} ${activeView === "doctors" ? "active" : ""}`}
                     type="button"
                     onClick={() => openView("doctors")}
                   >
@@ -486,7 +498,7 @@ export const Home = ({
                 </li>
                 <li className="nav-item menu-order-health">
                   <button
-                    className={`nav-link w-100 ${activeView === "patients" ? "active" : ""}`}
+                    className={`nav-link w-100 ${!canViewPage("patients") ? "d-none" : ""} ${activeView === "patients" ? "active" : ""}`}
                     type="button"
                     onClick={() => openView("patients")}
                   >
@@ -515,11 +527,11 @@ export const Home = ({
           />
         ) : activeView === "admin-tools" && user.role === "Admin" ? (
           <AdminTools users={users} loginMessages={loginMessages} />
-        ) : activeView === "support" ? (
+        ) : activeView === "support" && canViewPage("support") ? (
           <SupportRequests requests={supportRequests} currentUser={user} />
-        ) : activeView === "donations" && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
+        ) : activeView === "donations" && canViewPage("donations") && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
           <Donations />
-        ) : activeView === "absences" && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
+        ) : activeView === "absences" && canViewPage("absences") && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
           <Absences absences={absences} users={users} currentUser={user} />
         ) : activeView === "settings" ? (
           <Settings theme={theme} onToggleTheme={onToggleTheme} fontSize={fontSize} onFontSizeChange={onFontSizeChange} highContrast={highContrast} onToggleHighContrast={onToggleHighContrast} boldText={boldText} onToggleBoldText={onToggleBoldText} pushNotifications={pushNotifications} />
@@ -527,11 +539,11 @@ export const Home = ({
           <Info />
         ) : activeView === "notifications" ? (
           <Notifications notifications={notifications} />
-        ) : activeView === "useful-files" && presidentId ? (
+        ) : activeView === "useful-files" && presidentId && canViewPage("useful-files") ? (
           <UsefulFiles files={usefulFiles} currentUser={user} />
-        ) : activeView === "profile" ? (
+        ) : activeView === "profile" && canViewPage("profile") ? (
           <Profile currentUser={user} hospitals={hospitals} />
-        ) : activeView === "calendar" ? (
+        ) : activeView === "calendar" && canViewPage("calendar") ? (
           <Calendar
             presentations={presentations}
             patients={patients}
@@ -541,7 +553,7 @@ export const Home = ({
             currentUser={user}
             presidentId={presidentId}
           />
-        ) : activeView === "events" && presidentId ? (
+        ) : activeView === "events" && presidentId && canViewPage("events") ? (
           <Events events={events} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "users" && user.role === "Admin" ? (
           <Users
@@ -550,7 +562,9 @@ export const Home = ({
             hospitals={hospitals}
             manager={user}
           />
-        ) : activeView === "hospitals" && presidentId ? (
+        ) : activeView === "permissions" && user.role === "Presidente" ? (
+          <Permissions users={users} presidentId={user.id} />
+        ) : activeView === "hospitals" && presidentId && canViewPage("hospitals") ? (
           <Hospitals
             hospitals={hospitals}
             setHospitals={setHospitals}
@@ -558,25 +572,25 @@ export const Home = ({
             doctors={doctors}
             users={users}
             presidentId={presidentId}
-            readOnly={user.role === "GVP"}
+            readOnly={!canEditPage("hospitals")}
           />
-        ) : activeView === "departments" && presidentId ? (
+        ) : activeView === "departments" && presidentId && canViewPage("departments") ? (
           <Departments
             departments={departments}
             setDepartments={setDepartments}
             hospitals={hospitals}
             presidentId={presidentId}
           />
-        ) : activeView === "doctors" && presidentId ? (
+        ) : activeView === "doctors" && presidentId && canViewPage("doctors") ? (
           <Doctors
             doctors={doctors}
             setDoctors={setDoctors}
             hospitals={hospitals}
             presidentId={presidentId}
             currentUser={user}
-            readOnly={user.role === "GVP"}
+            readOnly={!canEditPage("doctors")}
           />
-        ) : activeView === "patients" && presidentId ? (
+        ) : activeView === "patients" && presidentId && canViewPage("patients") ? (
           <Patients
             patients={patients}
             setPatients={setPatients}
@@ -588,18 +602,18 @@ export const Home = ({
             absences={absences}
             notifications={notifications}
           />
-        ) : activeView === "patient-reports" && presidentId && user.role !== "GVP" ? (
+        ) : activeView === "patient-reports" && presidentId && canViewPage("patient-reports") ? (
           <PatientReports patients={patients} hospitals={hospitals} users={users} currentUser={user} presidentId={presidentId} />
-        ) : activeView === "presentation-reports" && presidentId && user.role !== "GVP" ? (
+        ) : activeView === "presentation-reports" && presidentId && canViewPage("presentation-reports") ? (
           <PresentationReports presentations={presentations} presidentId={presidentId} />
-        ) : activeView === "presentations" && presidentId ? (
+        ) : activeView === "presentations" && presidentId && canViewPage("presentations") ? (
           <Presentations
             presentations={presentations}
             setPresentations={setPresentations}
             currentUser={user}
             presidentId={presidentId}
           />
-        ) : activeView === "cas" && (user.role === "Presidente" || user.role === "CAS") ? (
+        ) : activeView === "cas" && canViewPage("cas") && (user.role === "Presidente" || user.role === "CAS") ? (
           <Users
             users={users}
             setUsers={setUsers}
@@ -607,7 +621,7 @@ export const Home = ({
             manager={user}
             managedRole="CAS"
           />
-        ) : activeView === "gvp" && (user.role === "Presidente" || user.role === "CAS" || (user.role === "GVP" && user.canInsertGvp)) ? (
+        ) : activeView === "gvp" && canViewPage("gvp") && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
           <Users
             users={users}
             setUsers={setUsers}

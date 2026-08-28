@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { confirmAction } from "./ConfirmDialog.js";
 import { PaginationControls, usePagination } from "./Pagination.js";
+import { getPagePermission } from "/imports/constants/pagePermissions";
 
 const emptyForm = () => ({
   title: "",
@@ -65,6 +66,7 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const canCreate = ["Presidente", "CAS"].includes(currentUser.role);
+  const canRespond = currentUser.role !== "GVP" || getPagePermission(currentUser, "events").edit;
   const organizationUsers = useMemo(() => users.filter((user) =>
     user.id !== currentUser.id &&
     ["CAS", "GVP"].includes(user.role) &&
@@ -192,7 +194,7 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
               </details>}
             </div>
             <div className="card-footer d-flex align-items-center justify-content-end gap-2">
-              {isOwner ? <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => removeEvent(event)}>Elimina evento</button> : <><button className={`btn btn-sm ${invitation?.status === "declined" ? "btn-danger" : "btn-outline-danger"}`} type="button" onClick={() => respond(event.id, "declined")}>Non partecipo</button><button className={`btn btn-sm ${invitation?.status === "accepted" ? "btn-success" : "btn-outline-success"}`} type="button" onClick={() => respond(event.id, "accepted")}>Partecipo</button></>}
+              {isOwner ? <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => removeEvent(event)}>Elimina evento</button> : canRespond ? <><button className={`btn btn-sm ${invitation?.status === "declined" ? "btn-danger" : "btn-outline-danger"}`} type="button" onClick={() => respond(event.id, "declined")}>Non partecipo</button><button className={`btn btn-sm ${invitation?.status === "accepted" ? "btn-success" : "btn-outline-success"}`} type="button" onClick={() => respond(event.id, "accepted")}>Partecipo</button></> : <span className="text-secondary small">Risposta non autorizzata</span>}
             </div>
           </article>;
         })}</div><PaginationControls {...eventPagination} /></>}

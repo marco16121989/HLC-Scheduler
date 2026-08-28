@@ -21,6 +21,7 @@ import {
 } from "/imports/api/links";
 import { formatUserName } from "/imports/utils/formatUserName";
 import { DEFAULT_DEPARTMENT_NAMES } from "/imports/constants/departments";
+import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
 
 const usefulFileExtensions = new Set([
   "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
@@ -161,6 +162,10 @@ const requireUser = (context) => {
   if (!context.userId) {
     throw new Meteor.Error("not-authorized", "Devi effettuare l'accesso.");
   }
+};
+const requirePageEdit = (actor, pageId) => {
+  const permission = getPagePermission({ ...(actor?.profile || {}), role: actor?.profile?.role }, pageId);
+  if (!permission.edit) throw new Meteor.Error("not-authorized", "Non hai il permesso di modificare questa sezione.");
 };
 
 export const buildPatientNoteNotification = ({ recipientId, patientId, patientName, noteAuthor, noteText }) => ({
@@ -370,7 +375,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
   const userSelector =
     role === "Admin"
       ? {}
-      : role === "GVP" && !actor.profile?.canInsertGvp
+      : role === "GVP" && !getPagePermission({ ...actor.profile, role }, "gvp").view
         ? { _id: actor._id }
       : presidentId
         ? {
@@ -548,6 +553,46 @@ Meteor.publish("hlc-login-messages", async function publishHlcLoginMessages() {
 });
 
 Meteor.methods({
+  async "hlc.updatePagePermissions"(targetUserId, permissions) {
+    requireUser(this);
+    check(targetUserId, String);
+    check(permissions, Object);
+    const president = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
+    if (president?.profile?.role !== "Presidente") throw new Meteor.Error("not-authorized", "Operazione riservata al Presidente.");
+    const target = await Meteor.users.findOneAsync(targetUserId, { fields: publicUserFields });
+    const belongsToPresident = target && ["CAS", "GVP"].includes(target.profile?.role) && (target.profile?.presidentId === this.userId || target.profile?.associationId === this.userId);
+    if (!belongsToPresident) throw new Meteor.Error("not-authorized", "Utente non disponibile.");
+    const allowedPageIds = new Set(MANAGEABLE_PAGES.map(([pageId]) => pageId));
+    const normalized = {};
+    for (const [pageId, permission] of Object.entries(permissions)) {
+      if (!allowedPageIds.has(pageId) || !permission || typeof permission !== "object") continue;
+      normalized[pageId] = { view: Boolean(permission.view), edit: Boolean(permission.view && permission.edit) };
+    }
+    await Meteor.users.updateAsync(targetUserId, { $set: { "profile.pagePermissions": normalized } });
+    return true;
+  },
+
+  async "hlc.updateRolePagePermissions"(targetRole, permissions) {
+    requireUser(this);
+    check(targetRole, Match.OneOf("CAS", "GVP"));
+    check(permissions, Object);
+    const president = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
+    if (president?.profile?.role !== "Presidente") throw new Meteor.Error("not-authorized", "Operazione riservata al Presidente.");
+    const allowedPageIds = new Set(MANAGEABLE_PAGES.map(([pageId]) => pageId));
+    const normalized = {};
+    for (const [pageId, permission] of Object.entries(permissions)) {
+      if (!allowedPageIds.has(pageId) || !permission || typeof permission !== "object") continue;
+      normalized[pageId] = { view: Boolean(permission.view), edit: Boolean(permission.view && permission.edit) };
+    }
+    await Meteor.users.updateAsync({
+      "profile.role": targetRole,
+      $or: [
+        { "profile.presidentId": this.userId },
+        { "profile.associationId": this.userId },
+      ],
+    }, { $set: { "profile.pagePermissions": normalized } }, { multi: true });
+    return true;
+  },
   async "hlc.createLoginMessage"(data) {
     requireUser(this);
     check(data, { text: String, startDate: String, endDate: String });
@@ -732,12 +777,12 @@ Meteor.methods({
     check(file, { name: String, displayName: String, type: String, size: Number, dataUrl: String });
     const actor = await Meteor.users.findOneAsync(this.userId);
     const role = actor?.profile?.role;
-    if (!["Presidente", "CAS"].includes(role)) {
+    if (!["Presidente", "CAS", "GVP"].includes(role)) {
       throw new Meteor.Error("not-authorized", "Non puoi caricare file utili.");
     }
     const presidentId = role === "Presidente"
       ? actor._id
-      : actor.profile?.presidentId || actor.profile?.associationId || "";
+      : await getActorPresidentId(actor);
     const name = file.name.trim();
     const displayName = file.displayName.trim().slice(0, 120);
     const maxSize = 6 * 1024 * 1024;
@@ -785,12 +830,10 @@ Meteor.methods({
     const role = actor?.profile?.role;
     const presidentId = role === "Presidente"
       ? actor._id
-      : role === "CAS"
-        ? actor.profile?.presidentId || actor.profile?.associationId || ""
-        : "";
+      : ["CAS", "GVP"].includes(role) ? await getActorPresidentId(actor) : "";
     const file = await UsefulFilesCollection.findOneAsync(fileId);
     const canDelete = file && file.presidentId === presidentId &&
-      (role === "Presidente" || (role === "CAS" && file.createdBy === actor._id));
+      (role === "Presidente" || (["CAS", "GVP"].includes(role) && file.createdBy === actor._id));
     if (!canDelete) throw new Meteor.Error("not-authorized", "Non puoi eliminare questo file.");
     await UsefulFilesCollection.removeAsync(fileId);
   },
@@ -894,6 +937,7 @@ Meteor.methods({
     check(eventId, String);
     check(response, Match.OneOf("accepted", "declined"));
     const actor = await Meteor.users.findOneAsync(this.userId);
+    if (actor?.profile?.role === "GVP") requirePageEdit(actor, "events");
     const presidentId = await getActorPresidentId(actor);
     const event = await EventsCollection.findOneAsync({
       _id: eventId,
@@ -1044,6 +1088,10 @@ Meteor.methods({
     check(patientId, String);
     check(noteText, String);
     const actor = await Meteor.users.findOneAsync(this.userId);
+    requirePageEdit(actor, "events");
+    requirePageEdit(actor, "events");
+    requirePageEdit(actor, "useful-files");
+    requirePageEdit(actor, "useful-files");
     const actorRole = actor?.profile?.role;
     if (!["Presidente", "CAS"].includes(actorRole)) {
       throw new Meteor.Error("not-authorized", "Le note CAS sono riservate a CAS e Presidente.");
@@ -1262,6 +1310,8 @@ Meteor.methods({
     requireUser(this);
     check(kind, Match.OneOf("hospitals", "departments", "doctors", "patients", "presentations"));
     const actor = await Meteor.users.findOneAsync(this.userId);
+    requirePageEdit(actor, "support");
+    requirePageEdit(actor, ({ hospitals: "hospitals", departments: "departments", doctors: "doctors", patients: "patients", presentations: "presentations" })[kind]);
     const role = actor?.profile?.role;
     const presidentId =
       role === "Presidente"
@@ -1426,6 +1476,7 @@ Meteor.methods({
     check(kind, Match.OneOf("hospitals", "departments", "doctors", "presentations"));
     check(changes, { upserts: [Object], removedIds: [String] });
     const actor = await Meteor.users.findOneAsync(this.userId);
+    requirePageEdit(actor, ({ hospitals: "hospitals", departments: "departments", doctors: "doctors", presentations: "presentations" })[kind]);
     const role = actor?.profile?.role;
     const presidentId = role === "Presidente"
       ? actor._id
@@ -1511,7 +1562,7 @@ Meteor.methods({
     const actorRole = actor?.profile?.role;
     const presidentId = await getActorPresidentId(actor);
     const canManageCas = actorRole === "Presidente" ||
-      (actorRole === "CAS" && actor.profile?.canInsertCas === true && casUserId !== actor._id);
+      (actorRole === "CAS" && getPagePermission({ ...actor.profile, role: actorRole }, "cas").edit && casUserId !== actor._id);
     if (!canManageCas || !presidentId) {
       throw new Meteor.Error("not-authorized", "Non puoi modificare i reparti di questo CAS.");
     }
@@ -1565,9 +1616,9 @@ Meteor.methods({
             ? actor.profile.presidentId || actorLinkedCas?.profile?.presidentId || actorLinkedCas?.profile?.associationId ||
               (actorLinkedCas?.profile?.role === "Presidente" ? actorLinkedCas._id : "")
           : "";
-    const casCanCreateCas = actorRole === "CAS" && actor.profile?.canInsertCas === true;
-    const casCanCreateGvp = actorRole === "CAS" && actor.profile?.canInsertGvp === true;
-    const gvpCanCreateGvp = actorRole === "GVP" && actor.profile?.canInsertGvp === true;
+    const casCanCreateCas = actorRole === "CAS" && getPagePermission({ ...actor.profile, role: actorRole }, "cas").edit;
+    const casCanCreateGvp = actorRole === "CAS" && getPagePermission({ ...actor.profile, role: actorRole }, "gvp").edit;
+    const gvpCanCreateGvp = actorRole === "GVP" && getPagePermission({ ...actor.profile, role: actorRole }, "gvp").edit;
     const canManage = (record) => {
       if (actorRole === "Admin") {
         return true;

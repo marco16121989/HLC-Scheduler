@@ -3,6 +3,7 @@ import { Meteor } from "meteor/meteor";
 import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
 import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPdf.js";
 import { confirmAction } from "./ConfirmDialog.js";
+import { getPagePermission } from "/imports/constants/pagePermissions";
 import { PaginationControls, usePagination } from "./Pagination.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
@@ -304,6 +305,8 @@ export const Patients = ({
   notifications = [],
 }) => {
   const isGvp = currentUser.role === "GVP";
+  const canEditPatients = getPagePermission(currentUser, "patients").edit;
+  const isPatientReadOnly = isGvp && !canEditPatients;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [admissionType, setAdmissionType] = useState("emergency");
@@ -1281,7 +1284,7 @@ export const Patients = ({
                 <option value="all">Tutti i pazienti</option>
                 {visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{casUser.username}</option>)}
               </select>}
-              {!isGvp && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
+              {canEditPatients && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
             </div>
           </div>
         </div>
@@ -1359,6 +1362,7 @@ export const Patients = ({
                       className="form-select form-select-sm w-auto"
                       id="patient-header-status"
                       value={patientStatus}
+                      disabled={isPatientReadOnly}
                       onChange={(event) => requestFormStatusChange(event.target.value)}
                     >
                       <option value="">Nessuno stato</option>
@@ -1374,7 +1378,7 @@ export const Patients = ({
                     onClick={resetForm}
                   />
                 </div>
-                {!isGvp && (
+                {canEditPatients && (
                   <div className="d-flex flex-wrap gap-2 mt-2">
                     <button
                       className="btn btn-outline-secondary btn-sm"
@@ -1410,7 +1414,7 @@ export const Patients = ({
                     </div>
                   )}
 
-                  {isGvp ? (
+                  {isPatientReadOnly ? (
                     <div className="patient-form-grid">
                       <div className="alert alert-light border mb-3" role="status">
                         Riepilogo delle informazioni disponibili per il GVP.
@@ -2557,7 +2561,7 @@ export const Patients = ({
                 </div>
 
                 <div className="card-footer d-flex align-items-center gap-2">
-                  {!isGvp && isEditing && (
+                  {canEditPatients && isEditing && (
                     <button
                       className="btn btn-outline-danger me-auto"
                       type="button"
@@ -2566,7 +2570,7 @@ export const Patients = ({
                       Elimina
                     </button>
                   )}
-                  {!isGvp && isEditing && (
+                  {canEditPatients && isEditing && (
                     <button
                       className="btn btn-outline-secondary"
                       type="button"
@@ -2575,7 +2579,7 @@ export const Patients = ({
                       Annulla
                     </button>
                   )}
-                  {isGvp ? (
+                  {isPatientReadOnly ? (
                     <button className="btn btn-secondary ms-auto" type="button" onClick={resetForm}>Chiudi</button>
                   ) : null}
                 </div>
