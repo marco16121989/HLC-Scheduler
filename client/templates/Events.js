@@ -65,7 +65,8 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const canCreate = ["Presidente", "CAS"].includes(currentUser.role);
+  const canModifyEvents = getPagePermission(currentUser, "events").edit;
+  const canCreate = ["Presidente", "CAS"].includes(currentUser.role) && canModifyEvents;
   const canRespond = currentUser.role !== "GVP" || getPagePermission(currentUser, "events").edit;
   const organizationUsers = useMemo(() => users.filter((user) =>
     user.id !== currentUser.id &&
@@ -194,7 +195,7 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
               </details>}
             </div>
             <div className="card-footer d-flex align-items-center justify-content-end gap-2">
-              {isOwner ? <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => removeEvent(event)}>Elimina evento</button> : canRespond ? <><button className={`btn btn-sm ${invitation?.status === "declined" ? "btn-danger" : "btn-outline-danger"}`} type="button" onClick={() => respond(event.id, "declined")}>Non partecipo</button><button className={`btn btn-sm ${invitation?.status === "accepted" ? "btn-success" : "btn-outline-success"}`} type="button" onClick={() => respond(event.id, "accepted")}>Partecipo</button></> : <span className="text-secondary small">Risposta non autorizzata</span>}
+              {isOwner ? canModifyEvents && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => removeEvent(event)}>Elimina evento</button> : canRespond ? <><button className={`btn btn-sm ${invitation?.status === "declined" ? "btn-danger" : "btn-outline-danger"}`} type="button" onClick={() => respond(event.id, "declined")}>Non partecipo</button><button className={`btn btn-sm ${invitation?.status === "accepted" ? "btn-success" : "btn-outline-success"}`} type="button" onClick={() => respond(event.id, "accepted")}>Partecipo</button></> : <span className="text-secondary small">Risposta non autorizzata</span>}
             </div>
           </article>;
         })}</div><PaginationControls {...eventPagination} /></>}

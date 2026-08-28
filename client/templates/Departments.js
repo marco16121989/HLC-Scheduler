@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
 
-export const Departments = ({ departments, setDepartments, hospitals, presidentId }) => {
+export const Departments = ({ departments, setDepartments, hospitals, presidentId, readOnly = false }) => {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -89,7 +89,7 @@ export const Departments = ({ departments, setDepartments, hospitals, presidentI
               Questa sezione contiene soltanto i modelli generali dei reparti, non i reparti effettivi degli ospedali. Dopo aver creato un modello, il reparto deve essere inserito negli ospedali in cui è realmente presente.
             </p>
           </div>
-          <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>
+          {!readOnly && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
         </div>
       </div>
     </div>
@@ -121,12 +121,12 @@ export const Departments = ({ departments, setDepartments, hospitals, presidentI
           <div className="card-body p-0">
             <div className="table-responsive">
               <table className="table table-hover align-middle mb-0 mobile-card-table department-list-table">
-                <thead><tr><th>Reparto</th><th>Ospedali associati</th><th className="text-end">Azioni</th></tr></thead>
+                <thead><tr><th>Reparto</th><th>Ospedali associati</th>{!readOnly && <th className="text-end">Azioni</th>}</tr></thead>
                 <tbody>{visibleDepartments.length === 0
-                  ? <tr><td className="text-center text-secondary py-4" colSpan="3">Nessun reparto inserito.</td></tr>
+                  ? <tr><td className="text-center text-secondary py-4" colSpan={readOnly ? 2 : 3}>Nessun reparto inserito.</td></tr>
                   : visibleDepartments.map((department) => {
                     const hospitalCount = hospitals.filter((hospital) => hospital.presidentId === presidentId && hospital.departments?.some((item) => item.templateId === department.id || item.name?.toLowerCase() === department.name.toLowerCase())).length;
-                    return <tr className="department-clickable-row" key={department.id} role="button" tabIndex="0" onClick={() => handleEdit(department)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleEdit(department); } }}><td className="fw-medium" data-label="Reparto">{department.name}</td><td data-label="Ospedali">{hospitalCount}</td><td className="text-end" data-label="Azioni"><button className="btn btn-outline-primary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); handleEdit(department); }}>Modifica</button></td></tr>;
+                    return <tr className={readOnly ? "" : "department-clickable-row"} key={department.id} role={readOnly ? undefined : "button"} tabIndex={readOnly ? undefined : 0} onClick={readOnly ? undefined : () => handleEdit(department)} onKeyDown={(event) => { if (!readOnly && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); handleEdit(department); } }}><td className="fw-medium" data-label="Reparto">{department.name}</td><td data-label="Ospedali">{hospitalCount}</td>{!readOnly && <td className="text-end" data-label="Azioni"><button className="btn btn-outline-primary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); handleEdit(department); }}>Modifica</button></td>}</tr>;
                   })}</tbody>
               </table>
             </div>

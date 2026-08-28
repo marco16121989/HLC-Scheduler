@@ -388,7 +388,14 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         : { _id: actor._id };
 
   if (role === "GVP") {
-    const gvpHospitalUsersSelector = {
+    const canViewPermissions = getPagePermission({ ...actor.profile, role }, "permissions").view;
+    const gvpHospitalUsersSelector = canViewPermissions ? {
+      $or: [
+        { _id: actor._id },
+        { "profile.presidentId": presidentId },
+        { "profile.associationId": presidentId },
+      ],
+    } : {
       $or: [
         { _id: actor._id },
         { "profile.role": "CAS", "profile.presidentId": presidentId },
@@ -558,9 +565,11 @@ Meteor.methods({
     check(targetUserId, String);
     check(permissions, Object);
     const president = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
-    if (president?.profile?.role !== "Presidente") throw new Meteor.Error("not-authorized", "Operazione riservata al Presidente.");
+    const actorRole = president?.profile?.role;
+    const actorPresidentId = actorRole === "Presidente" ? president._id : await getActorPresidentId(president);
+    if (actorRole !== "Presidente" && !getPagePermission({ ...president?.profile, role: actorRole }, "permissions").edit) throw new Meteor.Error("not-authorized", "Non hai il permesso di modificare questa sezione.");
     const target = await Meteor.users.findOneAsync(targetUserId, { fields: publicUserFields });
-    const belongsToPresident = target && ["CAS", "GVP"].includes(target.profile?.role) && (target.profile?.presidentId === this.userId || target.profile?.associationId === this.userId);
+    const belongsToPresident = target && ["CAS", "GVP"].includes(target.profile?.role) && (target.profile?.presidentId === actorPresidentId || target.profile?.associationId === actorPresidentId);
     if (!belongsToPresident) throw new Meteor.Error("not-authorized", "Utente non disponibile.");
     const allowedPageIds = new Set(MANAGEABLE_PAGES.map(([pageId]) => pageId));
     const normalized = {};
@@ -577,7 +586,9 @@ Meteor.methods({
     check(targetRole, Match.OneOf("CAS", "GVP"));
     check(permissions, Object);
     const president = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
-    if (president?.profile?.role !== "Presidente") throw new Meteor.Error("not-authorized", "Operazione riservata al Presidente.");
+    const actorRole = president?.profile?.role;
+    const actorPresidentId = actorRole === "Presidente" ? president._id : await getActorPresidentId(president);
+    if (actorRole !== "Presidente" && !getPagePermission({ ...president?.profile, role: actorRole }, "permissions").edit) throw new Meteor.Error("not-authorized", "Non hai il permesso di modificare questa sezione.");
     const allowedPageIds = new Set(MANAGEABLE_PAGES.map(([pageId]) => pageId));
     const normalized = {};
     for (const [pageId, permission] of Object.entries(permissions)) {
@@ -587,8 +598,8 @@ Meteor.methods({
     await Meteor.users.updateAsync({
       "profile.role": targetRole,
       $or: [
-        { "profile.presidentId": this.userId },
-        { "profile.associationId": this.userId },
+        { "profile.presidentId": actorPresidentId },
+        { "profile.associationId": actorPresidentId },
       ],
     }, { $set: { "profile.pagePermissions": normalized } }, { multi: true });
     return true;
@@ -1310,7 +1321,6 @@ Meteor.methods({
     requireUser(this);
     check(kind, Match.OneOf("hospitals", "departments", "doctors", "patients", "presentations"));
     const actor = await Meteor.users.findOneAsync(this.userId);
-    requirePageEdit(actor, "support");
     requirePageEdit(actor, ({ hospitals: "hospitals", departments: "departments", doctors: "doctors", patients: "patients", presentations: "presentations" })[kind]);
     const role = actor?.profile?.role;
     const presidentId =

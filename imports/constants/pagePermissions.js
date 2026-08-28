@@ -1,13 +1,21 @@
 export const MANAGEABLE_PAGES = [
-  ["events", "Eventi"], ["useful-files", "File utili"], ["support", "Segnalazioni"],
+  ["events", "Eventi"], ["useful-files", "File utili"],
   ["cas", "CAS"], ["gvp", "GVP"],
   ["hospitals", "Ospedali"], ["departments", "Reparti"], ["doctors", "Medici"],
-  ["patients", "Pazienti"],
+  ["permissions", "Permessi"],
 ];
 
 export const getPagePermission = (user, pageId) => {
   if (["Admin", "Presidente"].includes(user?.role)) return { view: true, edit: true };
   if (["calendar", "profile", "absences", "donations"].includes(pageId)) return { view: true, edit: true };
+  if (pageId === "support") {
+    const view = user?.role === "CAS";
+    return { view, edit: view };
+  }
+  if (pageId === "patients") {
+    const view = ["CAS", "GVP"].includes(user?.role);
+    return { view, edit: user?.role === "CAS" };
+  }
   if (["presentations", "patient-reports", "presentation-reports"].includes(pageId)) {
     const view = user?.role === "CAS";
     return { view, edit: pageId === "presentations" && view };

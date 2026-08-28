@@ -110,7 +110,7 @@ export const Home = ({
     if (globalThis.innerWidth < 992) setSidebarOpen(false);
   };
   const openView = (view) => {
-    if (view !== "permissions" && !["home", "settings", "info", "notifications"].includes(view) && !canViewPage(view)) return;
+    if (!["home", "settings", "info", "notifications"].includes(view) && !canViewPage(view)) return;
     if (view !== activeView) {
       globalThis.history?.pushState({ ...(globalThis.history.state || {}), hlcApp: true, hlcView: view }, "");
     }
@@ -399,7 +399,7 @@ export const Home = ({
                   <p>Profilo</p>
                 </button>
               </li>}
-              {user.role === "Presidente" && <li className="nav-item menu-order-team">
+              {canViewPage("permissions") && <li className="nav-item menu-order-team">
                 <button className={`nav-link w-100 ${activeView === "permissions" ? "active" : ""}`} type="button" onClick={() => openView("permissions")}>
                   <MenuIcon name="permissions" />
                   <p>Permessi</p>
@@ -562,8 +562,8 @@ export const Home = ({
             hospitals={hospitals}
             manager={user}
           />
-        ) : activeView === "permissions" && user.role === "Presidente" ? (
-          <Permissions users={users} presidentId={user.id} />
+        ) : activeView === "permissions" && presidentId && canViewPage("permissions") ? (
+          <Permissions users={users} presidentId={presidentId} canEdit={canEditPage("permissions")} />
         ) : activeView === "hospitals" && presidentId && canViewPage("hospitals") ? (
           <Hospitals
             hospitals={hospitals}
@@ -580,6 +580,7 @@ export const Home = ({
             setDepartments={setDepartments}
             hospitals={hospitals}
             presidentId={presidentId}
+            readOnly={!canEditPage("departments")}
           />
         ) : activeView === "doctors" && presidentId && canViewPage("doctors") ? (
           <Doctors
