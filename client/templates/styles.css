@@ -992,7 +992,7 @@ svg.admin-nav-icon {
 
 .hospital-department-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   align-items: center;
   gap: 0.5rem;
 }
@@ -1029,11 +1029,64 @@ svg.admin-nav-icon {
   font-size: 0.8rem;
 }
 .hospital-department-coverage { display: grid; gap: .75rem; border-left: .3rem solid var(--bs-success); }
-.hospital-department-coverage.is-uncovered { border-left-color: var(--bs-warning); background: color-mix(in srgb,var(--bs-warning) 7%,var(--bs-body-bg)); }
-.hospital-department-coverage-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.hospital-department-coverage.is-uncovered { border-left-color: var(--bs-danger); background: color-mix(in srgb,var(--bs-danger) 9%,var(--bs-body-bg)); }
+.hospital-department-coverage-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .4rem 1rem; }
 .hospital-department-coverage-heading > span { text-align: right; }
+.hospital-department-locations {
+  grid-column: 1;
+  display: grid;
+  gap: .2rem;
+  color: var(--bs-secondary-color);
+  font-size: .875rem;
+}
+.hospital-department-website-link {
+  grid-column: 1;
+  justify-self: start;
+  color: var(--bs-primary);
+  background: transparent;
+  border: 1px solid var(--bs-primary);
+}
+.hospital-department-website-link:hover,
+.hospital-department-website-link:focus-visible {
+  color: var(--bs-primary);
+  background: transparent;
+  border-color: var(--bs-primary);
+  text-decoration: underline;
+}
 .hospital-department-cas { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.hospital-department-doctors { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .hospital-department-cas-label { color: var(--bs-secondary-color); font-size: .72rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.hospital-department-coverage-list { gap: .75rem; }
+.hospital-department-coverage-list > .hospital-department-coverage {
+  border-top-width: 1px;
+  border-radius: var(--bs-border-radius);
+}
+
+@media (max-width: 767.98px) {
+  .hospital-department-coverage-heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hospital-department-coverage-heading > span {
+    grid-row: 2;
+    text-align: left;
+  }
+
+  .hospital-department-website-link {
+    grid-row: 4;
+  }
+
+  .hospital-department-locations {
+    grid-row: 3;
+  }
+
+  .hospital-department-cas,
+  .hospital-department-doctors {
+    display: grid;
+    justify-items: start;
+  }
+
+}
 
 .doctor-departments-fieldset {
   min-width: 0;
@@ -2821,9 +2874,8 @@ svg.admin-nav-icon {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .hospital-department-row > input:nth-child(2) {
+  .hospital-department-row > input {
     grid-column: 1 / -1;
-    grid-row: 2;
   }
 
 }

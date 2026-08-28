@@ -513,6 +513,7 @@ export const Home = ({
             hospitals={hospitals}
             setHospitals={setHospitals}
             departmentTemplates={departments}
+            doctors={doctors}
             users={users}
             presidentId={presidentId}
           />

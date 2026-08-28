@@ -14,7 +14,13 @@ const DEFAULT_DEPARTMENTS = [
   "Radiologia interventistica", "Terapia intensiva/Rianimazione", "Urologia",
 ];
 
-export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], users = [], presidentId }) => {
+const normalizeWebsiteUrl = (value) => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return "";
+  return /^https?:\/\//i.test(trimmedValue) ? trimmedValue : `https://${trimmedValue}`;
+};
+
+export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], doctors = [], users = [], presidentId }) => {
   const [name, setName] = useState("");
   const [director, setDirector] = useState("");
   const [departments, setDepartments] = useState([]);
@@ -22,6 +28,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [departmentListHospital, setDepartmentListHospital] = useState(null);
+  const [departmentListSearch, setDepartmentListSearch] = useState("");
 
   const isEditing = editingId !== null;
   const visibleHospitals = hospitals.filter(
@@ -44,6 +51,26 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
   const getUncoveredDepartmentCount = (hospital) => (hospital.departments || []).filter(
     (department) => getDepartmentCasUsers(hospital.id, department.id).length === 0,
   ).length;
+  const filteredDepartmentList = departmentListHospital
+    ? [...departmentListHospital.departments]
+      .filter((department) => department.name.toLocaleLowerCase("it").includes(departmentListSearch.trim().toLocaleLowerCase("it")))
+      .sort((firstDepartment, secondDepartment) =>
+        firstDepartment.name.localeCompare(secondDepartment.name, "it", { sensitivity: "base" }),
+      )
+    : [];
+  const openDepartmentList = (hospital) => {
+    setDepartmentListSearch("");
+    setDepartmentListHospital(normalizeHospital(hospital));
+  };
+  const getDepartmentDoctors = (departmentId) => doctors.filter((doctor) =>
+    doctor.presidentId === presidentId && (doctor.departmentIds || []).includes(departmentId),
+  ).sort((firstDoctor, secondDoctor) =>
+    `${firstDoctor.lastName || ""} ${firstDoctor.firstName || ""}`.localeCompare(
+      `${secondDoctor.lastName || ""} ${secondDoctor.firstName || ""}`,
+      "it",
+      { sensitivity: "base" },
+    ),
+  );
   const resetForm = () => {
     setName("");
     setDirector("");
@@ -66,7 +93,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
       );
       return selected
         ? current.filter((department) => department.id !== selected.id)
-        : [...current, { id: crypto.randomUUID(), templateId: departmentTemplate.id, name: departmentTemplate.name, head: "" }];
+        : [...current, { id: crypto.randomUUID(), templateId: departmentTemplate.id, name: departmentTemplate.name, head: "", websiteUrl: "", location: "", managementLocation: "" }];
     });
     setError("");
   };
@@ -91,7 +118,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
         .filter((template) => !current.some(
           (department) => department.templateId === template.id || department.name.toLowerCase() === template.name.toLowerCase(),
         ))
-        .map((template) => ({ id: crypto.randomUUID(), templateId: template.id, name: template.name, head: "" }));
+        .map((template) => ({ id: crypto.randomUUID(), templateId: template.id, name: template.name, head: "", websiteUrl: "", location: "", managementLocation: "" }));
       return [...current, ...missingDepartments];
     });
     setError("");
@@ -131,6 +158,22 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
       return;
     }
 
+    const invalidDepartmentUrl = departments.some((department) => {
+      const websiteUrl = normalizeWebsiteUrl(department.websiteUrl || "");
+      if (!websiteUrl) return false;
+      try {
+        const parsedUrl = new URL(websiteUrl);
+        return !parsedUrl.hostname.includes(".");
+      } catch {
+        return true;
+      }
+    });
+
+    if (invalidDepartmentUrl) {
+      setError("Controlla il link web dei reparti.");
+      return;
+    }
+
     const isDuplicate = hospitals.some(
       (hospital) =>
         hospital.name.toLowerCase() === normalizedName.toLowerCase() &&
@@ -155,6 +198,9 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
           ...(template ? { templateId: template.id } : {}),
           name: template?.name || department.name.trim(),
           head: (department.head || "").trim(),
+          websiteUrl: normalizeWebsiteUrl(department.websiteUrl || ""),
+          location: (department.location || "").trim(),
+          managementLocation: (department.managementLocation || "").trim(),
         };
       }),
     };
@@ -232,16 +278,31 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
                   <div className="card-body">
                     {departmentListHospital.departments.length > 0 && (() => {
                       const uncoveredCount = departmentListHospital.departments.filter((department) => getDepartmentCasUsers(departmentListHospital.id, department.id).length === 0).length;
-                      return <div className={`alert ${uncoveredCount > 0 ? "alert-warning" : "alert-success"} py-2`} role="status"><strong>{uncoveredCount > 0 ? `${uncoveredCount} ${uncoveredCount === 1 ? "reparto scoperto" : "reparti scoperti"}` : "Tutti i reparti sono coperti"}</strong><span className="d-block small">Le assegnazioni sono aggiornate automaticamente dalla sezione CAS.</span></div>;
+                      return <div className={`alert ${uncoveredCount > 0 ? "alert-danger" : "alert-success"} py-2`} role="status"><strong>{uncoveredCount > 0 ? `${uncoveredCount} ${uncoveredCount === 1 ? "reparto scoperto" : "reparti scoperti"}` : "Tutti i reparti sono coperti"}</strong><span className="d-block small">Le assegnazioni sono aggiornate automaticamente dalla sezione CAS.</span></div>;
                     })()}
-                    {departmentListHospital.departments.length > 0 ? <div className="list-group">
-                      {departmentListHospital.departments.map((department) => {
+                    {departmentListHospital.departments.length > 0 && <div className="mb-3">
+                      <label className="form-label" htmlFor="hospital-department-search">Cerca per nome reparto</label>
+                      <input className="form-control" id="hospital-department-search" type="search" value={departmentListSearch} onChange={(event) => setDepartmentListSearch(event.target.value)} placeholder="Scrivi il nome del reparto" autoFocus />
+                    </div>}
+                    {departmentListHospital.departments.length > 0 ? <div className="list-group hospital-department-coverage-list">
+                      {filteredDepartmentList.map((department) => {
                         const assignedCasUsers = getDepartmentCasUsers(departmentListHospital.id, department.id);
+                        const departmentDoctors = getDepartmentDoctors(department.id);
                         return <div className={`list-group-item hospital-department-coverage ${assignedCasUsers.length === 0 ? "is-uncovered" : ""}`} key={department.id}>
-                          <div className="hospital-department-coverage-heading"><strong>{department.name}</strong><span className="text-secondary">{department.head ? `Primario: ${department.head}` : "Primario non indicato"}</span></div>
-                          <div className="hospital-department-cas"><span className="hospital-department-cas-label">CAS incaricati</span>{assignedCasUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{assignedCasUsers.map((casUser) => <span className="badge text-bg-success" key={casUser.id}>{casUser.username}</span>)}</div> : <span className="badge text-bg-warning">Reparto scoperto</span>}</div>
+                          <div className="hospital-department-coverage-heading">
+                            <strong>{department.name}</strong>
+                            <span className="text-secondary">{department.head ? `Primario: ${department.head}` : "Primario non indicato"}</span>
+                            <div className="hospital-department-locations">
+                              {department.location && <span><strong>Dove si trova il reparto:</strong> {department.location}</span>}
+                              {department.managementLocation && <span><strong>Dove si trova la direzione di reparto:</strong> {department.managementLocation}</span>}
+                            </div>
+                            {department.websiteUrl && <a className="btn btn-sm hospital-department-website-link" href={normalizeWebsiteUrl(department.websiteUrl)} target="_blank" rel="noopener noreferrer" aria-label={`Apri il sito web di ${department.name} in una nuova scheda`}>Visita il sito del reparto <span aria-hidden="true">↗</span></a>}
+                          </div>
+                          <div className="hospital-department-cas"><span className="hospital-department-cas-label">CAS incaricati</span>{assignedCasUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{assignedCasUsers.map((casUser) => <span className="badge text-bg-success" key={casUser.id}>{casUser.username}</span>)}</div> : <span className="badge text-bg-danger">Reparto scoperto</span>}</div>
+                          <div className="hospital-department-doctors"><span className="hospital-department-cas-label">Medici del reparto</span>{departmentDoctors.length > 0 ? <div className="d-flex flex-wrap gap-1">{departmentDoctors.map((doctor) => <span className="badge text-bg-secondary" key={doctor.id}>{doctor.lastName} {doctor.firstName}</span>)}</div> : <span className="text-secondary small">Nessun medico associato</span>}</div>
                         </div>;
                       })}
+                      {filteredDepartmentList.length === 0 && <p className="text-secondary mb-0">Nessun reparto trovato.</p>}
                     </div> : <p className="text-secondary mb-0">Nessun reparto inserito.</p>}
                   </div>
                   <div className="card-footer text-end">
@@ -337,7 +398,12 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
                               <input className="form-check-input" type="checkbox" checked={Boolean(selectedDepartment)} onChange={() => toggleDepartment(departmentTemplate)} />
                               <span className="form-check-label">{departmentTemplate.name}</span>
                             </label>
-                            {selectedDepartment && <input className="form-control form-control-sm mt-2" type="text" value={selectedDepartment.head || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "head", event.target.value)} aria-label={`Primario di ${departmentTemplate.name}`} placeholder="Primario (facoltativo)" />}
+                            {selectedDepartment && <div className="d-grid gap-2 mt-2">
+                              <input className="form-control form-control-sm" type="text" value={selectedDepartment.head || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "head", event.target.value)} aria-label={`Primario di ${departmentTemplate.name}`} placeholder="Primario (facoltativo)" />
+                              <input className="form-control form-control-sm" type="text" value={selectedDepartment.location || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "location", event.target.value)} aria-label={`Dove si trova il reparto ${departmentTemplate.name}`} placeholder="Dove si trova il reparto (facoltativo)" />
+                              <input className="form-control form-control-sm" type="text" value={selectedDepartment.managementLocation || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "managementLocation", event.target.value)} aria-label={`Dove si trova la direzione di reparto di ${departmentTemplate.name}`} placeholder="Dove si trova la direzione di reparto (facoltativo)" />
+                              <input className="form-control form-control-sm" type="text" inputMode="url" value={selectedDepartment.websiteUrl || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "websiteUrl", event.target.value)} onBlur={(event) => updateDepartment(selectedDepartment.id, "websiteUrl", normalizeWebsiteUrl(event.target.value))} aria-label={`Link web di ${departmentTemplate.name}`} placeholder="Es. www.ospedale.it/reparto" />
+                            </div>}
                           </div>;
                         })}
                       </div>
@@ -348,6 +414,9 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
                           {departments.filter((department) => !visibleDepartmentTemplates.some((template) => template.id === department.templateId || template.name.toLowerCase() === department.name.toLowerCase())).map((department) => <div className="hospital-department-row" key={department.id}>
                             <input className="form-control form-control-sm" type="text" value={department.name} onChange={(event) => updateDepartment(department.id, "name", event.target.value)} aria-label="Nome reparto" required />
                             <input className="form-control form-control-sm" type="text" value={department.head || ""} onChange={(event) => updateDepartment(department.id, "head", event.target.value)} aria-label={`Primario di ${department.name}`} placeholder="Primario (facoltativo)" />
+                            <input className="form-control form-control-sm" type="text" value={department.location || ""} onChange={(event) => updateDepartment(department.id, "location", event.target.value)} aria-label={`Dove si trova il reparto ${department.name}`} placeholder="Dove si trova il reparto (facoltativo)" />
+                            <input className="form-control form-control-sm" type="text" value={department.managementLocation || ""} onChange={(event) => updateDepartment(department.id, "managementLocation", event.target.value)} aria-label={`Dove si trova la direzione di reparto di ${department.name}`} placeholder="Dove si trova la direzione di reparto (facoltativo)" />
+                            <input className="form-control form-control-sm" type="text" inputMode="url" value={department.websiteUrl || ""} onChange={(event) => updateDepartment(department.id, "websiteUrl", event.target.value)} onBlur={(event) => updateDepartment(department.id, "websiteUrl", normalizeWebsiteUrl(event.target.value))} aria-label={`Link web di ${department.name}`} placeholder="Es. www.ospedale.it/reparto" />
                             <button className="btn btn-outline-danger btn-sm" type="button" aria-label={`Rimuovi ${department.name}`} onClick={() => removeDepartment(department.id)}>&times;</button>
                           </div>)}
                         </div>
@@ -426,13 +495,13 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], u
                               <td className="fw-medium" data-label="Ospedale">
                                 <div className="d-flex align-items-center gap-2 flex-wrap">
                                   <span>{hospital.name}</span>
-                                  <button className="badge text-bg-primary border-0 hospital-department-count" type="button" onClick={(event) => { event.stopPropagation(); setDepartmentListHospital(normalizeHospital(hospital)); }}>{hospital.departments.length} reparti</button>
-                                  {uncoveredDepartmentCount > 0 && <button className="badge text-bg-danger border-0 hospital-department-count" type="button" aria-label={`${uncoveredDepartmentCount} reparti senza CAS in ${hospital.name}`} onClick={(event) => { event.stopPropagation(); setDepartmentListHospital(normalizeHospital(hospital)); }}>{uncoveredDepartmentCount} senza CAS</button>}
+                                  <button className="badge text-bg-primary border-0 hospital-department-count" type="button" onClick={(event) => { event.stopPropagation(); openDepartmentList(hospital); }}>{hospital.departments.length} reparti</button>
+                                  <button className={`badge ${uncoveredDepartmentCount > 0 ? "text-bg-danger" : "text-bg-success"} border-0 hospital-department-count`} type="button" aria-label={`${uncoveredDepartmentCount} reparti senza CAS in ${hospital.name}`} onClick={(event) => { event.stopPropagation(); openDepartmentList(hospital); }}>{uncoveredDepartmentCount} senza CAS</button>
                                 </div>
                               </td>
                               <td data-label="Direttore">{hospital.director || "-"}</td>
                               <td data-label="Reparti">
-                                <button className="btn btn-outline-secondary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); setDepartmentListHospital(normalizeHospital(hospital)); }}>
+                                <button className="btn btn-outline-secondary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); openDepartmentList(hospital); }}>
                                   Visualizza reparti
                                 </button>
                               </td>
