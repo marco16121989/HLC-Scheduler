@@ -385,6 +385,13 @@ Meteor.publish("hlc-data", async function publishHlcData() {
   if (role === "GVP") {
     return [
       Meteor.users.find(userSelector, { fields: publicUserFields }),
+      HospitalsCollection.find({ presidentId }),
+      DoctorsCollection.find({ presidentId }, { fields: {
+        presidentId: 1,
+        firstName: 1,
+        lastName: 1,
+        departmentIds: 1,
+      } }),
       PatientsCollection.find(
         { presidentId, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] },
         { fields: {

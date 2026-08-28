@@ -20,7 +20,7 @@ const normalizeWebsiteUrl = (value) => {
   return /^https?:\/\//i.test(trimmedValue) ? trimmedValue : `https://${trimmedValue}`;
 };
 
-export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], doctors = [], users = [], presidentId }) => {
+export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], doctors = [], users = [], presidentId, readOnly = false }) => {
   const [name, setName] = useState("");
   const [director, setDirector] = useState("");
   const [departments, setDepartments] = useState([]);
@@ -234,6 +234,14 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
     setModalOpen(true);
   };
 
+  const handleHospitalClick = (hospital) => {
+    if (readOnly || globalThis.matchMedia?.("(max-width: 767.98px)").matches) {
+      openDepartmentList(hospital);
+      return;
+    }
+    handleEdit(hospital);
+  };
+
   const handleDelete = async () => {
     const hospital = hospitals.find((item) => item.id === editingId);
 
@@ -252,14 +260,14 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
       <div className="app-content-header hospital-page-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
-            <div><h1 className="mb-1">Ospedali</h1><p className="text-secondary mb-0">Gestisci le strutture ospedaliere e i relativi reparti.</p></div>
-            <button
+            <div><h1 className="mb-1">Ospedali</h1><p className="text-secondary mb-0">{readOnly ? "Consulta le strutture ospedaliere e i relativi reparti." : "Gestisci le strutture ospedaliere e i relativi reparti."}</p></div>
+            {!readOnly && <button
               className="btn btn-primary"
               type="button"
               onClick={openCreateModal}
             >
               Inserisci
-            </button>
+            </button>}
           </div>
         </div>
       </div>
@@ -305,7 +313,8 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                       {filteredDepartmentList.length === 0 && <p className="text-secondary mb-0">Nessun reparto trovato.</p>}
                     </div> : <p className="text-secondary mb-0">Nessun reparto inserito.</p>}
                   </div>
-                  <div className="card-footer text-end">
+                  <div className="card-footer d-flex justify-content-end gap-2">
+                    {!readOnly && <button className="btn btn-primary" type="button" onClick={() => handleEdit(departmentListHospital)}>Modifica ospedale</button>}
                     <button className="btn btn-outline-secondary" type="button" onClick={() => setDepartmentListHospital(null)}>Chiudi</button>
                   </div>
                 </section>
@@ -465,13 +474,13 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                           <th>Ospedale</th>
                           <th>Direttore sanitario</th>
                           <th>Reparti</th>
-                          <th className="text-end">Azioni</th>
+                          {!readOnly && <th className="text-end">Azioni</th>}
                         </tr>
                       </thead>
                       <tbody>
                         {visibleHospitals.length === 0 ? (
                           <tr>
-                            <td className="text-center text-secondary py-4" colSpan="4">
+                            <td className="text-center text-secondary py-4" colSpan={readOnly ? 3 : 4}>
                               Nessun ospedale inserito.
                             </td>
                           </tr>
@@ -484,11 +493,11 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                               key={hospital.id}
                               role="button"
                               tabIndex="0"
-                              onClick={() => handleEdit(hospital)}
+                              onClick={() => handleHospitalClick(hospital)}
                               onKeyDown={(event) => {
                                 if (event.key === "Enter" || event.key === " ") {
                                   event.preventDefault();
-                                  handleEdit(hospital);
+                                  handleHospitalClick(hospital);
                                 }
                               }}
                             >
@@ -505,7 +514,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                                   Visualizza reparti
                                 </button>
                               </td>
-                              <td className="text-end" data-label="Azioni">
+                              {!readOnly && <td className="text-end" data-label="Azioni">
                                 <button
                                   className="btn btn-outline-primary btn-sm"
                                   type="button"
@@ -513,7 +522,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                                 >
                                   Modifica
                                 </button>
-                              </td>
+                              </td>}
                             </tr>
                             );
                           })

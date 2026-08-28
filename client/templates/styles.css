@@ -1292,18 +1292,25 @@ svg.admin-nav-icon {
 .admin-login-message-list article p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .login-message-backdrop { position: fixed; z-index: 12000; inset: 0; background: rgb(7 18 35 / 64%); backdrop-filter: blur(5px); }
 .login-message-shell { position: fixed; z-index: 12010; inset: 0; display: grid; place-items: center; padding: max(1rem,env(safe-area-inset-top)) 1rem max(1rem,env(safe-area-inset-bottom)); }
-.login-message-card { position: relative; display: flex; width: min(760px,100%); min-height: min(430px,calc(100dvh - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; align-items: stretch; justify-content: center; flex-direction: column; padding: clamp(2rem,6vw,4rem); border: 1px solid var(--bs-border-color); border-radius: 1.25rem; background: var(--bs-body-bg); box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 32%); text-align: left; }
+.login-message-card { position: relative; display: flex; width: min(720px,100%); min-height: min(400px,calc(100dvh - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; align-items: stretch; justify-content: center; flex-direction: column; padding: clamp(1.5rem,5vw,3rem); border: 1px solid color-mix(in srgb,var(--bs-primary) 20%,var(--bs-border-color)); border-top: .35rem solid var(--bs-primary); border-radius: 1.1rem; background: var(--bs-body-bg); box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 32%); text-align: left; }
 .login-message-close { position: absolute; top: 1rem; right: 1rem; display: grid; width: 2.75rem; height: 2.75rem; padding: 0; place-items: center; border: 0; border-radius: 50%; background: var(--bs-tertiary-bg); color: var(--bs-body-color); font-size: 2rem; line-height: 1; }
 .login-message-close:hover,.login-message-close:focus-visible { background: var(--bs-secondary-bg); color: var(--bs-primary); }
-.login-message-card h2 { margin: .25rem 0 1rem; color: var(--bs-secondary-color); font-size: clamp(1.05rem,2vw,1.3rem); font-weight: 650; }
-.login-message-alert-icon { width: 3.1em; height: 2.8em; margin-right: .5rem; color: #241a00; vertical-align: middle; }
-.login-message-text { width: 100%; margin-bottom: 1.25rem; padding: clamp(1.25rem,3vw,2rem); border: 1px solid color-mix(in srgb,var(--bs-primary) 28%,var(--bs-border-color)); border-left: .35rem solid var(--bs-primary); border-radius: .9rem; background: color-mix(in srgb,var(--bs-primary) 7%,var(--bs-body-bg)); color: var(--bs-body-color); white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(1.05rem,2vw,1.3rem); font-weight: 600; line-height: 1.55; text-align: left; }
+.login-message-header { display: flex; align-items: center; gap: 1.25rem; padding-right: 3rem; }
+.login-message-logo { width: 112px; height: 46px; flex: 0 0 auto; object-fit: contain; object-position: left center; border-radius: .35rem; }
+.login-message-eyebrow { display: block; margin-bottom: .2rem; color: var(--bs-primary); font-size: .72rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.login-message-card h2 { margin: 0; color: var(--bs-body-color); font-size: clamp(1.3rem,2.4vw,1.75rem); font-weight: 750; }
+.login-message-divider { height: 1px; margin: 1.25rem 0; background: linear-gradient(90deg,var(--bs-primary),color-mix(in srgb,var(--bs-primary) 10%,transparent) 70%,transparent); }
+.login-message-text { width: 100%; margin: 0; padding: clamp(1.15rem,3vw,1.65rem); border: 1px solid var(--bs-border-color); border-radius: .75rem; background: var(--bs-tertiary-bg); color: var(--bs-body-color); white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(1.05rem,2vw,1.22rem); font-weight: 550; line-height: 1.6; text-align: left; }
+.login-message-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; color: var(--bs-secondary-color); font-size: .8rem; font-weight: 650; }
 .login-message-card small { color: var(--bs-secondary-color); font-size: .95rem; }
 
 @media (max-width: 767.98px) {
   .admin-login-message-dates { grid-template-columns: 1fr; }
   .admin-login-message-list article { flex-direction: column; }
   .admin-login-message-list article .btn { align-self: flex-end; }
+  .login-message-header { align-items: flex-start; flex-direction: column; gap: .75rem; }
+  .login-message-logo { width: 92px; height: 38px; }
+  .login-message-footer { align-items: flex-start; flex-direction: column; gap: .25rem; }
   .patient-departments-tab,
   .patient-departments-content {
     display: none !important;
