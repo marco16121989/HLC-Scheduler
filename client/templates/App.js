@@ -76,6 +76,52 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
+    const getOpenModalShells = () => [...document.querySelectorAll(".entity-modal-shell:not(.d-none), .login-message-shell")];
+    let openModalCount = getOpenModalShells().length;
+    let closingFromHistory = false;
+    let ignoringHistoryEvent = false;
+
+    const observer = new MutationObserver(() => {
+      const nextOpenModalCount = getOpenModalShells().length;
+      if (nextOpenModalCount > openModalCount) {
+        for (let index = openModalCount; index < nextOpenModalCount; index += 1) {
+          globalThis.history?.pushState({ ...(globalThis.history.state || {}), hlcOverlay: true }, "");
+        }
+      } else if (nextOpenModalCount < openModalCount) {
+        if (closingFromHistory) {
+          closingFromHistory = false;
+        } else if (globalThis.history?.state?.hlcOverlay) {
+          ignoringHistoryEvent = true;
+          globalThis.history.back();
+        }
+      }
+      openModalCount = nextOpenModalCount;
+    });
+
+    const handleModalHistory = () => {
+      if (ignoringHistoryEvent) {
+        ignoringHistoryEvent = false;
+        return;
+      }
+      const openShells = getOpenModalShells();
+      const topShell = openShells.at(-1);
+      if (!topShell) return;
+      const closeButton = topShell.querySelector(".btn-close, .login-message-close, [aria-label^='Chiudi'], [aria-label^='Annulla']");
+      if (closeButton) {
+        closingFromHistory = true;
+        closeButton.click();
+      }
+    };
+
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+    globalThis.addEventListener("popstate", handleModalHistory);
+    return () => {
+      observer.disconnect();
+      globalThis.removeEventListener("popstate", handleModalHistory);
+    };
+  }, []);
+
+  useEffect(() => {
     const logo = new Image();
     let cancelled = false;
     const markLogoReady = () => {

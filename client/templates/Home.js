@@ -89,7 +89,7 @@ export const Home = ({
   const [sidebarOpen, setSidebarOpen] = useState(
     () => globalThis.innerWidth >= 992,
   );
-  const [activeView, setActiveView] = useState("home");
+  const [activeView, setActiveView] = useState(() => globalThis.history?.state?.hlcView || "home");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsMenuRef = useRef(null);
   const unreadNotifications = notifications.filter((notification) => !notification.readAt);
@@ -105,9 +105,31 @@ export const Home = ({
     if (globalThis.innerWidth < 992) setSidebarOpen(false);
   };
   const openView = (view) => {
+    if (view !== activeView) {
+      globalThis.history?.pushState({ ...(globalThis.history.state || {}), hlcApp: true, hlcView: view }, "");
+    }
     setActiveView(view);
     closeMobileSidebar();
   };
+
+  useEffect(() => {
+    if (!globalThis.history?.state?.hlcApp) {
+      globalThis.history?.replaceState({ ...(globalThis.history.state || {}), hlcAppRoot: true }, "");
+      globalThis.history?.pushState({ hlcApp: true, hlcView: activeView }, "");
+    }
+    const handleHistoryNavigation = (event) => {
+      if (event.state?.hlcView) {
+        setActiveView(event.state.hlcView);
+        closeMobileSidebar();
+        return;
+      }
+      setActiveView("home");
+      closeMobileSidebar();
+      globalThis.history?.pushState({ hlcApp: true, hlcView: "home" }, "");
+    };
+    globalThis.addEventListener("popstate", handleHistoryNavigation);
+    return () => globalThis.removeEventListener("popstate", handleHistoryNavigation);
+  }, []);
 
   useEffect(() => {
     if (!notificationsOpen) return undefined;
