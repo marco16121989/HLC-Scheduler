@@ -22,6 +22,7 @@ import {
 import { formatUserName } from "/imports/utils/formatUserName";
 import { DEFAULT_DEPARTMENT_NAMES } from "/imports/constants/departments";
 import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
+import { normalizeGvpPatientSharedFields } from "/imports/constants/gvpPatientSharing";
 
 const usefulFileExtensions = new Set([
   "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
@@ -166,6 +167,44 @@ const requireUser = (context) => {
 const requirePageEdit = (actor, pageId) => {
   const permission = getPagePermission({ ...(actor?.profile || {}), role: actor?.profile?.role }, pageId);
   if (!permission.edit) throw new Meteor.Error("not-authorized", "Non hai il permesso di modificare questa sezione.");
+};
+
+const getGvpPatientSharedFields = async (presidentId) => {
+  const president = await Meteor.users.findOneAsync(presidentId, {
+    fields: { "profile.gvpPatientSharedFields": 1 },
+  });
+  return normalizeGvpPatientSharedFields(president?.profile?.gvpPatientSharedFields);
+};
+
+const gvpPatientProjection = (sharedFields) => Object.fromEntries([
+  "presidentId", "casId", "casIds", "gvpId", "gvpIds", "gvpNotes",
+  ...sharedFields,
+].map((field) => [field, 1]));
+
+const setNestedValue = (target, path, value) => {
+  const parts = path.split(".");
+  let cursor = target;
+  parts.forEach((part, index) => {
+    if (index === parts.length - 1) cursor[part] = value;
+    else cursor = cursor[part] ||= {};
+  });
+};
+
+const pickGvpPatientFields = (patient, sharedFields) => {
+  const visible = {
+    _id: patient._id,
+    presidentId: patient.presidentId,
+    casId: patient.casId,
+    casIds: patient.casIds,
+    gvpId: patient.gvpId,
+    gvpIds: patient.gvpIds,
+    gvpNotes: patient.gvpNotes,
+  };
+  for (const path of sharedFields) {
+    const value = path.split(".").reduce((current, part) => current?.[part], patient);
+    if (value !== undefined) setNestedValue(visible, path, value);
+  }
+  return visible;
 };
 
 export const buildPatientNoteNotification = ({ recipientId, patientId, patientName, noteAuthor, noteText }) => ({
@@ -388,6 +427,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         : { _id: actor._id };
 
   if (role === "GVP") {
+    const sharedPatientFields = await getGvpPatientSharedFields(presidentId);
     const canViewPermissions = getPagePermission({ ...actor.profile, role }, "permissions").view;
     const gvpHospitalUsersSelector = canViewPermissions ? {
       $or: [
@@ -420,42 +460,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
       } }),
       PatientsCollection.find(
         { presidentId, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] },
-        { fields: {
-          presidentId: 1,
-          casId: 1,
-          casIds: 1,
-          gvpId: 1,
-          gvpIds: 1,
-          firstName: 1,
-          lastName: 1,
-          admissionDate: 1,
-          dischargeDate: 1,
-          admissionType: 1,
-          status: 1,
-          transferNotes: 1,
-          departmentHistory: 1,
-          "details.sex": 1,
-          "details.departmentId": 1,
-          "details.hospitalDepartment": 1,
-          "details.hospitalRoom": 1,
-          "details.hospitalBed": 1,
-          "details.anesthesiologistDate": 1,
-          "details.anesthesiologistTime": 1,
-          "details.anesthesiologistName": 1,
-          "details.maidenName": 1,
-          "details.congregation": 1,
-          "details.age": 1,
-          "details.patientPhone": 1,
-          "details.healthProblems": 1,
-          "details.spiritualCondition": 1,
-          "details.nonWitnessFamily": 1,
-          "details.datCompleted": 1,
-          "details.datRegistered": 1,
-          "details.elderName": 1,
-          "details.elderEmail": 1,
-          "details.elderPhone": 1,
-          "details.simplifiedNotes": 1,
-        } },
+        { fields: gvpPatientProjection(sharedPatientFields) },
       ),
       UsefulFilesCollection.find({ presidentId }, { sort: { createdAt: -1 } }),
       AbsencesCollection.find({ userId: actor._id }, { sort: { startDate: 1 } }),
@@ -864,10 +869,38 @@ Meteor.methods({
       throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
     }
     if (role === "GVP") {
-      const { casNotes: _privateCasNotes, ...visiblePatient } = patient;
-      return visiblePatient;
+      const sharedFields = await getGvpPatientSharedFields(presidentId);
+      return pickGvpPatientFields(patient, sharedFields);
     }
     return patient;
+  },
+
+  async "hlc.getGvpPatientSharingSettings"() {
+    requireUser(this);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    if (!["Presidente", "GVP"].includes(role)) {
+      throw new Meteor.Error("not-authorized", "Configurazione non disponibile per il tuo profilo.");
+    }
+    const presidentId = role === "Presidente" ? actor._id : await getActorPresidentId(actor);
+    return getGvpPatientSharedFields(presidentId);
+  },
+
+  async "hlc.updateGvpPatientSharingSettings"(fields) {
+    requireUser(this);
+    check(fields, [String]);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    if (actor?.profile?.role !== "Presidente") {
+      throw new Meteor.Error("not-authorized", "Operazione riservata al Presidente.");
+    }
+    const normalized = normalizeGvpPatientSharedFields(fields);
+    if (normalized.length !== new Set(fields).size) {
+      throw new Meteor.Error("invalid-fields", "La selezione contiene campi non validi.");
+    }
+    await Meteor.users.updateAsync(actor._id, {
+      $set: { "profile.gvpPatientSharedFields": normalized },
+    });
+    return normalized;
   },
 
   async "hlc.createEvent"(data) {

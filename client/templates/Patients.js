@@ -4,6 +4,10 @@ import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
 import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPdf.js";
 import { confirmAction } from "./ConfirmDialog.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
+import {
+  DEFAULT_GVP_PATIENT_SHARED_FIELDS,
+  GVP_PATIENT_SUMMARY_FIELDS,
+} from "/imports/constants/gvpPatientSharing";
 import { PaginationControls, usePagination } from "./Pagination.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
@@ -368,6 +372,20 @@ export const Patients = ({
   const [transferDraft, setTransferDraft] = useState("");
   const [transferError, setTransferError] = useState("");
   const [activeTab, setActiveTab] = useState("main");
+  const [sharingModalOpen, setSharingModalOpen] = useState(false);
+  const [sharedGvpFields, setSharedGvpFields] = useState(DEFAULT_GVP_PATIENT_SHARED_FIELDS);
+  const [sharingDraft, setSharingDraft] = useState(DEFAULT_GVP_PATIENT_SHARED_FIELDS);
+  const [sharingSaving, setSharingSaving] = useState(false);
+  const [sharingMessage, setSharingMessage] = useState("");
+
+  useEffect(() => {
+    if (!["Presidente", "GVP"].includes(currentUser.role)) return;
+    Meteor.call("hlc.getGvpPatientSharingSettings", (methodError, fields) => {
+      if (methodError || !Array.isArray(fields)) return;
+      setSharedGvpFields(fields);
+      setSharingDraft(fields);
+    });
+  }, [currentUser.role]);
 
   const isEditing = editingId !== null;
   const transferTargetPatient = transferTarget?.type === "patient"
@@ -1180,6 +1198,35 @@ export const Patients = ({
   const selectedCasUsers = users.filter((item) => casIds.includes(item.id));
   const selectedCasUser = selectedCasUsers[0];
   const selectedGvpUsers = users.filter((item) => gvpIds.includes(item.id));
+  const sharingOptions = GVP_PATIENT_SUMMARY_FIELDS;
+
+  const openSharingModal = () => {
+    setSharingDraft(sharedGvpFields);
+    setSharingMessage("");
+    setSharingModalOpen(true);
+  };
+
+  const toggleSharingField = (field) => {
+    setSharingDraft((current) => current.includes(field)
+      ? current.filter((item) => item !== field)
+      : [...current, field]);
+    setSharingMessage("");
+  };
+
+  const saveSharingSettings = () => {
+    setSharingSaving(true);
+    setSharingMessage("");
+    Meteor.call("hlc.updateGvpPatientSharingSettings", sharingDraft, (methodError, fields) => {
+      setSharingSaving(false);
+      if (methodError) {
+        setSharingMessage(methodError.reason || "Impossibile salvare le informazioni condivise.");
+        return;
+      }
+      setSharedGvpFields(fields);
+      setSharingDraft(fields);
+      setSharingMessage("Impostazioni salvate.");
+    });
+  };
 
   const summaryEntries = [
     { label: "Nome", value: firstName },
@@ -1204,31 +1251,22 @@ export const Patients = ({
     ),
   ];
 
-  const gvpSummaryEntries = [
-    { label: "Nome", value: firstName },
-    { label: "Cognome", value: lastName },
-    { label: "Sesso", value: details.sex },
-    ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
-    { label: "Stato", value: patientStatus },
-    ...(patientStatus === "Trasferito" ? [{ label: "Dove è stato trasferito", value: transferNotes }] : []),
-    { label: "Numero camera", value: details.hospitalRoom },
-    { label: "Numero letto", value: details.hospitalBed },
-    { label: "Visita con l’anestesista", value: details.anesthesiologistDate },
-    { label: "Orario visita", value: details.anesthesiologistTime },
-    { label: "Anestesista", value: details.anesthesiologistName },
-    { label: "Congregazione", value: details.congregation },
-    { label: "Età", value: details.age },
-    { label: "Numero di cellulare del paziente", value: details.patientPhone },
-    { label: "Problemi di salute", value: details.healthProblems },
-    { label: "Condizione spirituale", value: details.spiritualCondition },
-    { label: "Familiari non Testimoni coinvolti", value: details.nonWitnessFamily },
-    { label: "DAT compilata?", value: details.datCompleted },
-    { label: "DAT registrata?", value: details.datRegistered },
-    { label: "Nome dell’anziano", value: details.elderName },
-    { label: "E-mail dell’anziano", value: details.elderEmail },
-    { label: "Cellulare dell’anziano", value: details.elderPhone },
-    { label: "Note per il CAS", value: details.simplifiedNotes },
-  ];
+  const getSharingSummaryValue = (field) => {
+    if (field === "firstName") return firstName;
+    if (field === "lastName") return lastName;
+    if (field === "admissionType") return admissionTypeLabel(admissionType);
+    if (field === "status") return patientStatus;
+    if (field === "transferNotes") return transferNotes;
+    if (field === "doctorId") return doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato";
+    if (field === "recommendedDoctorIds") return recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ") : "Nessun medico consigliato";
+    if (field === "details.departmentId") return selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Non assegnato";
+    if (field === "casIds") return selectedCasUsers.length > 0 ? selectedCasUsers.map((user) => user.username).join(", ") : "Non assegnato";
+    if (field === "gvpIds") return selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato";
+    return field.startsWith("details.") ? details[field.slice(8)] : "";
+  };
+  const gvpSummaryEntries = sharingOptions
+    .filter(([field]) => sharedGvpFields.includes(field))
+    .map(([field, label]) => ({ label, value: getSharingSummaryValue(field) }));
 
   const mainSummaryEntries = [
     { label: "Nome", value: firstName },
@@ -1284,6 +1322,7 @@ export const Patients = ({
                 <option value="all">Tutti i pazienti</option>
                 {visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{casUser.username}</option>)}
               </select>}
+              {currentUser.role === "Presidente" && <button className="btn btn-outline-primary" type="button" onClick={openSharingModal}>Scegli info da condividere con GVP</button>}
               {canEditPatients && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
             </div>
           </div>
@@ -1292,6 +1331,42 @@ export const Patients = ({
 
       <div className="app-content patient-page-content">
         <div className="container-fluid">
+          {sharingModalOpen && <>
+            <button className="entity-modal-backdrop" type="button" aria-label="Chiudi scelta informazioni" onClick={() => setSharingModalOpen(false)} />
+            <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="gvp-sharing-title">
+              <section className="card entity-modal-card">
+                <div className="card-header d-flex align-items-center gap-3">
+                  <div className="flex-grow-1">
+                    <h2 className="card-title mb-1" id="gvp-sharing-title">Scegli info da condividere con GVP</h2>
+                    <p className="text-secondary small mb-0 patient-sharing-description">La scelta vale per tutti i pazienti e per tutti i GVP assegnati.</p>
+                  </div>
+                  <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setSharingModalOpen(false)} />
+                </div>
+                <div className="card-body">
+                  <div className="d-flex justify-content-end gap-2 mb-3">
+                    <button className="btn btn-outline-secondary btn-sm" type="button" onClick={() => setSharingDraft([])}>Deseleziona tutto</button>
+                    <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setSharingDraft(sharingOptions.map(([field]) => field))}>Seleziona tutto</button>
+                  </div>
+                  <div className="patient-sharing-list">
+                    {sharingOptions.map(([field, label]) => (
+                      <label className="patient-sharing-row" key={field}>
+                        <span>{label}</span>
+                        <span className="form-check d-flex align-items-center gap-2 mb-0">
+                          <input className="form-check-input mt-0" type="checkbox" checked={sharingDraft.includes(field)} onChange={() => toggleSharingField(field)} />
+                          <span>Condividi</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="card-footer d-flex align-items-center justify-content-end gap-3">
+                  {sharingMessage && <span className={sharingMessage === "Impostazioni salvate." ? "text-success" : "text-danger"}>{sharingMessage}</span>}
+                  <button className="btn btn-outline-secondary" type="button" onClick={() => setSharingModalOpen(false)}>Chiudi</button>
+                  <button className="btn btn-primary" type="button" disabled={sharingSaving} onClick={saveSharingSettings}>{sharingSaving ? "Salvataggio..." : "Salva"}</button>
+                </div>
+              </section>
+            </div>
+          </>}
           {notePatient && <>
             <button className="entity-modal-backdrop" type="button" aria-label="Chiudi note GVP" onClick={closeNotes} />
             <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="gvp-notes-title">

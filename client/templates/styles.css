@@ -1562,6 +1562,33 @@ svg.admin-nav-icon {
   white-space: pre-wrap;
 }
 
+.patient-sharing-list {
+  display: grid;
+  gap: 0;
+}
+
+.patient-sharing-description {
+  clear: both;
+  display: block;
+  width: 100%;
+}
+
+.patient-sharing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.35rem;
+  padding: .35rem .15rem;
+  border-bottom: 1px solid var(--bs-border-color);
+  cursor: pointer;
+  user-select: none;
+}
+
+.patient-sharing-row:last-child {
+  border-bottom: 0;
+}
+
 .patient-row-actions {
   display: flex;
   justify-content: center;
