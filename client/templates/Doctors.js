@@ -74,6 +74,7 @@ export const Doctors = ({
   hospitals,
   presidentId,
   currentUser,
+  readOnly = false,
 }) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -387,14 +388,14 @@ export const Doctors = ({
       <div className="app-content-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
-            <div><h1 className="mb-1">Medici</h1><p className="text-secondary mb-0">Gestisci i contatti dei medici e le indicazioni sugli studi in cui ricevono.</p></div>
-            <button
+            <div><h1 className="mb-1">Medici</h1><p className="text-secondary mb-0">{readOnly ? "Consulta i contatti dei medici e i reparti in cui operano." : "Gestisci i contatti dei medici e le indicazioni sugli studi in cui ricevono."}</p></div>
+            {!readOnly && <button
               className="btn btn-primary"
               type="button"
               onClick={openCreateModal}
             >
               Inserisci
-            </button>
+            </button>}
           </div>
         </div>
       </div>
@@ -412,13 +413,12 @@ export const Doctors = ({
                 <div className="card-body">
                   {doctorNoteError && <div className="alert alert-danger py-2" role="alert">{doctorNoteError}</div>}
                   <h3 className="h6">Note operative esistenti</h3>
-                  {getDoctorNotes(noteDoctor).length === 0 ? <p className="text-secondary">Nessuna nota operativa inserita.</p> : <div className="d-grid gap-2 mb-4">{getDoctorNotes(noteDoctor).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{note.authorId === currentUser?.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteDoctorNote(note)}>Elimina</button>}</div><small className="text-secondary">{note.author || "Utente"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></article>)}</div>}
-                  <label className="form-label" htmlFor="new-doctor-note">Aggiungi una nota operativa</label>
-                  <textarea className="form-control" id="new-doctor-note" rows="5" value={newDoctorNote} onChange={(event) => { setNewDoctorNote(event.target.value); setDoctorNoteError(""); }} maxLength="4000" autoFocus />
+                  {getDoctorNotes(noteDoctor).length === 0 ? <p className="text-secondary">Nessuna nota operativa inserita.</p> : <div className={`d-grid gap-2 ${readOnly ? "" : "mb-4"}`}>{getDoctorNotes(noteDoctor).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{!readOnly && note.authorId === currentUser?.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteDoctorNote(note)}>Elimina</button>}</div><small className="text-secondary">{note.author || "Utente"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></article>)}</div>}
+                  {!readOnly && <><label className="form-label" htmlFor="new-doctor-note">Aggiungi una nota operativa</label><textarea className="form-control" id="new-doctor-note" rows="5" value={newDoctorNote} onChange={(event) => { setNewDoctorNote(event.target.value); setDoctorNoteError(""); }} maxLength="4000" autoFocus /></>}
                 </div>
                 <div className="card-footer d-flex justify-content-end gap-2">
-                  <button className="btn btn-outline-secondary" type="button" onClick={closeDoctorNotes}>Annulla</button>
-                  <button className="btn btn-primary" type="button" onClick={saveDoctorNote} disabled={!newDoctorNote.trim()}>Aggiungi nota operativa</button>
+                  <button className="btn btn-outline-secondary" type="button" onClick={closeDoctorNotes}>{readOnly ? "Chiudi" : "Annulla"}</button>
+                  {!readOnly && <button className="btn btn-primary" type="button" onClick={saveDoctorNote} disabled={!newDoctorNote.trim()}>Aggiungi nota operativa</button>}
                 </div>
               </section>
             </div>
@@ -787,13 +787,13 @@ export const Doctors = ({
 
                               return (
                               <tr
-                                className="doctor-clickable-row"
+                                className={readOnly ? "" : "doctor-clickable-row"}
                                 key={doctor.id}
-                                role="button"
-                                tabIndex="0"
-                                onClick={() => handleEdit(doctor)}
+                                role={readOnly ? undefined : "button"}
+                                tabIndex={readOnly ? undefined : 0}
+                                onClick={readOnly ? undefined : () => handleEdit(doctor)}
                                 onKeyDown={(event) => {
-                                  if (event.key === "Enter" || event.key === " ") {
+                                  if (!readOnly && (event.key === "Enter" || event.key === " ")) {
                                     event.preventDefault();
                                     handleEdit(doctor);
                                   }

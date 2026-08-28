@@ -454,6 +454,16 @@ export const Home = ({
                 </li>
                 <li className="nav-item menu-order-health">
                   <button
+                    className={`nav-link w-100 ${activeView === "doctors" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => openView("doctors")}
+                  >
+                    <MenuIcon name="doctor" />
+                    <p>Medici</p>
+                  </button>
+                </li>
+                <li className="nav-item menu-order-health">
+                  <button
                     className={`nav-link w-100 ${activeView === "patients" ? "active" : ""}`}
                     type="button"
                     onClick={() => openView("patients")}
@@ -542,6 +552,7 @@ export const Home = ({
             hospitals={hospitals}
             presidentId={presidentId}
             currentUser={user}
+            readOnly={user.role === "GVP"}
           />
         ) : activeView === "patients" && presidentId ? (
           <Patients

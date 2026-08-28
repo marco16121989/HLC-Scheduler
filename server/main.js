@@ -383,13 +383,27 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         : { _id: actor._id };
 
   if (role === "GVP") {
+    const gvpHospitalUsersSelector = {
+      $or: [
+        { _id: actor._id },
+        { "profile.role": "CAS", "profile.presidentId": presidentId },
+        { "profile.role": "CAS", "profile.associationId": presidentId },
+      ],
+    };
     return [
-      Meteor.users.find(userSelector, { fields: publicUserFields }),
+      Meteor.users.find(gvpHospitalUsersSelector, { fields: publicUserFields }),
       HospitalsCollection.find({ presidentId }),
       DoctorsCollection.find({ presidentId }, { fields: {
         presidentId: 1,
         firstName: 1,
         lastName: 1,
+        phone: 1,
+        email: 1,
+        doctorType: 1,
+        professionalRole: 1,
+        notes: 1,
+        doctorNotes: 1,
+        officeInstructions: 1,
         departmentIds: 1,
       } }),
       PatientsCollection.find(
