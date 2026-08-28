@@ -72,7 +72,7 @@ export const AdminTools = ({ users = [], loginMessages = [] }) => {
             globalThis.alert(loginError.reason || "Impossibile avviare la modalità assistenza.");
             return;
           }
-          globalThis.sessionStorage?.setItem("hlc-impersonation", JSON.stringify({ targetUsername: result?.targetUsername || "Utente" }));
+          globalThis.sessionStorage?.setItem("hlc-impersonation", JSON.stringify({ sessionToken: result?.sessionToken, targetUsername: result?.targetUsername || "Utente" }));
           globalThis.dispatchEvent(new CustomEvent("hlc-impersonation-changed"));
         },
       });

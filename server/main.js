@@ -29,10 +29,17 @@ const usefulFileExtensions = new Set([
 
 const impersonationSessions = new Map();
 const impersonationLoginTickets = new Map();
+const impersonationConnectionTokens = new Map();
+const clearExpiredImpersonationSessions = () => {
+  const now = Date.now();
+  for (const [token, session] of impersonationSessions) {
+    if (session.expiresAt < now) impersonationSessions.delete(token);
+  }
+};
 
 Meteor.onConnection((connection) => {
   connection.onClose(() => {
-    impersonationSessions.delete(connection.id);
+    impersonationConnectionTokens.delete(connection.id);
     for (const [token, ticket] of impersonationLoginTickets) {
       if (ticket.connectionId === connection.id) impersonationLoginTickets.delete(token);
     }
@@ -49,13 +56,16 @@ Accounts.registerLoginHandler("hlc-impersonation", async function impersonationL
     throw new Meteor.Error("invalid-token", "Token assistenza non valido o scaduto.");
   }
   if (ticket.mode === "start") {
-    impersonationSessions.set(this.connection.id, {
+    impersonationSessions.set(ticket.sessionToken, {
       adminId: ticket.adminId,
       targetId: ticket.userId,
       startedAt: new Date(),
+      expiresAt: Date.now() + 12 * 60 * 60 * 1000,
     });
+    impersonationConnectionTokens.set(this.connection.id, ticket.sessionToken);
   } else {
-    impersonationSessions.delete(this.connection.id);
+    impersonationSessions.delete(ticket.sessionToken);
+    impersonationConnectionTokens.delete(this.connection.id);
   }
   return { userId: ticket.userId };
 });
@@ -541,6 +551,7 @@ Meteor.methods({
 
   async "hlc.startImpersonation"(targetUserId) {
     requireUser(this);
+    clearExpiredImpersonationSessions();
     check(targetUserId, String);
     const admin = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
     if (admin?.profile?.role !== "Admin") {
@@ -551,11 +562,13 @@ Meteor.methods({
       throw new Meteor.Error("invalid-user", "Utente non disponibile per la modalità assistenza.");
     }
     const impersonationToken = Random.secret();
+    const sessionToken = Random.secret();
     impersonationLoginTickets.set(impersonationToken, {
       mode: "start",
       connectionId: this.connection.id,
       adminId: admin._id,
       userId: target._id,
+      sessionToken,
       expiresAt: Date.now() + 60_000,
     });
     await AccessLogsCollection.insertAsync({
@@ -567,18 +580,32 @@ Meteor.methods({
       targetUsername: target.username || target.profile?.role,
       createdAt: new Date(),
     });
-    return { impersonationToken, targetUsername: target.username || target.profile?.role };
+    return { impersonationToken, sessionToken, targetUsername: target.username || target.profile?.role };
   },
 
-  async "hlc.stopImpersonation"() {
+  "hlc.getImpersonationStatus"(sessionToken) {
     requireUser(this);
-    const session = impersonationSessions.get(this.connection.id);
-    if (!session || session.targetId !== this.userId) {
+    check(sessionToken, String);
+    const session = impersonationSessions.get(sessionToken);
+    if (!session || session.targetId !== this.userId || session.expiresAt < Date.now()) {
+      impersonationSessions.delete(sessionToken);
+      return false;
+    }
+    impersonationConnectionTokens.set(this.connection.id, sessionToken);
+    return true;
+  },
+
+  async "hlc.stopImpersonation"(sessionToken) {
+    requireUser(this);
+    check(sessionToken, String);
+    const session = impersonationSessions.get(sessionToken);
+    if (!session || session.targetId !== this.userId || session.expiresAt < Date.now()) {
+      impersonationSessions.delete(sessionToken);
       throw new Meteor.Error("not-authorized", "Modalità assistenza non attiva.");
     }
     const admin = await Meteor.users.findOneAsync(session.adminId, { fields: publicUserFields });
     if (admin?.profile?.role !== "Admin") {
-      impersonationSessions.delete(this.connection.id);
+      impersonationSessions.delete(sessionToken);
       throw new Meteor.Error("not-authorized", "Account amministratore non disponibile.");
     }
     await AccessLogsCollection.insertAsync({
@@ -595,6 +622,7 @@ Meteor.methods({
       connectionId: this.connection.id,
       adminId: admin._id,
       userId: admin._id,
+      sessionToken,
       expiresAt: Date.now() + 60_000,
     });
     return { restoreToken };
@@ -623,7 +651,7 @@ Meteor.methods({
 
   async "hlc.trackAccess"() {
     requireUser(this);
-    const assistanceSession = impersonationSessions.get(this.connection.id);
+    const assistanceSession = impersonationSessions.get(impersonationConnectionTokens.get(this.connection.id));
     if (assistanceSession?.targetId === this.userId) return null;
     const actor = await Meteor.users.findOneAsync(this.userId, { fields: publicUserFields });
     const duplicateWindow = new Date(Date.now() - 30 * 60 * 1000);

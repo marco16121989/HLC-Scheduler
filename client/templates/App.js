@@ -174,6 +174,21 @@ export const App = () => {
   }, [impersonation, user?.role]);
 
   useEffect(() => {
+    if (!impersonation || !user?.id || user.role === "Admin") return;
+    if (!impersonation.sessionToken) {
+      globalThis.sessionStorage?.removeItem("hlc-impersonation");
+      setImpersonation(null);
+      return;
+    }
+    Meteor.call("hlc.getImpersonationStatus", impersonation.sessionToken, (error, isActive) => {
+      if (!error && isActive) return;
+      globalThis.sessionStorage?.removeItem("hlc-impersonation");
+      setImpersonation(null);
+      setImpersonationBannerOpen(false);
+    });
+  }, [impersonation?.sessionToken, user?.id, user?.role]);
+
+  useEffect(() => {
     if (!user?.id) return;
     const trackingKey = `hlc-access-session:${user.id}`;
     if (globalThis.sessionStorage?.getItem(trackingKey)) return;
@@ -289,7 +304,7 @@ export const App = () => {
     </div>;
 
   const stopImpersonation = () => {
-    Meteor.call("hlc.stopImpersonation", (error, result) => {
+    Meteor.call("hlc.stopImpersonation", impersonation?.sessionToken, (error, result) => {
       if (error) {
         globalThis.alert(error.reason || "Impossibile tornare all’account Admin.");
         return;
