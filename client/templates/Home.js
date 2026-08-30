@@ -23,6 +23,7 @@ import { AdminTools } from "./AdminTools.js";
 import { Donations } from "./Donations.js";
 import { PageInfo } from "./PageInfo.js";
 import { Permissions } from "./Permissions.js";
+import { Hospitality } from "./Hospitality.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
 
 const ICON_PATHS = {
@@ -40,6 +41,7 @@ const ICON_PATHS = {
   presentation: ["M3 4h18v13H3z", "M8 21l4-4 4 4M7 9l3 3 4-5 3 3"],
   doctor: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", "M12 7v10M7 12h10"],
   patient: ["M4 21v-7a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v7", "M12 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M9 16h6M12 13v6"],
+  hospitality: ["M3 11.5 12 4l9 7.5", "M5 10v10h14V10", "M9 20v-6h6v6", "M8 8V5h3"],
   reports: ["M4 20V10M10 20V4M16 20v-7M22 20H2", "M4 7h.01M10 1h.01M16 10h.01"],
   presentationReports: ["M12 3v9l7.8 4.5A9 9 0 1 1 12 3z", "M14 3.3A9 9 0 0 1 21 10h-7z"],
   support: ["M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z", "M8 9h8M8 13h5"],
@@ -69,6 +71,8 @@ export const Home = ({
   setDoctors,
   patients,
   setPatients,
+  hospitalityOffers = [],
+  setHospitalityOffers,
   presentations,
   events = [],
   setPresentations,
@@ -508,6 +512,12 @@ export const Home = ({
                 </li>
                 </>
               )}
+              {["Presidente", "CAS", "GVP"].includes(user.role) && canViewPage("hospitality") && <li className="nav-item menu-order-health">
+                <button className={`nav-link w-100 ${activeView === "hospitality" ? "active" : ""}`} type="button" onClick={() => openView("hospitality")}>
+                  <MenuIcon name="hospitality" />
+                  <p>Ospitalità</p>
+                </button>
+              </li>}
             </ul>
           </nav>
         </div>
@@ -603,6 +613,8 @@ export const Home = ({
             absences={absences}
             notifications={notifications}
           />
+        ) : activeView === "hospitality" && presidentId && canViewPage("hospitality") ? (
+          <Hospitality offers={hospitalityOffers} setOffers={setHospitalityOffers} presidentId={presidentId} readOnly={!canEditPage("hospitality")} />
         ) : activeView === "patient-reports" && presidentId && canViewPage("patient-reports") ? (
           <PatientReports patients={patients} hospitals={hospitals} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "presentation-reports" && presidentId && canViewPage("presentation-reports") ? (

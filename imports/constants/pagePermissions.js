@@ -2,6 +2,8 @@ export const MANAGEABLE_PAGES = [
   ["events", "Eventi"], ["useful-files", "File utili"],
   ["cas", "CAS"], ["gvp", "GVP"],
   ["hospitals", "Ospedali"], ["departments", "Reparti"], ["doctors", "Medici"],
+  ["hospitality", "Ospitalità"],
+  ["patient-gvp-sharing", "Condivisione info pazienti con GVP"],
   ["permissions", "Permessi"],
 ];
 

@@ -12,6 +12,7 @@ import {
   DoctorsCollection,
   EventsCollection,
   HospitalsCollection,
+  HospitalityOffersCollection,
   NotificationsCollection,
   PatientsCollection,
   PresentationsCollection,
@@ -183,7 +184,7 @@ export const App = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
   };
 
-  const { ready, user, users, hospitals, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, accessLogs, loginMessages } = useTracker(() => {
+  const { ready, user, users, hospitals, hospitalityOffers, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, accessLogs, loginMessages } = useTracker(() => {
     const dataSubscription = Meteor.subscribe("hlc-data");
     const eventSubscription = Meteor.subscribe("hlc-events");
     const notificationSubscription = Meteor.subscribe("hlc-notifications");
@@ -196,6 +197,7 @@ export const App = () => {
       user: account ? toClientRecord(account) : null,
       users: Meteor.users.find({}, { sort: { username: 1 } }).fetch().map(toClientRecord),
       hospitals: HospitalsCollection.find().fetch().map(toClientRecord),
+      hospitalityOffers: HospitalityOffersCollection.find({}, { sort: { hostName: 1 } }).fetch().map(toClientRecord),
       departments: DepartmentsCollection.find({}, { sort: { name: 1 } }).fetch().map(toClientRecord),
       doctors: DoctorsCollection.find().fetch().map(toClientRecord),
       patients: PatientsCollection.find().fetch().map(toClientRecord),
@@ -396,6 +398,8 @@ export const App = () => {
       setUsers={setUsers}
       hospitals={hospitals}
       setHospitals={makeSetter("hospitals", hospitals)}
+      hospitalityOffers={hospitalityOffers}
+      setHospitalityOffers={makeSetter("hospitality", hospitalityOffers)}
       departments={departments}
       setDepartments={makeSetter("departments", departments)}
       doctors={doctors}

@@ -311,28 +311,26 @@ export const Doctors = ({
       setDoctorNoteError("Inserisci una nota.");
       return;
     }
-    const note = {
-      id: crypto.randomUUID(),
-      text: normalizedNote.slice(0, 4000),
-      authorId: currentUser?.id || "",
-      author: currentUser?.username || currentUser?.role || "Utente",
-      authorRole: currentUser?.role || "",
-      createdAt: new Date().toISOString(),
-    };
-    setDoctors((current) => current.map((doctor) => doctor.id === noteDoctor.id
-      ? { ...doctor, doctorNotes: [...(Array.isArray(doctor.doctorNotes) ? doctor.doctorNotes : []), note] }
-      : doctor));
-    closeDoctorNotes();
+    Meteor.call("hlc.addDoctorOperationalNote", noteDoctor.id, normalizedNote, (methodError) => {
+      if (methodError) {
+        setDoctorNoteError(methodError.reason || "Impossibile aggiungere la nota operativa.");
+        return;
+      }
+      closeDoctorNotes();
+    });
   };
 
   const deleteDoctorNote = async (note) => {
     if (!noteDoctor || note.authorId !== currentUser?.id) return;
     if (!await confirmAction("Eliminare questa nota?")) return;
-    const remainingNotes = (Array.isArray(noteDoctor.doctorNotes) ? noteDoctor.doctorNotes : []).filter((item) => item.id !== note.id);
-    setDoctors((current) => current.map((doctor) => doctor.id === noteDoctor.id
-      ? { ...doctor, doctorNotes: remainingNotes }
-      : doctor));
-    setNoteDoctor((current) => current ? { ...current, doctorNotes: remainingNotes } : current);
+    Meteor.call("hlc.deleteDoctorOperationalNote", noteDoctor.id, note.id, (methodError) => {
+      if (methodError) {
+        setDoctorNoteError(methodError.reason || "Impossibile eliminare la nota operativa.");
+        return;
+      }
+      const remainingNotes = (Array.isArray(noteDoctor.doctorNotes) ? noteDoctor.doctorNotes : []).filter((item) => item.id !== note.id);
+      setNoteDoctor((current) => current ? { ...current, doctorNotes: remainingNotes } : current);
+    });
   };
 
   const toggleDepartment = (departmentId) => {
@@ -413,12 +411,12 @@ export const Doctors = ({
                 <div className="card-body">
                   {doctorNoteError && <div className="alert alert-danger py-2" role="alert">{doctorNoteError}</div>}
                   <h3 className="h6">Note operative esistenti</h3>
-                  {getDoctorNotes(noteDoctor).length === 0 ? <p className="text-secondary">Nessuna nota operativa inserita.</p> : <div className={`d-grid gap-2 ${readOnly ? "" : "mb-4"}`}>{getDoctorNotes(noteDoctor).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{!readOnly && note.authorId === currentUser?.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteDoctorNote(note)}>Elimina</button>}</div><small className="text-secondary">{note.author || "Utente"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></article>)}</div>}
-                  {!readOnly && <><label className="form-label" htmlFor="new-doctor-note">Aggiungi una nota operativa</label><textarea className="form-control" id="new-doctor-note" rows="5" value={newDoctorNote} onChange={(event) => { setNewDoctorNote(event.target.value); setDoctorNoteError(""); }} maxLength="4000" autoFocus /></>}
+                  {getDoctorNotes(noteDoctor).length === 0 ? <p className="text-secondary">Nessuna nota operativa inserita.</p> : <div className="d-grid gap-2 mb-4">{getDoctorNotes(noteDoctor).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{note.authorId === currentUser?.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteDoctorNote(note)}>Elimina</button>}</div><small className="text-secondary">{note.author || "Utente"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></article>)}</div>}
+                  <label className="form-label" htmlFor="new-doctor-note">Aggiungi una nota operativa</label><textarea className="form-control" id="new-doctor-note" rows="5" value={newDoctorNote} onChange={(event) => { setNewDoctorNote(event.target.value); setDoctorNoteError(""); }} maxLength="4000" autoFocus />
                 </div>
                 <div className="card-footer d-flex justify-content-end gap-2">
-                  <button className="btn btn-outline-secondary" type="button" onClick={closeDoctorNotes}>{readOnly ? "Chiudi" : "Annulla"}</button>
-                  {!readOnly && <button className="btn btn-primary" type="button" onClick={saveDoctorNote} disabled={!newDoctorNote.trim()}>Aggiungi nota operativa</button>}
+                  <button className="btn btn-outline-secondary" type="button" onClick={closeDoctorNotes}>Annulla</button>
+                  <button className="btn btn-primary" type="button" onClick={saveDoctorNote} disabled={!newDoctorNote.trim()}>Aggiungi nota operativa</button>
                 </div>
               </section>
             </div>

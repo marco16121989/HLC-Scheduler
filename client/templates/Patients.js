@@ -310,6 +310,8 @@ export const Patients = ({
 }) => {
   const isGvp = currentUser.role === "GVP";
   const canEditPatients = getPagePermission(currentUser, "patients").edit;
+  const canViewGvpSharing = getPagePermission(currentUser, "patient-gvp-sharing").view;
+  const canEditGvpSharing = getPagePermission(currentUser, "patient-gvp-sharing").edit;
   const isPatientReadOnly = isGvp && !canEditPatients;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -379,13 +381,13 @@ export const Patients = ({
   const [sharingMessage, setSharingMessage] = useState("");
 
   useEffect(() => {
-    if (!["Presidente", "GVP"].includes(currentUser.role)) return;
+    if (currentUser.role !== "GVP" && !canViewGvpSharing) return;
     Meteor.call("hlc.getGvpPatientSharingSettings", (methodError, fields) => {
       if (methodError || !Array.isArray(fields)) return;
       setSharedGvpFields(fields);
       setSharingDraft(fields);
     });
-  }, [currentUser.role]);
+  }, [currentUser.role, canViewGvpSharing]);
 
   const isEditing = editingId !== null;
   const transferTargetPatient = transferTarget?.type === "patient"
@@ -1322,7 +1324,7 @@ export const Patients = ({
                 <option value="all">Tutti i pazienti</option>
                 {visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{casUser.username}</option>)}
               </select>}
-              {currentUser.role === "Presidente" && <button className="btn btn-outline-primary" type="button" onClick={openSharingModal}>Scegli info da condividere con GVP</button>}
+              {canViewGvpSharing && <button className="btn btn-outline-primary" type="button" onClick={openSharingModal}>Scegli info da condividere con GVP</button>}
               {canEditPatients && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
             </div>
           </div>
@@ -1343,16 +1345,16 @@ export const Patients = ({
                   <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setSharingModalOpen(false)} />
                 </div>
                 <div className="card-body">
-                  <div className="d-flex justify-content-end gap-2 mb-3">
+                  {canEditGvpSharing && <div className="d-flex justify-content-end gap-2 mb-3">
                     <button className="btn btn-outline-secondary btn-sm" type="button" onClick={() => setSharingDraft([])}>Deseleziona tutto</button>
                     <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setSharingDraft(sharingOptions.map(([field]) => field))}>Seleziona tutto</button>
-                  </div>
+                  </div>}
                   <div className="patient-sharing-list">
                     {sharingOptions.map(([field, label]) => (
                       <label className="patient-sharing-row" key={field}>
                         <span>{label}</span>
                         <span className="form-check d-flex align-items-center gap-2 mb-0">
-                          <input className="form-check-input mt-0" type="checkbox" checked={sharingDraft.includes(field)} onChange={() => toggleSharingField(field)} />
+                          <input className="form-check-input mt-0" type="checkbox" checked={sharingDraft.includes(field)} disabled={!canEditGvpSharing} onChange={() => toggleSharingField(field)} />
                           <span>Condividi</span>
                         </span>
                       </label>
@@ -1362,7 +1364,7 @@ export const Patients = ({
                 <div className="card-footer d-flex align-items-center justify-content-end gap-3">
                   {sharingMessage && <span className={sharingMessage === "Impostazioni salvate." ? "text-success" : "text-danger"}>{sharingMessage}</span>}
                   <button className="btn btn-outline-secondary" type="button" onClick={() => setSharingModalOpen(false)}>Chiudi</button>
-                  <button className="btn btn-primary" type="button" disabled={sharingSaving} onClick={saveSharingSettings}>{sharingSaving ? "Salvataggio..." : "Salva"}</button>
+                  {canEditGvpSharing && <button className="btn btn-primary" type="button" disabled={sharingSaving} onClick={saveSharingSettings}>{sharingSaving ? "Salvataggio..." : "Salva"}</button>}
                 </div>
               </section>
             </div>
