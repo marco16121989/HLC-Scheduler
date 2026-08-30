@@ -11,6 +11,23 @@ import {
 import { PaginationControls, usePagination } from "./Pagination.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
+const MASKED_VALUE = "********";
+const CLOSED_PATIENT_HIDDEN_FIELDS = ["firstName", "lastName"];
+const CLOSED_PATIENT_STATUSES = ["Dimesso", "Deceduto", "Trasferito"];
+const TRANSFERRED_PATIENT_PRIVACY_NOTE = "Come da istruzioni dello schiavo il nome e cognome del paziente sono stati eliminati.";
+const maskClosedPatientForDisplay = (patient) => {
+  if (!CLOSED_PATIENT_STATUSES.includes(patient?.status)) return patient;
+  const masked = { ...patient, details: { ...(patient.details || {}) } };
+  CLOSED_PATIENT_HIDDEN_FIELDS.forEach((path) => {
+    const parts = path.split(".");
+    let cursor = masked;
+    parts.forEach((part, index) => {
+      if (index === parts.length - 1) cursor[part] = MASKED_VALUE;
+      else cursor = cursor[part] ||= {};
+    });
+  });
+  return masked;
+};
 const ADMISSION_TYPES = ["emergency", "scheduled", "consultation"];
 const admissionTypeLabel = (value, compact = false) => value === "scheduled"
   ? (compact ? "Programmato" : "Ricovero programmato")
@@ -40,7 +57,7 @@ const NoteButtonContent = ({ unreadCount = 0, label = "Note GVP" }) => <span cla
 
 const PatientMobileLocation = ({ patient, departmentName, hospitalName }) => <span className="patient-mobile-location">
   <span><strong>Ospedale:</strong> {hospitalName || patient.details?.hospitalName || "-"}</span>
-  <span><strong>Reparto:</strong> {departmentName || patient.details?.hospitalDepartment || "-"}</span>
+  <span><strong>Reparto:</strong> {patient.details?.departmentId === MASKED_VALUE ? MASKED_VALUE : departmentName || patient.details?.hospitalDepartment || "-"}</span>
   <span><strong>Camera:</strong> {patient.details?.hospitalRoom || "-"}</span>
   <span><strong>Letto:</strong> {patient.details?.hospitalBed || "-"}</span>
 </span>;
@@ -49,9 +66,9 @@ const PATIENT_STATUSES = [
   "In attesa di ricovero",
   "Ricoverato",
   "Dimesso",
-  "Trasferito",
   "Deceduto",
 ];
+const PATIENT_RECORD_STATUSES = [...PATIENT_STATUSES, "Trasferito"];
 
 const getPatientGvpIds = (patient) =>
   Array.isArray(patient?.gvpIds)
@@ -244,6 +261,7 @@ const PATIENT_FORM_TABS = [
   ["main", "Info Principali"],
   ["insertion", "Info Complete"],
   ["departments", "Trasferimenti"],
+  ["history", "Storico modifiche"],
 ];
 
 const SIMPLIFIED_FIELD_NAMES = new Set(SIMPLIFIED_FIELDS.map(([name]) => name));
@@ -297,6 +315,38 @@ export const formatSummaryValue = (value) => {
   return String(value);
 };
 
+const PATIENT_HISTORY_FIELD_LABELS = new Map([
+  ["__created", "Creazione paziente"],
+  ["firstName", "Nome"], ["lastName", "Cognome"], ["admissionType", "Tipo di accesso"],
+  ["status", "Stato"], ["transferNotes", "Note del trasferimento"],
+  ["admissionDate", "Data di accesso"], ["dischargeDate", "Data di dimissione"],
+  ["pathology", "Patologia"], ["doctorId", "Medico responsabile"],
+  ["recommendedDoctorIds", "Medici consigliati"], ["casId", "CAS principale"],
+  ["casIds", "CAS assegnati"], ["gvpId", "GVP principale"], ["gvpIds", "GVP assegnati"],
+  ["notes", "Note generali"], ["gvpNotes", "Note GVP"], ["casNotes", "Note CAS"],
+  ["departmentHistory", "Trasferimenti di reparto"],
+  ["details.departmentId", "Reparto"], ["details.hospitalName", "Ospedale"],
+  ["details.hospitalDepartment", "Reparto ospedaliero"], ["details.isMinorOrNewborn", "Minorenne o neonato"],
+  ...DETAIL_SECTIONS.flatMap((section) => section.fields.map(([name, label]) => [`details.${name}`, label])),
+  ...SIMPLIFIED_FIELDS.map(([name, label]) => [`details.${name}`, label]),
+]);
+
+const formatPatientHistoryValue = (value) => {
+  if (value === undefined || value === null || value === "") return "Non compilato";
+  if (value === MASKED_VALUE) return MASKED_VALUE;
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.length > 0 ? parsed.join(", ") : "Nessun valore";
+    if (parsed && typeof parsed === "object") return JSON.stringify(parsed);
+  } catch {
+    // Il valore non è JSON: viene mostrato così com'è.
+  }
+  return String(value);
+};
+
+const getPatientHistoryFieldLabel = (field) => PATIENT_HISTORY_FIELD_LABELS.get(field)
+  || field.replace(/^details\./, "").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase());
+
 export const Patients = ({
   patients,
   setPatients,
@@ -312,7 +362,6 @@ export const Patients = ({
   const canEditPatients = getPagePermission(currentUser, "patients").edit;
   const canViewGvpSharing = getPagePermission(currentUser, "patient-gvp-sharing").view;
   const canEditGvpSharing = getPagePermission(currentUser, "patient-gvp-sharing").edit;
-  const isPatientReadOnly = isGvp && !canEditPatients;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [admissionType, setAdmissionType] = useState("emergency");
@@ -338,7 +387,11 @@ export const Patients = ({
   const [notes, setNotes] = useState("");
   const [details, setDetails] = useState({ isMinorOrNewborn: "No" });
   const [departmentHistory, setDepartmentHistory] = useState([]);
+  const [changeHistory, setChangeHistory] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const isGvpReadOnly = isGvp && !canEditPatients;
+  const isTransferredReadOnly = editingId !== null && patientStatus === "Trasferito";
+  const isPatientReadOnly = isGvpReadOnly || isTransferredReadOnly;
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [doctorSelectionModalOpen, setDoctorSelectionModalOpen] = useState(false);
@@ -396,9 +449,9 @@ export const Patients = ({
   const canDeleteTransfer = transferTarget?.type === "form"
     ? patientStatus === "Trasferito"
     : transferTargetPatient?.status === "Trasferito";
-  const organizationPatients = patients.filter(
-    (patient) => patient.presidentId === presidentId,
-  );
+  const organizationPatients = patients
+    .filter((patient) => patient.presidentId === presidentId)
+    .map(maskClosedPatientForDisplay);
   const roleFilteredPatients = isGvp
     ? organizationPatients.filter((patient) => {
         const patientGvpIds = getPatientGvpIds(patient);
@@ -533,6 +586,41 @@ export const Patients = ({
     }
     return user.username || "";
   };
+  const parseHistoryValue = (value) => {
+    try { return JSON.parse(value); } catch { return value; }
+  };
+  const formatResolvedHistoryValue = (field, value) => {
+    if (value === undefined || value === null || value === "") return "Non compilato";
+    if (value === MASKED_VALUE) return MASKED_VALUE;
+    const parsed = parseHistoryValue(value);
+    const resolveDoctor = (doctorIdValue) => {
+      const resolvedDoctor = visibleDoctors.find((item) => item.id === doctorIdValue);
+      return resolvedDoctor ? `${resolvedDoctor.lastName} ${resolvedDoctor.firstName}` : "Medico non più disponibile";
+    };
+    const resolveUser = (userIdValue) => {
+      const resolvedUser = users.find((item) => item.id === userIdValue);
+      if (!resolvedUser) return "Utente non più disponibile";
+      return resolvedUser.role === "GVP" ? getGvpDisplayName(resolvedUser) : resolvedUser.username || `${resolvedUser.firstName || ""} ${resolvedUser.lastName || ""}`.trim();
+    };
+    if (field === "admissionType") return admissionTypeLabel(String(parsed));
+    if (field === "doctorId") return parsed ? resolveDoctor(parsed) : "Non assegnato";
+    if (field === "recommendedDoctorIds") return Array.isArray(parsed) && parsed.length > 0 ? parsed.map(resolveDoctor).join(", ") : "Nessun medico consigliato";
+    if (["casId", "gvpId"].includes(field)) return parsed ? resolveUser(parsed) : "Non assegnato";
+    if (["casIds", "gvpIds"].includes(field)) return Array.isArray(parsed) && parsed.length > 0 ? parsed.map(resolveUser).join(", ") : "Nessun utente assegnato";
+    if (field === "details.departmentId") {
+      const department = availableDepartments.find((item) => item.id === parsed);
+      return department ? `${department.hospitalName} / ${department.name}` : "Reparto non più disponibile";
+    }
+    if (field === "departmentHistory" && Array.isArray(parsed)) {
+      return parsed.length > 0
+        ? parsed.map((movement) => [movement.toHospitalName, movement.toDepartmentName, movement.date].filter(Boolean).join(" / ")).join("; ")
+        : "Nessun trasferimento registrato";
+    }
+    if (["gvpNotes", "casNotes"].includes(field) && Array.isArray(parsed)) return `${parsed.length} note`;
+    if (parsed === true || parsed === "true") return "Sì";
+    if (parsed === false || parsed === "false") return "No";
+    return formatPatientHistoryValue(value);
+  };
   const normalizedGvpSearch = gvpSearch.trim().toLowerCase();
   const isGvpAssignedToCas = (user, selectedCasId) => Boolean(selectedCasId) && [
     ...(Array.isArray(user.casIds) ? user.casIds : []),
@@ -584,6 +672,7 @@ export const Patients = ({
     setNewGvpNote("");
     setDetails({ isMinorOrNewborn: "No" });
     setDepartmentHistory([]);
+    setChangeHistory([]);
     setEditingId(null);
     setError("");
     setActiveTab("main");
@@ -722,6 +811,8 @@ export const Patients = ({
     }
 
     if (isEditing && selectedDepartment && departmentChangeMode === "transfer") {
+      setPatientStatus("Trasferito");
+      setTransferNotes(`${department.hospitalName} / ${department.name}`);
       setDepartmentHistory((current) => [
         ...current,
         {
@@ -847,7 +938,7 @@ export const Patients = ({
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
       admissionType: ADMISSION_TYPES.includes(admissionType) ? admissionType : "emergency",
-      status: PATIENT_STATUSES.includes(patientStatus) ? patientStatus : "",
+      status: PATIENT_RECORD_STATUSES.includes(patientStatus) ? patientStatus : "",
       transferNotes: patientStatus === "Trasferito" ? transferNotes.trim() : "",
       admissionDate,
       dischargeDate,
@@ -946,7 +1037,7 @@ export const Patients = ({
     setLastName(patient.lastName);
     setAdmissionType(ADMISSION_TYPES.includes(patient.admissionType) ? patient.admissionType : "emergency");
     setPatientStatus(
-      PATIENT_STATUSES.includes(patient.status) ? patient.status : "",
+      PATIENT_RECORD_STATUSES.includes(patient.status) ? patient.status : "",
     );
     setTransferNotes(patient.transferNotes || "");
     setAdmissionDate(patient.admissionDate || getToday());
@@ -968,6 +1059,7 @@ export const Patients = ({
       isMinorOrNewborn: patient.details?.isMinorOrNewborn || "No",
     });
     setDepartmentHistory(Array.isArray(patient.departmentHistory) ? patient.departmentHistory : []);
+    setChangeHistory(Array.isArray(patient.changeHistory) ? patient.changeHistory : []);
     setError("");
     setActiveTab("summary");
     setModalOpen(true);
@@ -1038,6 +1130,20 @@ export const Patients = ({
     const normalizedTransferNotes = transferDraft.trim();
     if (!normalizedTransferNotes) {
       setTransferError("Indica dove è stato trasferito il paziente.");
+      return;
+    }
+    if (transferTarget?.type === "form" && editingId && patientStatus === "Trasferito") {
+      Meteor.call("hlc.updateTransferredPatientNotes", editingId, normalizedTransferNotes, (methodError, savedNotes) => {
+        if (methodError) {
+          setTransferError(methodError.reason || "Impossibile aggiornare le note del trasferimento.");
+          return;
+        }
+        setTransferNotes(savedNotes);
+        setPatients((current) => current.map((patient) => patient.id === editingId
+          ? { ...patient, transferNotes: savedNotes }
+          : patient));
+        closeTransferModal();
+      });
       return;
     }
     if (transferTarget?.type === "form") {
@@ -1237,11 +1343,11 @@ export const Patients = ({
     ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
     { label: "DAT compilata?", value: details.datCompleted },
     { label: "DAT registrata?", value: details.datRegistered },
-    { label: "Tipo di accesso", value: admissionTypeLabel(admissionType) },
+    { label: "Tipo di accesso", value: admissionType === MASKED_VALUE ? MASKED_VALUE : admissionTypeLabel(admissionType) },
     { label: "Stato", value: patientStatus },
     ...(patientStatus === "Trasferito" ? [{ label: "Dove è stato trasferito", value: transferNotes }] : []),
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
-    { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ") : "Nessun medico consigliato" },
+    { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join("\n") : "Nessun medico consigliato" },
     { label: "Reparto", value: selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Non assegnato" },
     { label: "CAS", value: selectedCasUsers.length > 0 ? selectedCasUsers.map((user) => user.username).join(", ") : "Non assegnato" },
     { label: "GVP assegnati", value: selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato" },
@@ -1254,13 +1360,14 @@ export const Patients = ({
   ];
 
   const getSharingSummaryValue = (field) => {
+    if (CLOSED_PATIENT_STATUSES.includes(patientStatus) && CLOSED_PATIENT_HIDDEN_FIELDS.includes(field)) return MASKED_VALUE;
     if (field === "firstName") return firstName;
     if (field === "lastName") return lastName;
     if (field === "admissionType") return admissionTypeLabel(admissionType);
     if (field === "status") return patientStatus;
     if (field === "transferNotes") return transferNotes;
     if (field === "doctorId") return doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato";
-    if (field === "recommendedDoctorIds") return recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ") : "Nessun medico consigliato";
+    if (field === "recommendedDoctorIds") return recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join("\n") : "Nessun medico consigliato";
     if (field === "details.departmentId") return selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Non assegnato";
     if (field === "casIds") return selectedCasUsers.length > 0 ? selectedCasUsers.map((user) => user.username).join(", ") : "Non assegnato";
     if (field === "gvpIds") return selectedGvpUsers.length > 0 ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ") : "Nessun GVP assegnato";
@@ -1269,6 +1376,9 @@ export const Patients = ({
   const gvpSummaryEntries = sharingOptions
     .filter(([field]) => sharedGvpFields.includes(field))
     .map(([field, label]) => ({ label, value: getSharingSummaryValue(field) }));
+  if (patientStatus === "Trasferito") {
+    gvpSummaryEntries.push({ label: "Destinazione del trasferimento", value: transferNotes });
+  }
 
   const mainSummaryEntries = [
     { label: "Nome", value: firstName },
@@ -1277,10 +1387,11 @@ export const Patients = ({
     ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
     { label: "DAT compilata?", value: details.datCompleted },
     { label: "DAT registrata?", value: details.datRegistered },
-    { label: "Tipo di accesso", value: admissionTypeLabel(admissionType) },
+    { label: "Tipo di accesso", value: admissionType === MASKED_VALUE ? MASKED_VALUE : admissionTypeLabel(admissionType) },
     { label: "Stato", value: patientStatus },
+    ...(patientStatus === "Trasferito" ? [{ label: "Destinazione del trasferimento", value: transferNotes }] : []),
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
-    { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ") : "Nessun medico consigliato" },
+    { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join("\n") : "Nessun medico consigliato" },
     { label: "Numero camera", value: details.hospitalRoom },
     { label: "Numero letto", value: details.hospitalBed },
     { label: "Visita con l’anestesista", value: details.anesthesiologistDate },
@@ -1443,6 +1554,7 @@ export const Patients = ({
                       onChange={(event) => requestFormStatusChange(event.target.value)}
                     >
                       <option value="">Nessuno stato</option>
+                      {patientStatus === "Trasferito" && <option value="Trasferito">Trasferito</option>}
                       {PATIENT_STATUSES.map((status) => (
                         <option key={status} value={status}>{status}</option>
                       ))}
@@ -1455,7 +1567,7 @@ export const Patients = ({
                     onClick={resetForm}
                   />
                 </div>
-                {canEditPatients && (
+                {canEditPatients && !isPatientReadOnly && (
                   <div className="d-flex flex-wrap gap-2 mt-2">
                     <button
                       className="btn btn-outline-secondary btn-sm"
@@ -1478,7 +1590,7 @@ export const Patients = ({
                 <div className="card-body">
                   {!isGvp && (
                     <div className="nav nav-tabs patient-form-tabs mb-3" role="tablist" aria-label="Sezioni scheda paziente">
-                      {PATIENT_FORM_TABS.filter(([tabId]) => !["summary", "departments"].includes(tabId) || isEditing).map(([tabId, label]) => <button
+                      {PATIENT_FORM_TABS.filter(([tabId]) => !["summary", "departments", "history"].includes(tabId) || isEditing).map(([tabId, label]) => <button
                         className={`nav-link ${tabId === "departments" ? "patient-departments-tab" : ""} ${activeTab === tabId ? "active" : ""}`}
                         type="button"
                         role="tab"
@@ -1491,10 +1603,15 @@ export const Patients = ({
                     </div>
                   )}
 
-                  {isPatientReadOnly ? (
+                  {isGvpReadOnly ? (
                     <div className="patient-form-grid">
-                      <div className="alert alert-light border mb-3" role="status">
-                        Riepilogo delle informazioni disponibili per il GVP.
+                      <div className={`alert border mb-3 ${patientStatus === "Trasferito" ? "alert-warning border-warning" : "alert-light"}`} role="status">
+                        {patientStatus === "Trasferito" ? (
+                          <>
+                            <div>Paziente trasferito: la scheda è bloccata e non può più essere modificata.</div>
+                            <div className="mt-2 fw-semibold">{TRANSFERRED_PATIENT_PRIVACY_NOTE}</div>
+                          </>
+                        ) : "Riepilogo delle informazioni disponibili per il GVP."}
                       </div>
                       <div className="patient-summary-grid">
                         {gvpSummaryEntries.map((entry) => (
@@ -1505,7 +1622,25 @@ export const Patients = ({
                         ))}
                       </div>
                     </div>
-                  ) : activeTab === "main" ? (
+                  ) : (
+                    <>
+                      {isTransferredReadOnly && (
+                        <div className="alert alert-warning border-warning mb-3" role="status">
+                          <div>Paziente trasferito: puoi consultare tutte le informazioni, ma la scheda non può più essere modificata.</div>
+                          <div className="mt-2 fw-semibold">{TRANSFERRED_PATIENT_PRIVACY_NOTE}</div>
+                          {canEditPatients && (
+                            <button className="btn btn-outline-primary btn-sm mt-3" type="button" onClick={() => {
+                              setTransferTarget({ type: "form" });
+                              setTransferDraft(transferNotes);
+                              setTransferError("");
+                            }}>
+                              Modifica note trasferimento
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <fieldset className="border-0 p-0 m-0 w-100" disabled={isTransferredReadOnly}>
+                      {activeTab === "main" ? (
                     <div className="patient-form-grid">
                       <div className="patient-form-actions">
                         <button className="btn btn-primary" type="submit">
@@ -1742,65 +1877,60 @@ export const Patients = ({
                         </div>
                       </fieldset>
                       {patientStatus === "Trasferito" && (
-                        <div className="w-100 alert alert-light border mb-0">
-                          <div className="fw-semibold mb-1">Dove è stato trasferito</div>
-                          <div>{transferNotes || "Informazione non disponibile"}</div>
-                          <button
-                            className="btn btn-outline-primary btn-sm mt-2"
-                            type="button"
-                            onClick={() => {
-                              setTransferTarget({ type: "form" });
-                              setTransferDraft(transferNotes);
-                              setTransferError("");
-                            }}
-                          >
-                            Modifica note trasferimento
-                          </button>
+                        <div className="w-100 alert alert-warning border-warning mb-0" role="status">
+                          <div className="d-flex align-items-center gap-2 mb-2">
+                            <span className="badge text-bg-warning border border-warning-subtle">TRASFERITO</span>
+                            <strong>Paziente trasferito</strong>
+                          </div>
+                          <div className="fw-semibold">Destinazione del trasferimento</div>
+                          <div className="fs-6">{transferNotes || "Informazione non disponibile"}</div>
                         </div>
                       )}
                       <div className="patient-assignment-row row g-3 w-100">
-                        <div className="col-12 col-md-6 col-xl">
-                          <div className="form-label">Reparto</div>
+                        <div className="col-12 col-md-6 col-xl d-flex flex-column">
+                          <div className="form-label">Ospedale e reparto</div>
                           {isEditing && selectedDepartment ? (
                             <button
-                              className="btn btn-outline-primary w-100 text-start"
+                              className="btn btn-outline-primary w-100 flex-grow-1 text-start d-flex flex-column align-items-start"
                               type="button"
                               onClick={openDepartmentSelectionModal}
                               disabled={availableDepartments.length === 0}
-                              aria-label={`Cambia reparto. Reparto attuale: ${selectedDepartment.hospitalName}, ${selectedDepartment.name}`}
-                              title="Clicca per cambiare reparto"
+                              aria-label={`Ospedale attuale: ${selectedDepartment.hospitalName}, reparto: ${selectedDepartment.name}. Clicca per trasferire il paziente o correggere i dati.`}
+                              title="Clicca sull'ospedale per trasferire il paziente oppure per cambiare reparto"
                             >
-                              {selectedDepartment.hospitalName} / {selectedDepartment.name}
+                              <strong>{selectedDepartment.hospitalName}</strong>
+                              <span>{selectedDepartment.name}</span>
+                              <small className="mt-2 text-primary-emphasis">Clicca sull’ospedale per trasferire il paziente oppure per cambiare reparto</small>
                             </button>
                           ) : (
-                            <button className="btn btn-outline-primary w-100" type="button" onClick={openDepartmentSelectionModal} disabled={availableDepartments.length === 0}>
+                            <button className="btn btn-outline-primary w-100 flex-grow-1" type="button" onClick={openDepartmentSelectionModal} disabled={availableDepartments.length === 0}>
                               {selectedDepartment ? `${selectedDepartment.hospitalName} / ${selectedDepartment.name}` : "Seleziona reparto"}
                             </button>
                           )}
                         </div>
-                        <div className="col-12 col-md-6 col-xl">
+                        <div className="col-12 col-md-6 col-xl d-flex flex-column">
                           <div className="form-label">Medico responsabile</div>
-                          <button className="btn btn-outline-primary w-100" type="button" onClick={openDoctorSelectionModal} disabled={!selectedDepartment || visibleDoctors.length === 0}>
+                          <button className="btn btn-outline-primary w-100 flex-grow-1" type="button" onClick={openDoctorSelectionModal} disabled={!selectedDepartment || visibleDoctors.length === 0}>
                             {!selectedDepartment ? "Seleziona prima il reparto" : doctor ? `${doctor.lastName} ${doctor.firstName}` : "Seleziona medico"}
                           </button>
                         </div>
-                        <div className="col-12 col-md-6 col-xl">
+                        <div className="col-12 col-md-6 col-xl d-flex flex-column">
                           <div className="form-label">Medici consigliati</div>
-                          <button className="btn btn-outline-primary w-100" type="button" onClick={openRecommendedDoctorsModal} disabled={!selectedDepartment || visibleDoctors.length === 0}>
+                          <button className={`btn btn-outline-primary w-100 flex-grow-1 ${recommendedDoctors.length > 0 ? "d-flex flex-column align-items-start gap-1 text-start" : ""}`} type="button" onClick={openRecommendedDoctorsModal} disabled={!selectedDepartment || visibleDoctors.length === 0}>
                             {!selectedDepartment ? "Seleziona prima il reparto" : recommendedDoctors.length > 0
-                              ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join(", ")
+                              ? recommendedDoctors.map((item) => <span className="d-block" key={item.id}>{item.lastName} {item.firstName}</span>)
                               : "Seleziona medici"}
                           </button>
                         </div>
-                        <div className="col-12 col-md-6 col-xl">
+                        <div className="col-12 col-md-6 col-xl d-flex flex-column">
                           <div className="form-label">CAS</div>
-                          <button className="btn btn-outline-primary w-100" type="button" onClick={openCasSelectionModal} disabled={!selectedDepartment || visibleCasUsers.length === 0}>
+                          <button className="btn btn-outline-primary w-100 flex-grow-1" type="button" onClick={openCasSelectionModal} disabled={!selectedDepartment || visibleCasUsers.length === 0}>
                             {!selectedDepartment ? "Seleziona prima il reparto" : selectedCasUsers.length > 0 ? selectedCasUsers.map((user) => user.username).join(", ") : "Seleziona CAS"}
                           </button>
                         </div>
-                        <div className="col-12 col-md-6 col-xl">
+                        <div className="col-12 col-md-6 col-xl d-flex flex-column">
                           <div className="form-label">GVP assegnati</div>
-                          <button className="btn btn-outline-primary w-100" type="button" onClick={openGvpSelectionModal} disabled={visibleGvpUsers.length === 0}>
+                          <button className="btn btn-outline-primary w-100 flex-grow-1" type="button" onClick={openGvpSelectionModal} disabled={visibleGvpUsers.length === 0}>
                             {selectedGvpUsers.length > 0
                               ? selectedGvpUsers.map((user) => getGvpDisplayName(user)).join(", ")
                               : "Seleziona GVP"}
@@ -2279,6 +2409,34 @@ export const Patients = ({
                         ))}
                       </div>
                     </div>
+                  ) : activeTab === "history" ? (
+                    <div className="patient-form-grid patient-history-content">
+                      {changeHistory.length === 0 ? (
+                        <div className="alert alert-light border mb-0">Nessuna modifica registrata.</div>
+                      ) : (
+                        <div className="d-grid gap-3 w-100">
+                          {[...changeHistory].reverse().map((entry) => (
+                            <article className="border rounded p-3" key={entry.id}>
+                              <div className="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                                <strong>{getPatientHistoryFieldLabel(entry.field)}</strong>
+                                <small className="text-secondary">
+                                  {entry.changedAt ? new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.changedAt)) : "Data non disponibile"}
+                                </small>
+                              </div>
+                              {entry.field !== "__created" && (
+                                <div className="row g-2">
+                                  <div className="col-12 col-md-6"><span className="d-block small text-secondary">Valore precedente</span><span className="text-break">{formatResolvedHistoryValue(entry.field, entry.oldValue)}</span></div>
+                                  <div className="col-12 col-md-6"><span className="d-block small text-secondary">Nuovo valore</span><span className="text-break">{formatResolvedHistoryValue(entry.field, entry.newValue)}</span></div>
+                                </div>
+                              )}
+                              <div className="mt-2 small text-secondary">
+                                Modificato da <strong>{entry.changedByName || "Utente non disponibile"}</strong>{entry.changedByRole ? ` (${entry.changedByRole})` : ""}
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ) : activeTab === "departments" ? (
                     <div className="patient-form-grid patient-departments-content">
                       <div className="patient-assignment-row w-100">
@@ -2635,10 +2793,13 @@ export const Patients = ({
                       ))}
                     </div>
                   )}
+                      </fieldset>
+                    </>
+                  )}
                 </div>
 
                 <div className="card-footer d-flex align-items-center gap-2">
-                  {canEditPatients && isEditing && (
+                  {canEditPatients && isEditing && !isPatientReadOnly && (
                     <button
                       className="btn btn-outline-danger me-auto"
                       type="button"
@@ -2647,7 +2808,7 @@ export const Patients = ({
                       Elimina
                     </button>
                   )}
-                  {canEditPatients && isEditing && (
+                  {canEditPatients && isEditing && !isPatientReadOnly && (
                     <button
                       className="btn btn-outline-secondary"
                       type="button"
@@ -2783,7 +2944,7 @@ export const Patients = ({
                                       : "text-bg-danger"
                                 }`}
                               >
-                                {admissionTypeLabel(patient.admissionType, true)}
+                                {patient.admissionType === MASKED_VALUE ? MASKED_VALUE : admissionTypeLabel(patient.admissionType, true)}
                               </span>
                             </td>
                             <td data-label="Stato">
@@ -2791,18 +2952,22 @@ export const Patients = ({
                                 className="form-select form-select-sm patient-list-status"
                                 aria-label={`Stato di ${patient.firstName} ${patient.lastName}`}
                                 value={patient.status || ""}
+                                disabled={patient.status === "Trasferito"}
                                 onClick={(event) => event.stopPropagation()}
                                 onKeyDown={(event) => event.stopPropagation()}
                                 onChange={(event) => updatePatientStatus(patient.id, event.target.value)}
                               >
                                 <option value="">Nessuno stato</option>
+                                {patient.status === "Trasferito" && <option value="Trasferito">Trasferito</option>}
                                 {PATIENT_STATUSES.map((status) => (
                                   <option key={status} value={status}>{status}</option>
                                 ))}
                               </select>
                             </td>
                             <td data-label="Data">
-                              {patient.admissionDate
+                              {patient.admissionDate === MASKED_VALUE
+                                ? MASKED_VALUE
+                                : patient.admissionDate
                                 ? new Intl.DateTimeFormat("it-IT").format(
                                     new Date(
                                       `${patient.admissionDate}T00:00:00`,

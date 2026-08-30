@@ -179,8 +179,11 @@ const getGvpPatientSharedFields = async (presidentId) => {
   return normalizeGvpPatientSharedFields(president?.profile?.gvpPatientSharedFields);
 };
 
+const CLOSED_PATIENT_STATUSES = ["Dimesso", "Deceduto", "Trasferito"];
+const getClosedPatientHiddenFields = async () => ["firstName", "lastName"];
+
 const gvpPatientProjection = (sharedFields) => Object.fromEntries([
-  "presidentId", "casId", "casIds", "gvpId", "gvpIds", "gvpNotes",
+  "presidentId", "casId", "casIds", "gvpId", "gvpIds", "gvpNotes", "transferNotes",
   ...sharedFields,
 ].map((field) => [field, 1]));
 
@@ -202,12 +205,106 @@ const pickGvpPatientFields = (patient, sharedFields) => {
     gvpId: patient.gvpId,
     gvpIds: patient.gvpIds,
     gvpNotes: patient.gvpNotes,
+    transferNotes: patient.transferNotes,
   };
   for (const path of sharedFields) {
     const value = path.split(".").reduce((current, part) => current?.[part], patient);
     if (value !== undefined) setNestedValue(visible, path, value);
   }
   return visible;
+};
+
+const maskClosedPatientFields = (patient, hiddenFields) => {
+  if (!patient || !CLOSED_PATIENT_STATUSES.includes(patient.status)) return patient;
+  const masked = { ...patient, details: { ...(patient.details || {}) } };
+  hiddenFields.forEach((path) => setNestedValue(masked, path, "********"));
+  if (Array.isArray(patient.changeHistory)) {
+    masked.changeHistory = patient.changeHistory.map((entry) => hiddenFields.includes(entry.field)
+      ? { ...entry, oldValue: "********", newValue: "********" }
+      : entry);
+  }
+  return masked;
+};
+
+const restoreProtectedPatientFields = (record, existing, hiddenFields) => {
+  if (!CLOSED_PATIENT_STATUSES.includes(record?.status) || !existing) return record;
+  const restored = { ...record, details: { ...(record.details || {}) } };
+  hiddenFields.forEach((path) => {
+    const originalValue = path.split(".").reduce((current, part) => current?.[part], existing);
+    if (originalValue !== undefined) setNestedValue(restored, path, originalValue);
+  });
+  return restored;
+};
+
+const PATIENT_AUDIT_EXCLUDED_FIELDS = new Set([
+  "_id", "id", "presidentId", "changeHistory", "createdAt", "updatedAt",
+]);
+
+const flattenPatientAuditFields = (value, prefix = "", output = {}) => {
+  if (value && typeof value === "object" && !Array.isArray(value) && !(value instanceof Date)) {
+    Object.entries(value).forEach(([key, nestedValue]) => {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (!PATIENT_AUDIT_EXCLUDED_FIELDS.has(path)) flattenPatientAuditFields(nestedValue, path, output);
+    });
+  } else if (prefix) {
+    output[prefix] = value;
+  }
+  return output;
+};
+
+const formatPatientAuditValue = (value) => {
+  if (value === undefined || value === null || value === "") return "";
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value) || typeof value === "object") return JSON.stringify(value);
+  return String(value);
+};
+
+const buildPatientChangeHistory = ({ existing, updated, actor }) => {
+  const before = flattenPatientAuditFields(existing);
+  const after = flattenPatientAuditFields(updated);
+  const changedAt = new Date();
+  const changedByName = actor?.username
+    || `${actor?.profile?.firstName || ""} ${actor?.profile?.lastName || ""}`.trim()
+    || actor?.profile?.role
+    || "Utente";
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter((field) => formatPatientAuditValue(before[field]) !== formatPatientAuditValue(after[field]))
+    .map((field) => ({
+      id: Random.id(),
+      field,
+      oldValue: formatPatientAuditValue(before[field]),
+      newValue: formatPatientAuditValue(after[field]),
+      changedAt,
+      changedById: actor?._id || "",
+      changedByName,
+      changedByRole: actor?.profile?.role || "",
+    }));
+};
+
+const standardPatientProjection = (hiddenFields = []) => {
+  const projection = Object.fromEntries([
+    "presidentId", "casId", "casIds", "gvpId", "gvpIds", "firstName", "lastName",
+    "admissionDate", "dischargeDate", "admissionType", "status", "transferNotes", "pathology",
+    "doctorId", "details.sex", "details.maidenName", "details.departmentId", "details.hospitalRoom",
+    "details.hospitalBed", "details.anesthesiologistDate", "details.anesthesiologistTime",
+    "details.anesthesiologistName",
+  ].map((field) => [field, 1]));
+  hiddenFields.forEach((field) => delete projection[field]);
+  projection.status = 1;
+  return projection;
+};
+
+const publishPatientCursors = async (subscription, cursors) => {
+  const observers = [];
+  for (const cursor of cursors) {
+    const observer = await cursor.observeChangesAsync({
+      added: (id, fields) => subscription.added(PatientsCollection._name, id, fields),
+      changed: (id, fields) => subscription.changed(PatientsCollection._name, id, fields),
+      removed: (id) => subscription.removed(PatientsCollection._name, id),
+    });
+    observers.push(observer);
+  }
+  subscription.onStop(() => observers.forEach((observer) => observer.stop()));
 };
 
 export const buildPatientNoteNotification = ({ recipientId, patientId, patientName, noteAuthor, noteText }) => ({
@@ -342,7 +439,7 @@ const sendScheduledAdmissionReminders = async () => {
   const patients = await PatientsCollection.find({
     admissionType: "scheduled",
     admissionDate: { $exists: true, $ne: "" },
-    status: { $nin: ["Dimesso", "Deceduto"] },
+    status: { $nin: CLOSED_PATIENT_STATUSES },
   }).fetchAsync();
 
   for (const patient of patients) {
@@ -431,6 +528,8 @@ Meteor.publish("hlc-data", async function publishHlcData() {
 
   if (role === "GVP") {
     const sharedPatientFields = await getGvpPatientSharedFields(presidentId);
+    const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
+    const closedGvpFields = sharedPatientFields.filter((field) => !closedPatientHiddenFields.includes(field));
     const canViewPermissions = getPagePermission({ ...actor.profile, role }, "permissions").view;
     const gvpHospitalUsersSelector = canViewPermissions ? {
       $or: [
@@ -445,6 +544,16 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         { "profile.role": "CAS", "profile.associationId": presidentId },
       ],
     };
+    await publishPatientCursors(this, [
+      PatientsCollection.find(
+        { presidentId, status: { $nin: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] },
+        { fields: gvpPatientProjection(sharedPatientFields) },
+      ),
+      PatientsCollection.find(
+        { presidentId, status: { $in: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] },
+        { fields: gvpPatientProjection(closedGvpFields) },
+      ),
+    ]);
     return [
       Meteor.users.find(gvpHospitalUsersSelector, { fields: publicUserFields }),
       HospitalsCollection.find({ presidentId }),
@@ -465,10 +574,6 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         officeInstructions: 1,
         departmentIds: 1,
       } }),
-      PatientsCollection.find(
-        { presidentId, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] },
-        { fields: gvpPatientProjection(sharedPatientFields) },
-      ),
       UsefulFilesCollection.find({ presidentId }, { sort: { createdAt: -1 } }),
       AbsencesCollection.find({ userId: actor._id }, { sort: { startDate: 1 } }),
     ];
@@ -477,6 +582,11 @@ Meteor.publish("hlc-data", async function publishHlcData() {
   const absenceUserIds = ["Presidente", "CAS"].includes(role)
     ? (await Meteor.users.find(userSelector, { fields: { _id: 1 } }).fetchAsync()).map((user) => user._id)
     : [actor._id];
+  const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
+  await publishPatientCursors(this, [
+    PatientsCollection.find({ ...dataSelector, status: { $nin: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection() }),
+    PatientsCollection.find({ ...dataSelector, status: { $in: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection(closedPatientHiddenFields) }),
+  ]);
 
   return [
     Meteor.users.find(userSelector, { fields: publicUserFields }),
@@ -487,30 +597,6 @@ Meteor.publish("hlc-data", async function publishHlcData() {
     ),
     DepartmentsCollection.find(dataSelector),
     DoctorsCollection.find(dataSelector),
-    PatientsCollection.find(dataSelector, { fields: {
-      presidentId: 1,
-      casId: 1,
-      casIds: 1,
-      gvpId: 1,
-      gvpIds: 1,
-      firstName: 1,
-      lastName: 1,
-      admissionDate: 1,
-      dischargeDate: 1,
-      admissionType: 1,
-      status: 1,
-      transferNotes: 1,
-      pathology: 1,
-      doctorId: 1,
-      "details.sex": 1,
-      "details.maidenName": 1,
-      "details.departmentId": 1,
-      "details.hospitalRoom": 1,
-      "details.hospitalBed": 1,
-      "details.anesthesiologistDate": 1,
-      "details.anesthesiologistTime": 1,
-      "details.anesthesiologistName": 1,
-    } }),
     // Le presentazioni sono condivise soltanto all'interno della stessa organizzazione.
     PresentationsCollection.find(dataSelector),
     SupportRequestsCollection.find(role === "Admin" ? {} : { createdBy: actor._id }),
@@ -928,9 +1014,38 @@ Meteor.methods({
     }
     if (role === "GVP") {
       const sharedFields = await getGvpPatientSharedFields(presidentId);
-      return pickGvpPatientFields(patient, sharedFields);
+      const hiddenFields = await getClosedPatientHiddenFields(presidentId);
+      return maskClosedPatientFields(pickGvpPatientFields(patient, sharedFields), hiddenFields);
     }
-    return patient;
+    return maskClosedPatientFields(patient, await getClosedPatientHiddenFields(presidentId));
+  },
+
+  async "hlc.updateTransferredPatientNotes"(patientId, transferNotes) {
+    requireUser(this);
+    check(patientId, String);
+    check(transferNotes, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    if (!["Presidente", "CAS"].includes(role) || !getPagePermission({ ...(actor?.profile || {}), role }, "patients").edit) {
+      throw new Meteor.Error("not-authorized", "Non hai il permesso di modificare le note del trasferimento.");
+    }
+    const presidentId = await getActorPresidentId(actor);
+    const normalizedNotes = transferNotes.trim();
+    if (!normalizedNotes || normalizedNotes.length > 4000) {
+      throw new Meteor.Error("invalid-transfer-notes", "Le note del trasferimento devono contenere da 1 a 4000 caratteri.");
+    }
+    const patient = await PatientsCollection.findOneAsync({ _id: patientId, presidentId, status: "Trasferito" });
+    if (!patient) throw new Meteor.Error("patient-not-found", "Paziente trasferito non trovato.");
+    const historyEntries = buildPatientChangeHistory({
+      existing: { transferNotes: patient.transferNotes },
+      updated: { transferNotes: normalizedNotes },
+      actor,
+    });
+    await PatientsCollection.updateAsync(patientId, {
+      $set: { transferNotes: normalizedNotes, updatedAt: new Date() },
+      ...(historyEntries.length > 0 ? { $push: { changeHistory: { $each: historyEntries } } } : {}),
+    });
+    return normalizedNotes;
   },
 
   async "hlc.getGvpPatientSharingSettings"() {
@@ -1629,24 +1744,47 @@ Meteor.methods({
         ? actor.profile?.presidentId || actor.profile?.associationId || ""
         : "";
     if (!presidentId) throw new Meteor.Error("not-authorized", "Operazione non autorizzata.");
+    const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
     const currentRecords = await PatientsCollection.find({ presidentId }).fetchAsync();
     const recordsById = new Map(currentRecords.map((record) => [record._id, { ...record, id: record._id }]));
     const changedRecords = [];
-    for (const removedId of changes.removedIds) recordsById.delete(removedId);
+    for (const removedId of changes.removedIds) {
+      if (recordsById.get(removedId)?.status === "Trasferito") {
+        throw new Meteor.Error("patient-locked", "Un paziente trasferito non può essere modificato o eliminato.");
+      }
+      recordsById.delete(removedId);
+    }
     for (const record of changes.upserts) {
       if (record.presidentId !== presidentId) {
         throw new Meteor.Error("not-authorized", "Dati fuori dalla tua organizzazione.");
       }
       const recordId = record.id || record._id;
+      const recordExists = recordsById.has(recordId);
       const existing = recordsById.get(recordId) || {};
-      const mergedRecord = {
+      if (existing.status === "Trasferito") {
+        throw new Meteor.Error("patient-locked", "Un paziente trasferito non può essere modificato o eliminato.");
+      }
+      const mergedRecord = restoreProtectedPatientFields({
         ...existing,
         ...record,
         id: recordId,
         details: record.details === undefined ? existing.details : record.details,
         departmentHistory: record.departmentHistory === undefined ? existing.departmentHistory : record.departmentHistory,
         notes: record.notes === undefined ? existing.notes : record.notes,
-      };
+      }, existing, closedPatientHiddenFields);
+      const existingHistory = Array.isArray(existing.changeHistory) ? existing.changeHistory : [];
+      mergedRecord.changeHistory = recordExists
+        ? [...existingHistory, ...buildPatientChangeHistory({ existing, updated: mergedRecord, actor })]
+        : [{
+            id: Random.id(),
+            field: "__created",
+            oldValue: "",
+            newValue: "Paziente creato",
+            changedAt: new Date(),
+            changedById: actor._id,
+            changedByName: actor.username || `${actor.profile?.firstName || ""} ${actor.profile?.lastName || ""}`.trim() || role,
+            changedByRole: role,
+          }];
       recordsById.set(recordId, mergedRecord);
       changedRecords.push(mergedRecord);
     }

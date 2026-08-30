@@ -1562,6 +1562,17 @@ svg.admin-nav-icon {
   white-space: pre-wrap;
 }
 
+.patient-history-content {
+  display: block;
+  width: 100%;
+}
+
+.patient-history-content > *,
+.patient-history-content article {
+  width: 100%;
+  max-width: none;
+}
+
 .patient-sharing-list {
   display: grid;
   gap: 0;
