@@ -359,6 +359,8 @@ export const Patients = ({
   notifications = [],
 }) => {
   const isGvp = currentUser.role === "GVP";
+  const isAdminOperator = ["Admin", "Presidente"].includes(currentUser.role)
+    || Boolean(globalThis.sessionStorage?.getItem("hlc-impersonation"));
   const canEditPatients = getPagePermission(currentUser, "patients").edit;
   const canViewGvpSharing = getPagePermission(currentUser, "patient-gvp-sharing").view;
   const canEditGvpSharing = getPagePermission(currentUser, "patient-gvp-sharing").edit;
@@ -390,8 +392,10 @@ export const Patients = ({
   const [changeHistory, setChangeHistory] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const isGvpReadOnly = isGvp && !canEditPatients;
-  const isTransferredReadOnly = editingId !== null && patientStatus === "Trasferito";
-  const isPatientReadOnly = isGvpReadOnly || isTransferredReadOnly;
+  const isClosedPatientReadOnly = editingId !== null && CLOSED_PATIENT_STATUSES.includes(
+    patients.find((patient) => patient.id === editingId)?.status,
+  );
+  const isPatientReadOnly = isGvpReadOnly || isClosedPatientReadOnly;
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [doctorSelectionModalOpen, setDoctorSelectionModalOpen] = useState(false);
@@ -966,6 +970,9 @@ export const Patients = ({
           patient.id === editingId ? { ...patient, ...savedPatient } : patient,
         ),
       );
+      if (statusFilter !== "all" && statusFilter !== savedPatient.status) {
+        setStatusFilter("all");
+      }
     } else {
       setPatients((current) => [...current, savedPatient]);
       if (statusFilter !== "all" && statusFilter !== savedPatient.status) {
@@ -1093,10 +1100,14 @@ export const Patients = ({
     resetForm();
   };
 
-  const updatePatientStatus = (patientId, status) => {
+  const updatePatientStatus = async (patientId, status) => {
     if (status !== "" && !PATIENT_STATUSES.includes(status)) return;
+    const patient = patients.find((item) => item.id === patientId);
+    if (["Dimesso", "Deceduto"].includes(status) && patient?.status !== status) {
+      const confirmed = await confirmAction(`Impostare il paziente come ${status}? Dopo la conferma il paziente non sarà più modificabile.`);
+      if (!confirmed) return;
+    }
     if (status === "Trasferito") {
-      const patient = patients.find((item) => item.id === patientId);
       if (!patient) return;
       setTransferTarget({ type: "patient", patientId });
       setTransferDraft(patient.transferNotes || "");
@@ -1106,9 +1117,14 @@ export const Patients = ({
     setPatients((current) => current.map((patient) =>
       patient.id === patientId ? { ...patient, status, transferNotes: "" } : patient,
     ));
+    if (statusFilter !== "all" && statusFilter !== status) setStatusFilter("all");
   };
 
-  const requestFormStatusChange = (status) => {
+  const requestFormStatusChange = async (status) => {
+    if (["Dimesso", "Deceduto"].includes(status) && patientStatus !== status) {
+      const confirmed = await confirmAction(`Impostare il paziente come ${status}? Dopo la conferma il paziente non sarà più modificabile.`);
+      if (!confirmed) return;
+    }
     if (status === "Trasferito") {
       setTransferTarget({ type: "form" });
       setTransferDraft(transferNotes);
@@ -1624,11 +1640,11 @@ export const Patients = ({
                     </div>
                   ) : (
                     <>
-                      {isTransferredReadOnly && (
+                      {isClosedPatientReadOnly && (
                         <div className="alert alert-warning border-warning mb-3" role="status">
-                          <div>Paziente trasferito: puoi consultare tutte le informazioni, ma la scheda non può più essere modificata.</div>
-                          <div className="mt-2 fw-semibold">{TRANSFERRED_PATIENT_PRIVACY_NOTE}</div>
-                          {canEditPatients && (
+                          <div>Paziente {patientStatus.toLowerCase()}: puoi consultare tutte le informazioni, ma la scheda non può più essere modificata.</div>
+                          {patientStatus === "Trasferito" && <div className="mt-2 fw-semibold">{TRANSFERRED_PATIENT_PRIVACY_NOTE}</div>}
+                          {canEditPatients && patientStatus === "Trasferito" && (
                             <button className="btn btn-outline-primary btn-sm mt-3" type="button" onClick={() => {
                               setTransferTarget({ type: "form" });
                               setTransferDraft(transferNotes);
@@ -1639,7 +1655,7 @@ export const Patients = ({
                           )}
                         </div>
                       )}
-                      <fieldset className="border-0 p-0 m-0 w-100" disabled={isTransferredReadOnly}>
+                      <fieldset className="border-0 p-0 m-0 w-100" disabled={isClosedPatientReadOnly}>
                       {activeTab === "main" ? (
                     <div className="patient-form-grid">
                       <div className="patient-form-actions">
@@ -2799,7 +2815,7 @@ export const Patients = ({
                 </div>
 
                 <div className="card-footer d-flex align-items-center gap-2">
-                  {canEditPatients && isEditing && !isPatientReadOnly && (
+                  {canEditPatients && isEditing && (!isPatientReadOnly || isAdminOperator) && (
                     <button
                       className="btn btn-outline-danger me-auto"
                       type="button"
@@ -2952,7 +2968,7 @@ export const Patients = ({
                                 className="form-select form-select-sm patient-list-status"
                                 aria-label={`Stato di ${patient.firstName} ${patient.lastName}`}
                                 value={patient.status || ""}
-                                disabled={patient.status === "Trasferito"}
+                                disabled={CLOSED_PATIENT_STATUSES.includes(patient.status)}
                                 onClick={(event) => event.stopPropagation()}
                                 onKeyDown={(event) => event.stopPropagation()}
                                 onChange={(event) => updatePatientStatus(patient.id, event.target.value)}

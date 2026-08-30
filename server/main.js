@@ -296,11 +296,54 @@ const standardPatientProjection = (hiddenFields = []) => {
 
 const publishPatientCursors = async (subscription, cursors) => {
   const observers = [];
-  for (const cursor of cursors) {
+  const sourceRecords = cursors.map(() => new Map());
+  const publishedRecords = new Map();
+  const valuesMatch = (first, second) => JSON.stringify(first) === JSON.stringify(second);
+  const syncPatient = (id) => {
+    const availableSources = sourceRecords.filter((source) => source.has(id));
+    if (availableSources.length === 0) {
+      if (publishedRecords.has(id)) subscription.removed(PatientsCollection._name, id);
+      publishedRecords.delete(id);
+      return;
+    }
+    // Il cursore dei pazienti conclusi è l'ultimo e ha la precedenza, così i campi
+    // censurati non possono riapparire durante un cambio di stato simultaneo.
+    const nextFields = { ...availableSources.at(-1).get(id) };
+    const previousFields = publishedRecords.get(id);
+    if (!previousFields) {
+      publishedRecords.set(id, nextFields);
+      subscription.added(PatientsCollection._name, id, nextFields);
+      return;
+    }
+    const changes = {};
+    for (const field of new Set([...Object.keys(previousFields), ...Object.keys(nextFields)])) {
+      if (!(field in nextFields)) changes[field] = undefined;
+      else if (!valuesMatch(previousFields[field], nextFields[field])) changes[field] = nextFields[field];
+    }
+    publishedRecords.set(id, nextFields);
+    if (Object.keys(changes).length > 0) subscription.changed(PatientsCollection._name, id, changes);
+  };
+  for (let index = 0; index < cursors.length; index += 1) {
+    const source = sourceRecords[index];
+    const cursor = cursors[index];
     const observer = await cursor.observeChangesAsync({
-      added: (id, fields) => subscription.added(PatientsCollection._name, id, fields),
-      changed: (id, fields) => subscription.changed(PatientsCollection._name, id, fields),
-      removed: (id) => subscription.removed(PatientsCollection._name, id),
+      added: (id, fields) => {
+        source.set(id, { ...fields });
+        syncPatient(id);
+      },
+      changed: (id, fields) => {
+        const nextFields = { ...(source.get(id) || {}) };
+        Object.entries(fields).forEach(([field, value]) => {
+          if (value === undefined) delete nextFields[field];
+          else nextFields[field] = value;
+        });
+        source.set(id, nextFields);
+        syncPatient(id);
+      },
+      removed: (id) => {
+        source.delete(id);
+        syncPatient(id);
+      },
     });
     observers.push(observer);
   }
@@ -1738,6 +1781,15 @@ Meteor.methods({
     check(changes, { upserts: [Object], removedIds: [String] });
     const actor = await Meteor.users.findOneAsync(this.userId);
     const role = actor?.profile?.role;
+    if (role === "Admin") {
+      if (changes.upserts.length > 0) throw new Meteor.Error("patient-locked", "L'Admin può soltanto eliminare i pazienti conclusi.");
+      const recordsToDelete = await PatientsCollection.find({ _id: { $in: [...new Set(changes.removedIds)] } }).fetchAsync();
+      if (recordsToDelete.length !== new Set(changes.removedIds).size || recordsToDelete.some((record) => !CLOSED_PATIENT_STATUSES.includes(record.status))) {
+        throw new Meteor.Error("patient-locked", "L'Admin può eliminare soltanto pazienti dimessi, deceduti o trasferiti.");
+      }
+      if (changes.removedIds.length > 0) await PatientsCollection.removeAsync({ _id: { $in: [...new Set(changes.removedIds)] } });
+      return true;
+    }
     const presidentId = role === "Presidente"
       ? actor._id
       : role === "CAS"
@@ -1748,9 +1800,11 @@ Meteor.methods({
     const currentRecords = await PatientsCollection.find({ presidentId }).fetchAsync();
     const recordsById = new Map(currentRecords.map((record) => [record._id, { ...record, id: record._id }]));
     const changedRecords = [];
+    const assistanceSession = impersonationSessions.get(impersonationConnectionTokens.get(this.connection?.id));
+    const canDeleteClosedPatients = role === "Presidente" || assistanceSession?.targetId === this.userId;
     for (const removedId of changes.removedIds) {
-      if (recordsById.get(removedId)?.status === "Trasferito") {
-        throw new Meteor.Error("patient-locked", "Un paziente trasferito non può essere modificato o eliminato.");
+      if (CLOSED_PATIENT_STATUSES.includes(recordsById.get(removedId)?.status) && !canDeleteClosedPatients) {
+        throw new Meteor.Error("patient-locked", "Un paziente concluso non può essere modificato o eliminato.");
       }
       recordsById.delete(removedId);
     }
@@ -1761,8 +1815,8 @@ Meteor.methods({
       const recordId = record.id || record._id;
       const recordExists = recordsById.has(recordId);
       const existing = recordsById.get(recordId) || {};
-      if (existing.status === "Trasferito") {
-        throw new Meteor.Error("patient-locked", "Un paziente trasferito non può essere modificato o eliminato.");
+      if (CLOSED_PATIENT_STATUSES.includes(existing.status)) {
+        throw new Meteor.Error("patient-locked", "Un paziente concluso non può essere modificato o eliminato.");
       }
       const mergedRecord = restoreProtectedPatientFields({
         ...existing,
