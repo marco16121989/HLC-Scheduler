@@ -24,6 +24,7 @@ import { Donations } from "./Donations.js";
 import { PageInfo } from "./PageInfo.js";
 import { Permissions } from "./Permissions.js";
 import { Hospitality } from "./Hospitality.js";
+import { AnnualReport } from "./AnnualReport.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
 
 const ICON_PATHS = {
@@ -44,6 +45,7 @@ const ICON_PATHS = {
   hospitality: ["M3 11.5 12 4l9 7.5", "M5 10v10h14V10", "M9 20v-6h6v6", "M8 8V5h3"],
   reports: ["M4 20V10M10 20V4M16 20v-7M22 20H2", "M4 7h.01M10 1h.01M16 10h.01"],
   presentationReports: ["M12 3v9l7.8 4.5A9 9 0 1 1 12 3z", "M14 3.3A9 9 0 0 1 21 10h-7z"],
+  annualReport: ["M4 3h16v18H4z", "M8 8h8M8 12h8M8 16h5"],
   support: ["M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z", "M8 9h8M8 13h5"],
   files: ["M4 3h10l6 6v12H4z", "M14 3v6h6", "M8 14h8M8 18h6"],
   info: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 10v7M12 7h.01"],
@@ -477,6 +479,12 @@ export const Home = ({
                   </li>
                 </>
               )}
+              {(user.role === "Presidente" || (user.role === "CAS" && user.isSecretary)) && <li className="nav-item menu-order-reports">
+                <button className={`nav-link w-100 ${activeView === "annual-report" ? "active" : ""}`} type="button" onClick={() => openView("annual-report")}>
+                  <MenuIcon name="annualReport" />
+                  <p>Rapporto annuale</p>
+                </button>
+              </li>}
               {user.role === "GVP" && (
                 <>
                 <li className="sidebar-section-label menu-order-health">Gestione sanitaria</li>
@@ -619,6 +627,8 @@ export const Home = ({
           <PatientReports patients={patients} hospitals={hospitals} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "presentation-reports" && presidentId && canViewPage("presentation-reports") ? (
           <PresentationReports presentations={presentations} presidentId={presidentId} />
+        ) : activeView === "annual-report" && presidentId && (user.role === "Presidente" || (user.role === "CAS" && user.isSecretary)) ? (
+          <AnnualReport presentations={presentations} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "presentations" && presidentId && canViewPage("presentations") ? (
           <Presentations
             presentations={presentations}

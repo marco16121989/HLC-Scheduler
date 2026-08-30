@@ -1605,6 +1605,145 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   font-size: 1rem;
 }
 
+.annual-report-sheet {
+  width: 100%;
+  max-width: 82rem;
+  margin: 0 auto 2rem;
+  padding: 2.5rem 3rem;
+  color: #111;
+  background: #fff;
+  border: 1px solid var(--bs-border-color);
+}
+
+.annual-report-sheet > h2 {
+  margin: 0 0 2rem;
+  text-align: center;
+  font-size: clamp(1.25rem, 2.2vw, 2rem);
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
+.annual-report-section {
+  margin-top: 1.8rem;
+  border: 1px solid #222;
+}
+
+.annual-report-section h3 {
+  margin: 0;
+  padding: .45rem .55rem;
+  background: #ddd;
+  border-bottom: 1px solid #222;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.annual-report-section h3 small {
+  font-size: .95rem;
+  font-weight: 400;
+}
+
+.annual-report-section-one,
+.annual-report-specializations {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.annual-report-section-one > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.2rem;
+  padding: .35rem .55rem;
+  border-bottom: 1px solid #222;
+}
+
+.annual-report-section-one > div:nth-child(odd),
+.annual-report-specialization-column:first-child {
+  border-right: 1px solid #222;
+}
+
+.annual-report-section-one > div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.annual-report-specialization {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2rem;
+  padding: .25rem .55rem;
+  border-bottom: 1px solid #222;
+}
+
+.annual-report-specialization:last-child {
+  border-bottom: 0;
+}
+
+.annual-report-specialization strong,
+.annual-report-section-one strong {
+  min-width: 2rem;
+  text-align: right;
+}
+
+.annual-report-sheet footer {
+  margin-top: 1rem;
+  color: #555;
+  font-size: .8rem;
+  text-align: right;
+}
+
+@media (max-width: 767.98px) {
+  .annual-report-sheet {
+    padding: 1rem;
+  }
+
+  .annual-report-section-one,
+  .annual-report-specializations {
+    grid-template-columns: 1fr;
+  }
+
+  .annual-report-section-one > div:nth-child(odd),
+  .annual-report-specialization-column:first-child {
+    border-right: 0;
+  }
+
+  .annual-report-section-one > div:nth-last-child(2) {
+    border-bottom: 1px solid #222;
+  }
+
+  .annual-report-specialization-column:first-child .annual-report-specialization:last-child {
+    border-bottom: 1px solid #222;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .annual-report-sheet,
+  .annual-report-sheet * {
+    visibility: visible !important;
+  }
+
+  .annual-report-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 10mm;
+    border: 0;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+}
+
 .patient-row-actions {
   display: flex;
   justify-content: center;
