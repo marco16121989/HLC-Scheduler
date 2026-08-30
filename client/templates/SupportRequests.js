@@ -4,11 +4,16 @@ import { Meteor } from "meteor/meteor";
 const initialForm = { type: "Richiesta", subject: "", priority: "Normale", phone: "", message: "" };
 const statusClass = { Inviata: "text-bg-secondary", "In lavorazione": "text-bg-primary", Risolta: "text-bg-success", Chiusa: "text-bg-dark" };
 
+
 export const SupportRequests = ({ requests, currentUser }) => {
   const emptyForm = { ...initialForm, phone: currentUser.phone || "" };
   const [form, setForm] = useState(emptyForm);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
   const [sending, setSending] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("Inviata");
+  const filteredRequests = statusFilter === "all"
+    ? requests
+    : requests.filter((request) => request.status === statusFilter);
   const update = (event) => {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
     setFeedback({ type: "", message: "" });
@@ -42,8 +47,8 @@ export const SupportRequests = ({ requests, currentUser }) => {
           <div className="col-12"><label className="form-label" htmlFor="support-message">Descrizione</label><textarea className="form-control" id="support-message" name="message" rows="7" value={form.message} onChange={update} required /></div>
         </div></div><div className="card-footer text-end"><button className="btn btn-primary" type="submit" disabled={sending}>{sending ? "Invio…" : "Invia"}</button></div>
       </form></section></div>}
-      <div className={currentUser.role === "Admin" ? "col-12" : "col-12 col-xl-7"}><section className="card"><div className="card-header"><h2 className="card-title">{currentUser.role === "Admin" ? "Tutte le segnalazioni" : "Le mie segnalazioni"}</h2></div><div className="card-body">
-        {requests.length === 0 ? <p className="text-secondary mb-0">Nessuna segnalazione o richiesta inviata.</p> : <div className="support-request-list">{requests.map((request) => <article className="support-request" key={request.id}>
+      <div className={currentUser.role === "Admin" ? "col-12" : "col-12 col-xl-7"}><section className="card"><div className="card-header d-flex flex-wrap align-items-center gap-2"><h2 className="card-title mb-0">{currentUser.role === "Admin" ? "Tutte le segnalazioni" : "Le mie segnalazioni"}</h2><select className="form-select form-select-sm w-auto ms-auto" aria-label="Filtra segnalazioni per stato" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="Inviata">Nuove segnalazioni</option><option value="In lavorazione">In lavorazione</option><option value="Risolta">Risolte</option><option value="Chiusa">Chiuse</option><option value="all">Tutti gli stati</option></select></div><div className="card-body">
+        {filteredRequests.length === 0 ? <p className="text-secondary mb-0">Nessuna segnalazione corrisponde allo stato selezionato.</p> : <div className="support-request-list">{filteredRequests.map((request) => <article className="support-request" key={request.id}>
           <div className="d-flex justify-content-between gap-3"><div><div className="d-flex flex-wrap gap-2 mb-2"><span className="badge text-bg-light">{request.type}</span><span className={`badge ${request.priority === "Urgente" ? "text-bg-danger" : request.priority === "Alta" ? "text-bg-warning" : "text-bg-light"}`}>{request.priority}</span><span className={`badge ${statusClass[request.status] || "text-bg-secondary"}`}>{request.status}</span></div><h3>{request.subject}</h3></div><time>{request.createdAt ? new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(request.createdAt)) : ""}</time></div>
           <p>{request.message}</p>{currentUser.role === "Admin" && <div className="d-flex align-items-center justify-content-between gap-3"><small>Inviata da: {request.createdByUsername}{request.phone ? ` · Tel: ${request.phone}` : ""}</small><select className="form-select form-select-sm support-status-select" value={request.status} onChange={(event) => updateStatus(request.id, event.target.value)}><option>Inviata</option><option>In lavorazione</option><option>Risolta</option><option>Chiusa</option></select></div>}
         </article>)}</div>}

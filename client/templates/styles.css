@@ -1589,6 +1589,22 @@ svg.admin-nav-icon {
   border-bottom: 0;
 }
 
+button[aria-label^="Informazioni sui permessi"] {
+  order: -1;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  line-height: 1;
+}
+
+button[aria-label^="Informazioni sui permessi"] span {
+  font-size: 0;
+}
+
+button[aria-label^="Informazioni sui permessi"] span::after {
+  content: "i";
+  font-size: 1rem;
+}
+
 .patient-row-actions {
   display: flex;
   justify-content: center;

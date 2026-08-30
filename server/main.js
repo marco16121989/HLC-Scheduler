@@ -25,10 +25,12 @@ import { DEFAULT_DEPARTMENT_NAMES } from "/imports/constants/departments";
 import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
 import { normalizeGvpPatientSharedFields } from "/imports/constants/gvpPatientSharing";
 
+
 const usefulFileExtensions = new Set([
   "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
   "xls", "xlsx", "ods", "csv", "ppt", "pptx", "odp", "zip",
 ]);
+const supportRequestStatuses = new Set(["Inviata", "In lavorazione", "Risolta", "Chiusa"]);
 
 const impersonationSessions = new Map();
 const impersonationLoginTickets = new Map();
@@ -1339,7 +1341,7 @@ Meteor.methods({
     check(status, String);
     const actor = await Meteor.users.findOneAsync(this.userId);
     if (actor.profile?.role !== "Admin") throw new Meteor.Error("not-authorized", "Operazione riservata agli amministratori.");
-    const validStatus = ["Inviata", "In lavorazione", "Risolta", "Chiusa"].includes(status) ? status : "Inviata";
+    const validStatus = supportRequestStatuses.has(status) ? status : "Inviata";
     await SupportRequestsCollection.updateAsync(requestId, { $set: { status: validStatus } });
   },
 

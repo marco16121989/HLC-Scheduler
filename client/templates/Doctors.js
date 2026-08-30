@@ -440,7 +440,7 @@ export const Doctors = ({
                 <div className="card-header d-flex align-items-center">
                   <h2 className="card-title">
                     <span id="doctor-modal-title">
-                    {isEditing ? "Modifica medico" : "Inserisci medico"}
+                    {readOnly ? "Visualizza medico" : isEditing ? "Modifica medico" : "Inserisci medico"}
                     </span>
                   </h2>
                   <button
@@ -450,7 +450,7 @@ export const Doctors = ({
                     onClick={resetForm}
                   />
                 </div>
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={readOnly ? (event) => event.preventDefault() : handleSubmit}>
                   <div className="card-body">
                     {error && (
                       <div className="alert alert-danger py-2" role="alert">
@@ -458,6 +458,7 @@ export const Doctors = ({
                       </div>
                     )}
 
+                    <fieldset className="m-0 p-0 border-0" disabled={readOnly}>
                     <div className="mb-3">
                       <label className="form-label" htmlFor="doctor-first-name">
                         Nome
@@ -632,10 +633,11 @@ export const Doctors = ({
                         </div>
                       )}
                     </fieldset>
+                    </fieldset>
                   </div>
 
                   <div className="card-footer d-flex align-items-center gap-2">
-                    {isEditing && (
+                    {!readOnly && isEditing && (
                       <button
                         className="btn btn-outline-danger me-auto"
                         type="button"
@@ -650,12 +652,12 @@ export const Doctors = ({
                         type="button"
                         onClick={resetForm}
                       >
-                        Annulla
+                        {readOnly ? "Chiudi" : "Annulla"}
                       </button>
                     )}
-                    <button className="btn btn-primary" type="submit">
+                    {!readOnly && <button className="btn btn-primary" type="submit">
                       {isEditing ? "Salva modifiche" : "Inserisci"}
-                    </button>
+                    </button>}
                   </div>
                 </form>
               </section>
@@ -785,13 +787,13 @@ export const Doctors = ({
 
                               return (
                               <tr
-                                className={readOnly ? "" : "doctor-clickable-row"}
+                                className="doctor-clickable-row"
                                 key={doctor.id}
-                                role={readOnly ? undefined : "button"}
-                                tabIndex={readOnly ? undefined : 0}
-                                onClick={readOnly ? undefined : () => handleEdit(doctor)}
+                                role="button"
+                                tabIndex="0"
+                                onClick={() => handleEdit(doctor)}
                                 onKeyDown={(event) => {
-                                  if (!readOnly && (event.key === "Enter" || event.key === " ")) {
+                                  if (event.key === "Enter" || event.key === " ") {
                                     event.preventDefault();
                                     handleEdit(doctor);
                                   }
