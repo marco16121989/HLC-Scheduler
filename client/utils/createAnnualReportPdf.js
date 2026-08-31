@@ -1,80 +1,66 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-const PAGE_WIDTH = 1120;
-const PAGE_HEIGHT = 712;
-const TABLE_X = 112;
-const TABLE_WIDTH = 918;
-const COLUMN_WIDTH = TABLE_WIDTH / 2;
+const TEMPLATE_URL = "/templates/hlc-30_I.pdf";
 const black = rgb(0.05, 0.05, 0.05);
-const gray = rgb(0.86, 0.86, 0.86);
-
 const safeText = (value) => String(value ?? "").replaceAll("’", "'");
 
-const drawTextFitted = (page, text, { x, y, maxWidth, font, size = 13, minSize = 8 }) => {
-  const normalized = safeText(text);
+const drawFitted = (page, value, { x, y, maxWidth, font, size = 9.4, minSize = 6, align = "left" }) => {
+  const text = safeText(value);
   let fittedSize = size;
-  while (fittedSize > minSize && font.widthOfTextAtSize(normalized, fittedSize) > maxWidth) fittedSize -= 0.5;
-  page.drawText(normalized, { x, y, size: fittedSize, font, color: black });
+  while (fittedSize > minSize && font.widthOfTextAtSize(text, fittedSize) > maxWidth) fittedSize -= 0.25;
+  const width = font.widthOfTextAtSize(text, fittedSize);
+  page.drawText(text, { x: align === "right" ? x + maxWidth - width : x, y, size: fittedSize, font, color: black });
 };
 
-const drawLine = (page, start, end) => page.drawLine({ start, end, thickness: 1, color: black });
+const wrapText = (value, font, size, maxWidth) => {
+  const lines = [];
+  safeText(value || "Nessuna").split(/\r?\n/).forEach((paragraph) => {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return lines.push("");
+    let line = "";
+    words.forEach((word) => {
+      const candidate = line ? `${line} ${word}` : word;
+      if (line && font.widthOfTextAtSize(candidate, size) > maxWidth) {
+        lines.push(line);
+        line = word;
+      } else line = candidate;
+    });
+    lines.push(line);
+  });
+  return lines;
+};
 
-export const createAnnualReportPdf = async ({ casName, casMemberCount, gvpMemberCount, presentationCount, specializationColumns, totalFor }) => {
-  const pdf = await PDFDocument.create();
-  const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+export const createAnnualReportPdf = async ({ casName, casMemberCount, gvpMemberCount, presentationCount, specializationColumns, totalFor, significantIssues, reportDate, casMember, year }) => {
+  const templateResponse = await fetch(TEMPLATE_URL);
+  if (!templateResponse.ok) throw new Error("Modello PDF del rapporto annuale non disponibile.");
+  const pdf = await PDFDocument.load(await templateResponse.arrayBuffer());
+  const page = pdf.getPage(0);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const title = "RAPPORTO ANNUALE DEL COMITATO DI ASSISTENZA SANITARIA";
-  const titleSize = 24;
-  page.drawText(title, {
-    x: (PAGE_WIDTH - bold.widthOfTextAtSize(title, titleSize)) / 2,
-    y: 654,
-    size: titleSize,
-    font: bold,
-    color: black,
-  });
 
-  const sectionOneTop = 624;
-  const sectionOneHeaderHeight = 37;
-  const sectionOneRowHeight = 29;
-  const sectionOneBottom = sectionOneTop - sectionOneHeaderHeight - sectionOneRowHeight * 2;
-  page.drawRectangle({ x: TABLE_X, y: sectionOneTop - sectionOneHeaderHeight, width: TABLE_WIDTH, height: sectionOneHeaderHeight, color: gray, borderColor: black, borderWidth: 1 });
-  page.drawText("SEZIONE 1", { x: TABLE_X + 8, y: sectionOneTop - 26, size: 17, font: bold, color: black });
-  page.drawRectangle({ x: TABLE_X, y: sectionOneBottom, width: TABLE_WIDTH, height: sectionOneRowHeight * 2, borderColor: black, borderWidth: 1 });
-  drawLine(page, { x: TABLE_X + COLUMN_WIDTH, y: sectionOneBottom }, { x: TABLE_X + COLUMN_WIDTH, y: sectionOneTop - sectionOneHeaderHeight });
-  drawLine(page, { x: TABLE_X, y: sectionOneBottom + sectionOneRowHeight }, { x: TABLE_X + TABLE_WIDTH, y: sectionOneBottom + sectionOneRowHeight });
-  const sectionOneRows = [
-    [["Nome CAS:", casName], ["Numero di membri CAS:", casMemberCount]],
-    [["Numero di presentazioni significative effettuate:", presentationCount], ["Numero di membri GVP:", gvpMemberCount]],
-  ];
-  sectionOneRows.forEach((row, rowIndex) => row.forEach(([label, value], columnIndex) => {
-    const x = TABLE_X + columnIndex * COLUMN_WIDTH + 8;
-    const y = sectionOneTop - sectionOneHeaderHeight - (rowIndex + 1) * sectionOneRowHeight + 9;
-    drawTextFitted(page, label, { x, y, maxWidth: COLUMN_WIDTH - 95, font: regular, size: 13 });
-    drawTextFitted(page, value, { x: TABLE_X + (columnIndex + 1) * COLUMN_WIDTH - 78, y, maxWidth: 68, font: bold, size: 13 });
-  }));
+  // Sezione 1: valori inseriti negli spazi del modello originale.
+  drawFitted(page, casName, { x: 105, y: 733.8, maxWidth: 184, font: bold });
+  drawFitted(page, casMemberCount, { x: 410, y: 733.8, maxWidth: 130, font: bold, align: "right" });
+  drawFitted(page, presentationCount, { x: 257, y: 718.4, maxWidth: 32, font: bold, align: "right" });
+  drawFitted(page, gvpMemberCount, { x: 410, y: 718.4, maxWidth: 130, font: bold, align: "right" });
 
-  const sectionTwoTop = 503;
-  const sectionTwoHeaderHeight = 37;
-  const rowHeight = 28;
-  const sectionTwoBottom = sectionTwoTop - sectionTwoHeaderHeight - rowHeight * 16;
-  page.drawRectangle({ x: TABLE_X, y: sectionTwoTop - sectionTwoHeaderHeight, width: TABLE_WIDTH, height: sectionTwoHeaderHeight, color: gray, borderColor: black, borderWidth: 1 });
-  page.drawText("SEZIONE 2", { x: TABLE_X + 8, y: sectionTwoTop - 26, size: 17, font: bold, color: black });
-  page.drawText("(Indicare i totali di medici per specializzazione.)", { x: TABLE_X + 112, y: sectionTwoTop - 25, size: 14, font: regular, color: black });
-  page.drawRectangle({ x: TABLE_X, y: sectionTwoBottom, width: TABLE_WIDTH, height: rowHeight * 16, borderColor: black, borderWidth: 1 });
-  drawLine(page, { x: TABLE_X + COLUMN_WIDTH, y: sectionTwoBottom }, { x: TABLE_X + COLUMN_WIDTH, y: sectionTwoTop - sectionTwoHeaderHeight });
-  for (let index = 1; index < 16; index += 1) {
-    const y = sectionTwoBottom + index * rowHeight;
-    drawLine(page, { x: TABLE_X, y }, { x: TABLE_X + TABLE_WIDTH, y });
-  }
+  // Sezione 2: sedici righe e due colonne, con le coordinate esatte della tabella originale.
   specializationColumns.forEach((column, columnIndex) => column.forEach((specialization, rowIndex) => {
-    const x = TABLE_X + columnIndex * COLUMN_WIDTH + 8;
-    const y = sectionTwoTop - sectionTwoHeaderHeight - (rowIndex + 1) * rowHeight + 8;
-    drawTextFitted(page, `${specialization}:`, { x, y, maxWidth: COLUMN_WIDTH - 70, font: regular, size: 12.5, minSize: 7.5 });
-    drawTextFitted(page, totalFor(specialization), { x: TABLE_X + (columnIndex + 1) * COLUMN_WIDTH - 48, y, maxWidth: 38, font: bold, size: 12.5 });
+    const y = 668.6 - rowIndex * 15.4356;
+    const x = columnIndex === 0 ? 258 : 510;
+    drawFitted(page, totalFor(specialization), { x, y, maxWidth: 30, font: bold, size: 9.4, align: "right" });
   }));
 
-  pdf.setTitle("Rapporto annuale del Comitato di Assistenza Sanitaria");
+  // Sezione 3: testo contenuto nel riquadro già presente nel modello.
+  const issueLines = wrapText(significantIssues, regular, 9.3, 486).slice(0, 22);
+  issueLines.forEach((line, index) => page.drawText(line, { x: 54, y: 368 - index * 10.2, size: 9.3, font: regular, color: black }));
+
+  // Sezione 4: data e membro CAS sulle righe predisposte dal documento.
+  const formattedDate = /^\d{4}-\d{2}-\d{2}$/.test(reportDate || "") ? reportDate.split("-").reverse().join("/") : reportDate || "";
+  drawFitted(page, formattedDate, { x: 78, y: 105.4, maxWidth: 205, font: bold, size: 9.4 });
+  drawFitted(page, casMember, { x: 369, y: 105.4, maxWidth: 170, font: bold, size: 9.4 });
+
+  pdf.setTitle(`Rapporto annuale ${year || ""} del Comitato di Assistenza Sanitaria`);
   const bytes = await pdf.save();
   return URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
 };

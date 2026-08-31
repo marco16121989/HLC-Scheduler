@@ -7,6 +7,7 @@ import {
   AccessLogsCollection,
   LoginMessagesCollection,
   AbsencesCollection,
+  AnnualReportsCollection,
   DepartmentsCollection,
   DoctorsCollection,
   EventsCollection,
@@ -24,7 +25,6 @@ import { formatUserName } from "/imports/utils/formatUserName";
 import { DEFAULT_DEPARTMENT_NAMES } from "/imports/constants/departments";
 import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
 import { normalizeGvpPatientSharedFields } from "/imports/constants/gvpPatientSharing";
-
 
 const usefulFileExtensions = new Set([
   "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
@@ -642,6 +642,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
     DoctorsCollection.find(dataSelector),
     // Le presentazioni sono condivise soltanto all'interno della stessa organizzazione.
     PresentationsCollection.find(dataSelector),
+    AnnualReportsCollection.find(dataSelector, { sort: { year: -1 } }),
     SupportRequestsCollection.find(role === "Admin" ? {} : { createdBy: actor._id }),
     UsefulFilesCollection.find(dataSelector, { sort: { createdAt: -1 } }),
     AbsencesCollection.find({ userId: { $in: absenceUserIds } }, { sort: { startDate: 1 } }),
@@ -705,6 +706,80 @@ Meteor.publish("hlc-login-messages", async function publishHlcLoginMessages() {
 });
 
 Meteor.methods({
+  async "hlc.saveAnnualReport"(report) {
+    requireUser(this);
+    check(report, {
+      year: String,
+      casName: String,
+      casMemberCount: Number,
+      gvpMemberCount: Number,
+      presentationCount: Number,
+      specializationTotals: Object,
+      significantIssues: String,
+      reportDate: String,
+      casMember: String,
+    });
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : role === "CAS" && actor.profile?.isSecretary
+        ? actor.profile.presidentId || actor.profile.associationId
+        : null;
+    if (!presidentId) throw new Meteor.Error("not-authorized", "Solo il Presidente o il Segretario CAS può salvare il rapporto annuale.");
+    if (!/^\d{4}$/.test(report.year) || !report.reportDate || !report.casMember.trim()) {
+      throw new Meteor.Error("invalid-report", "Completa anno, data e membro CAS.");
+    }
+    const saved = {
+      ...report,
+      casName: report.casName.trim(),
+      significantIssues: report.significantIssues.trim(),
+      casMember: report.casMember.trim(),
+      presidentId,
+      updatedAt: new Date(),
+      updatedBy: this.userId,
+      updatedByName: actor.username,
+    };
+    const existing = await AnnualReportsCollection.findOneAsync({ presidentId, year: report.year });
+    if (existing) {
+      if (existing.sentAt) throw new Meteor.Error("report-locked", "Il rapporto è stato inviato alla filiale e non può più essere modificato.");
+      await AnnualReportsCollection.updateAsync(existing._id, { $set: saved });
+      return existing._id;
+    }
+    return AnnualReportsCollection.insertAsync({ ...saved, createdAt: new Date(), createdBy: this.userId });
+  },
+  async "hlc.markAnnualReportAsSent"(reportId) {
+    requireUser(this);
+    check(reportId, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : role === "CAS" && actor.profile?.isSecretary
+        ? actor.profile.presidentId || actor.profile.associationId
+        : null;
+    if (!presidentId) throw new Meteor.Error("not-authorized", "Solo il Presidente o il Segretario CAS può inviare il rapporto annuale.");
+    const report = await AnnualReportsCollection.findOneAsync({ _id: reportId, presidentId });
+    if (!report) throw new Meteor.Error("not-found", "Rapporto annuale non trovato.");
+    if (report.sentAt) throw new Meteor.Error("report-locked", "Il rapporto risulta già inviato alla filiale.");
+    await AnnualReportsCollection.updateAsync(reportId, { $set: { sentAt: new Date(), sentBy: this.userId, sentByName: actor.username } });
+    return true;
+  },
+  async "hlc.deleteAnnualReport"(reportId) {
+    requireUser(this);
+    check(reportId, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const role = actor?.profile?.role;
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : role === "CAS" && actor.profile?.isSecretary
+        ? actor.profile.presidentId || actor.profile.associationId
+        : null;
+    if (!presidentId) throw new Meteor.Error("not-authorized", "Solo il Presidente o il Segretario CAS può eliminare il rapporto annuale.");
+    const removedCount = await AnnualReportsCollection.removeAsync({ _id: reportId, presidentId });
+    if (!removedCount) throw new Meteor.Error("not-found", "Rapporto annuale non trovato.");
+    return true;
+  },
   async "hlc.updatePagePermissions"(targetUserId, permissions) {
     requireUser(this);
     check(targetUserId, String);
@@ -2075,6 +2150,7 @@ const ensurePerformanceIndexes = async () => {
     DoctorsCollection.rawCollection().createIndex({ presidentId: 1, lastName: 1, firstName: 1 }),
     HospitalityOffersCollection.rawCollection().createIndex({ presidentId: 1, hostName: 1 }),
     PresentationsCollection.rawCollection().createIndex({ presidentId: 1, presentationDate: -1 }),
+    AnnualReportsCollection.rawCollection().createIndex({ presidentId: 1, year: -1 }, { unique: true }),
     EventsCollection.rawCollection().createIndex({ presidentId: 1, createdBy: 1, startsAt: 1 }),
     EventsCollection.rawCollection().createIndex({ presidentId: 1, "invitees.userId": 1, startsAt: 1 }),
     NotificationsCollection.rawCollection().createIndex({ recipientId: 1, readAt: 1, createdAt: -1 }),

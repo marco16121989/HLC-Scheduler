@@ -1159,6 +1159,11 @@ svg.admin-nav-icon {
   width: min(100%, 34rem);
 }
 
+.annual-report-modal {
+  width: min(100%, 78rem);
+  max-width: 96vw;
+}
+
 .patient-modal-card {
   width: min(100%, 1600px);
   max-width: min(100%, 95vw);
@@ -1659,6 +1664,26 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   grid-template-columns: 1fr 1fr;
 }
 
+.annual-report-section-four {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.annual-report-section-four label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.75rem;
+  font-weight: 600;
+}
+
+.annual-report-section-four label + label {
+  border-left: 1px solid var(--bs-border-color);
+}
+
 .annual-report-section-one > div {
   display: flex;
   align-items: center;
@@ -1711,8 +1736,14 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   }
 
   .annual-report-section-one,
-  .annual-report-specializations {
+  .annual-report-specializations,
+  .annual-report-section-four {
     grid-template-columns: 1fr;
+  }
+
+  .annual-report-section-four label + label {
+    border-top: 1px solid var(--bs-border-color);
+    border-left: 0;
   }
 
   .annual-report-section-one > div:nth-child(odd),
