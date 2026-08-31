@@ -194,6 +194,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   const [hospitalFilter, setHospitalFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [mobileFormOpen, setMobileFormOpen] = useState(false);
+  const [detailPresidentId, setDetailPresidentId] = useState(null);
 
   useEffect(() => {
     const role = managedRole || availableRoles[0];
@@ -204,6 +205,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     setHospitalFilter("all");
     setDepartmentFilter("all");
     setMobileFormOpen(false);
+    setDetailPresidentId(null);
   }, [managedRole, manager?.id]);
   const formHospitalAssignments = Array.isArray(form.hospitalAssignments)
     ? form.hospitalAssignments
@@ -579,6 +581,20 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     const action = willActivate ? "riattivare" : "disattivare";
     if (!await confirmAction(`Vuoi ${action} ${user.username} e tutti i suoi CAS e GVP?`, { title: "Conferma operazione", confirmLabel: willActivate ? "Riattiva" : "Disattiva", tone: willActivate ? "primary" : "danger" })) return;
     Meteor.call("hlc.setPresidentActive", user.id, willActivate, (methodError) => {
+      if (methodError) globalThis.alert(methodError.reason || "Impossibile aggiornare lo stato.");
+    });
+  };
+
+  const openPresidentDetails = (user) => {
+    if (manager?.role === "Admin") {
+      setDetailPresidentId(user.id);
+    }
+  };
+
+  const toggleManagedUserActive = async (user) => {
+    const willActivate = Boolean(user.disabled);
+    if (!await confirmAction(`Vuoi ${willActivate ? "riattivare" : "disattivare"} ${user.username}?`, { title: "Conferma operazione", confirmLabel: willActivate ? "Riattiva" : "Disattiva", tone: willActivate ? "primary" : "danger" })) return;
+    Meteor.call("hlc.setManagedUserActive", user.id, willActivate, (methodError) => {
       if (methodError) globalThis.alert(methodError.reason || "Impossibile aggiornare lo stato.");
     });
   };
@@ -1037,7 +1053,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                     </div>
                   )}
                   <div className="table-responsive">
-                    <table className={`table table-hover align-middle mb-0 mobile-card-table ${managedRole === "CAS" ? "cas-list-table" : managedRole === "GVP" ? "gvp-list-table" : ""}`}>
+                    <table className={`table table-hover align-middle mb-0 mobile-card-table ${manager?.role === "Admin" ? "admin-presidents-table" : managedRole === "CAS" ? "cas-list-table" : managedRole === "GVP" ? "gvp-list-table" : ""}`}>
                       <thead>
                         {manager?.role === "Admin" ? (
                         <tr>
@@ -1101,12 +1117,12 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
 
                             if (manager?.role === "Admin") {
                               return (
-                                <tr key={user.id}>
+                                <tr key={user.id} className="admin-president-row" role="button" tabIndex="0" onClick={() => openPresidentDetails(user)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPresidentDetails(user); } }}>
                                   <td className="fw-medium" data-label="Presidente">{user.username} {user.disabled && <span className="badge text-bg-danger ms-2">Disattivato</span>}</td>
-                                  <td data-label="CAS di appartenenza">{user.casMembership || <span className="text-secondary">-</span>}</td>
-                                  <td data-label="CAS"><span className="badge text-bg-primary user-count-badge">{casCount}</span></td>
-                                  <td data-label="GVP"><span className="badge text-bg-info user-count-badge">{gvpCount}</span></td>
-                                  <td className="text-end" data-label="Azioni"><div className="d-inline-flex gap-2"><button className={`btn btn-sm ${user.disabled ? "btn-outline-success" : "btn-outline-danger"}`} type="button" onClick={() => togglePresidentActive(user)}>{user.disabled ? "Attiva" : "Disattiva"}</button><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => handleEdit(user)}>Modifica</button></div></td>
+                                  <td className="admin-president-membership" data-label="CAS di appartenenza">{user.casMembership || <span className="text-secondary">-</span>}</td>
+                                  <td className="admin-president-count" data-label="CAS"><span className="badge text-bg-primary user-count-badge">{casCount}</span></td>
+                                  <td className="admin-president-count" data-label="GVP"><span className="badge text-bg-info user-count-badge">{gvpCount}</span></td>
+                                  <td className="text-end" data-label="Azioni"><div className="d-inline-flex gap-2"><button className={`btn btn-sm ${user.disabled ? "btn-outline-success" : "btn-outline-danger"}`} type="button" onClick={(event) => { event.stopPropagation(); togglePresidentActive(user); }}>{user.disabled ? "Attiva" : "Disattiva"}</button><button className="btn btn-outline-primary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); handleEdit(user); }}>Modifica</button></div></td>
                                 </tr>
                               );
                             }
@@ -1208,6 +1224,14 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
           </div>
         </div>
       </div>
+      {detailPresidentId && (() => {
+        const president = users.find((user) => user.id === detailPresidentId && user.role === "Presidente");
+        if (!president) return null;
+        const linkedCas = users.filter((user) => user.role === "CAS" && getPresidentId(user, users) === president.id);
+        const linkedGvp = users.filter((user) => user.role === "GVP" && getPresidentId(user, users) === president.id);
+        const linkedUserRow = (user) => <li key={user.id}><span>{user.username}{user.disabled && <small className="d-block text-danger">Disattivato</small>}</span><button className={`btn btn-sm ${user.disabled ? "btn-outline-success" : "btn-outline-danger"}`} type="button" onClick={() => toggleManagedUserActive(user)}>{user.disabled ? "Attiva" : "Disattiva"}</button></li>;
+        return <><button className="admin-president-detail-backdrop" type="button" aria-label="Chiudi dettagli Presidente" onClick={() => setDetailPresidentId(null)} /><div className="admin-president-detail-shell"><section className="card admin-president-detail" role="dialog" aria-modal="true" aria-labelledby="admin-president-detail-title"><div className="card-header d-flex align-items-center"><div><h2 className="card-title mb-0" id="admin-president-detail-title">{president.username}</h2>{president.casMembership && <small className="text-secondary">{president.casMembership}</small>}</div><button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setDetailPresidentId(null)} /></div><div className="card-body admin-president-detail-body"><section><h3>CAS <span className="badge text-bg-primary">{linkedCas.length}</span></h3>{linkedCas.length ? <ul>{linkedCas.map(linkedUserRow)}</ul> : <p className="text-secondary">Nessun CAS associato.</p>}</section><section><h3>GVP <span className="badge text-bg-info">{linkedGvp.length}</span></h3>{linkedGvp.length ? <ul>{linkedGvp.map(linkedUserRow)}</ul> : <p className="text-secondary">Nessun GVP associato.</p>}</section></div><div className="card-footer d-grid gap-2"><button className={`btn ${president.disabled ? "btn-outline-success" : "btn-outline-danger"}`} type="button" onClick={() => togglePresidentActive(president)}>{president.disabled ? "Attiva" : "Disattiva"}</button><button className="btn btn-primary" type="button" onClick={() => { setDetailPresidentId(null); handleEdit(president); }}>Modifica</button></div></section></div></>;
+      })()}
     </>
   );
 };

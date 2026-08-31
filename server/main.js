@@ -1550,6 +1550,22 @@ Meteor.methods({
     );
   },
 
+  async "hlc.setManagedUserActive"(userId, active) {
+    requireUser(this);
+    check(userId, String);
+    check(active, Boolean);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    if (actor.profile?.role !== "Admin") {
+      throw new Meteor.Error("not-authorized", "Operazione riservata agli amministratori.");
+    }
+    const target = await Meteor.users.findOneAsync(userId);
+    if (!["CAS", "GVP"].includes(target?.profile?.role)) {
+      throw new Meteor.Error("invalid-user", "Utente non valido.");
+    }
+    await Meteor.users.updateAsync(userId, { $set: { "profile.disabled": !active } });
+    return true;
+  },
+
   async "hlc.createSupportRequest"(data) {
     requireUser(this);
     check(data, { type: String, subject: String, priority: String, phone: String, message: String });
