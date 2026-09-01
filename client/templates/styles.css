@@ -957,7 +957,7 @@ svg.admin-nav-icon {
   display: none;
 }
 
-.cas-secretary-badge {
+.cas-role-badge {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -971,8 +971,11 @@ svg.admin-nav-icon {
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1;
-  transform: translateY(-4px);
+  vertical-align: middle;
 }
+
+.cas-list-table .cas-role-badge { transform: translateY(-4px); }
+.badge .cas-role-badge { width: 1.15rem; height: 1.15rem; margin-right: .3rem; color: #198754; background: #fff; font-size: .62rem; }
 
 .user-row-unassigned > td:first-child {
   border-left: 3px solid var(--bs-warning);

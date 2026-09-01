@@ -3,6 +3,7 @@ import { Meteor } from "meteor/meteor";
 import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
 import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPdf.js";
 import { confirmAction } from "./ConfirmDialog.js";
+import { CasRoleBadge, formatCasUserLabel } from "./CasRoleBadge.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
 import {
   DEFAULT_GVP_PATIENT_SHARED_FIELDS,
@@ -499,8 +500,8 @@ export const Patients = ({
   const selectedDepartment = availableDepartments.find((department) => department.id === details.departmentId);
   const visibleCasUsers = users.filter(
     (user) =>
-      user.role === "CAS" &&
-      (user.presidentId || user.associationId) === presidentId,
+      (user.role === "Presidente" && user.id === presidentId) ||
+      (user.role === "CAS" && (user.presidentId || user.associationId) === presidentId),
   );
   const isCasAssignedToDepartment = (user, department) => {
     if (!department) return false;
@@ -1449,7 +1450,7 @@ export const Patients = ({
               {!isGvp && currentUser.role === "CAS" && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra pazienti per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
                 <option value={currentUser.id}>I miei pazienti</option>
                 <option value="all">Tutti i pazienti</option>
-                {visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{casUser.username}</option>)}
+                {visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{formatCasUserLabel(casUser)}</option>)}
               </select>}
               {canViewGvpSharing && <button className="btn btn-outline-primary" type="button" onClick={openSharingModal}>Scegli info da condividere con GVP</button>}
               {canEditPatients && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
@@ -2034,7 +2035,7 @@ export const Patients = ({
                           <option value="">Seleziona CAS</option>
                           {orderedCasUsers.map((casUser) => (
                             <option key={casUser.id} value={casUser.id}>
-                              {casUser.username}
+                              {formatCasUserLabel(casUser)}
                               {casUser.id === currentUser.id ? " (io)" : ""}
                               {isAbsentOnAdmissionDate(casUser.id) ? ` â€” ${getAbsenceLabel(casUser.id)}` : ""}
                             </option>
@@ -2305,7 +2306,7 @@ export const Patients = ({
                                         setCasIds(nextCasIds);
                                         setCasId(nextCasIds[0] || "");
                                       }} />
-                                      <span className="form-check-label">{casUser.username}{casUser.id === currentUser.id ? " (io)" : ""}{isAbsentOnAdmissionDate(casUser.id) ? ` — ${getAbsenceLabel(casUser.id)}` : ""}</span>
+                                      <span className="form-check-label"><CasRoleBadge user={casUser} />{casUser.username}{casUser.id === currentUser.id ? " (io)" : ""}{isAbsentOnAdmissionDate(casUser.id) ? ` — ${getAbsenceLabel(casUser.id)}` : ""}</span>
                                     </label>
                                   ))}
                                   {filteredCasUsers.length === 0 && <div className="text-secondary">{casModalTab === "recommended" ? "Nessun CAS associato a questo reparto. Puoi usare la tab “Tutti i CAS”." : "Nessun CAS trovato."}</div>}
@@ -2640,7 +2641,7 @@ export const Patients = ({
                             <option value="">Seleziona CAS</option>
                             {orderedCasUsers.map((casUser) => (
                               <option key={casUser.id} value={casUser.id}>
-                                {casUser.username}
+                                {formatCasUserLabel(casUser)}
                                 {casUser.id === currentUser.id ? " (io)" : ""}
                                 {isAbsentOnAdmissionDate(casUser.id) ? ` — ${getAbsenceLabel(casUser.id)}` : ""}
                               </option>
@@ -2992,7 +2993,7 @@ export const Patients = ({
                                 : "-"}
                             </td>
                             <td data-label="CAS">
-                              {casUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{casUsers.map((casUser) => <span className="badge text-bg-success" key={casUser.id}>{casUser.username}</span>)}</div> : (
+                              {casUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{casUsers.map((casUser) => <span className="badge text-bg-success" key={casUser.id}><CasRoleBadge user={casUser} />{casUser.username}</span>)}</div> : (
                                 <span className="badge text-bg-warning">
                                   Non assegnato
                                 </span>

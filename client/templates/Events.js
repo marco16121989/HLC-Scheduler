@@ -3,6 +3,7 @@ import { Meteor } from "meteor/meteor";
 import { confirmAction } from "./ConfirmDialog.js";
 import { PaginationControls, usePagination } from "./Pagination.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
+import { CasRoleBadge } from "./CasRoleBadge.js";
 
 const emptyForm = () => ({
   title: "",
@@ -70,10 +71,12 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
   const canRespond = currentUser.role !== "GVP" || getPagePermission(currentUser, "events").edit;
   const organizationUsers = useMemo(() => users.filter((user) =>
     user.id !== currentUser.id &&
-    ["CAS", "GVP"].includes(user.role) &&
-    (user.presidentId === presidentId || user.associationId === presidentId),
+    ((user.role === "Presidente" && user.id === presidentId) ||
+      (["CAS", "GVP"].includes(user.role) && (user.presidentId === presidentId || user.associationId === presidentId))),
   ), [users, currentUser.id, presidentId]);
-  const casUsers = organizationUsers.filter((user) => user.role === "CAS");
+  const casUsers = organizationUsers
+    .filter((user) => ["Presidente", "CAS"].includes(user.role))
+    .sort((first, second) => (first.username || "").localeCompare(second.username || "", "it-IT"));
   const gvpUsers = organizationUsers.filter((user) => user.role === "GVP");
   const eventPagination = usePagination(events, 12);
 
@@ -166,7 +169,7 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
                         <legend className="h6 mb-0">Invita {role}</legend>
                         <button className="btn btn-outline-primary btn-sm" type="button" disabled={roleUsers.length === 0} onClick={() => toggleRole(roleUsers)}>{allSelected ? "Deseleziona tutti" : `Tutti i ${role}`}</button>
                       </div>
-                      {roleUsers.length === 0 ? <p className="small text-secondary mb-0">Nessun {role} disponibile.</p> : <div className="event-invite-list">{roleUsers.map((user) => <label className="form-check" key={user.id}><input className="form-check-input" type="checkbox" checked={form.inviteeIds.includes(user.id)} onChange={() => toggleInvitee(user.id)} /><span className="form-check-label">{user.username}</span></label>)}</div>}
+                      {roleUsers.length === 0 ? <p className="small text-secondary mb-0">Nessun {role} disponibile.</p> : <div className="event-invite-list">{roleUsers.map((user) => <label className="form-check" key={user.id}><input className="form-check-input" type="checkbox" checked={form.inviteeIds.includes(user.id)} onChange={() => toggleInvitee(user.id)} /><span className="form-check-label">{role === "CAS" && <CasRoleBadge user={user} />}{user.username}</span></label>)}</div>}
                     </fieldset>;
                   })}
                 </div>

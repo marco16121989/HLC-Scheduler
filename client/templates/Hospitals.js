@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
 import { normalizeHospital } from "../utils/hospitals.js";
+import { CasRoleBadge } from "./CasRoleBadge.js";
 
 const DEFAULT_DEPARTMENTS = [
   "Anestesiologia", "Cardiochirurgia", "Centro ustioni", "Chirurgia colorettale",
@@ -20,6 +21,17 @@ const normalizeWebsiteUrl = (value) => {
   return /^https?:\/\//i.test(trimmedValue) ? trimmedValue : `https://${trimmedValue}`;
 };
 
+export const isUserAssignedToDepartment = (user, hospitalId, departmentId) => {
+  const assignments = Array.isArray(user.hospitalAssignments)
+    ? user.hospitalAssignments
+    : user.hospitalId
+      ? [{ hospitalId: user.hospitalId, departmentIds: user.departmentId ? [user.departmentId] : [] }]
+      : [];
+  return assignments.some((assignment) => assignment.hospitalId === hospitalId && (
+    !Array.isArray(assignment.departmentIds) || assignment.departmentIds.length === 0 || assignment.departmentIds.includes(departmentId)
+  ));
+};
+
 export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], doctors = [], users = [], presidentId, readOnly = false }) => {
   const [name, setName] = useState("");
   const [director, setDirector] = useState("");
@@ -37,19 +49,15 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
   const visibleDepartmentTemplates = departmentTemplates.filter(
     (department) => department.presidentId === presidentId,
   );
-  const visibleCasUsers = users.filter((user) => !user.disabled && user.role === "CAS" && (user.presidentId === presidentId || user.associationId === presidentId));
-  const getDepartmentCasUsers = (hospitalId, departmentId) => visibleCasUsers.filter((casUser) => {
-    const assignments = Array.isArray(casUser.hospitalAssignments)
-      ? casUser.hospitalAssignments
-      : casUser.hospitalId
-        ? [{ hospitalId: casUser.hospitalId, departmentIds: casUser.departmentId ? [casUser.departmentId] : [] }]
-        : [];
-    return assignments.some((assignment) => assignment.hospitalId === hospitalId && (
-      !Array.isArray(assignment.departmentIds) || assignment.departmentIds.length === 0 || assignment.departmentIds.includes(departmentId)
-    ));
-  });
+  const visibleAssignees = users.filter((user) => !user.disabled && (
+    (user.role === "Presidente" && user.id === presidentId) ||
+    (user.role === "CAS" && (user.presidentId === presidentId || user.associationId === presidentId))
+  ));
+  const getDepartmentAssignees = (hospitalId, departmentId) => visibleAssignees.filter((user) =>
+    isUserAssignedToDepartment(user, hospitalId, departmentId),
+  );
   const getUncoveredDepartmentCount = (hospital) => (hospital.departments || []).filter(
-    (department) => getDepartmentCasUsers(hospital.id, department.id).length === 0,
+    (department) => getDepartmentAssignees(hospital.id, department.id).length === 0,
   ).length;
   const filteredDepartmentList = departmentListHospital
     ? [...departmentListHospital.departments]
@@ -285,7 +293,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                   </div>
                   <div className="card-body">
                     {departmentListHospital.departments.length > 0 && (() => {
-                      const uncoveredCount = departmentListHospital.departments.filter((department) => getDepartmentCasUsers(departmentListHospital.id, department.id).length === 0).length;
+                      const uncoveredCount = departmentListHospital.departments.filter((department) => getDepartmentAssignees(departmentListHospital.id, department.id).length === 0).length;
                       return <div className={`alert ${uncoveredCount > 0 ? "alert-danger" : "alert-success"} py-2`} role="status"><strong>{uncoveredCount > 0 ? `${uncoveredCount} ${uncoveredCount === 1 ? "reparto scoperto" : "reparti scoperti"}` : "Tutti i reparti sono coperti"}</strong><span className="d-block small">Le assegnazioni sono aggiornate automaticamente dalla sezione CAS.</span></div>;
                     })()}
                     {departmentListHospital.departments.length > 0 && <div className="mb-3">
@@ -294,9 +302,9 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                     </div>}
                     {departmentListHospital.departments.length > 0 ? <div className="list-group hospital-department-coverage-list">
                       {filteredDepartmentList.map((department) => {
-                        const assignedCasUsers = getDepartmentCasUsers(departmentListHospital.id, department.id);
+                        const assignedUsers = getDepartmentAssignees(departmentListHospital.id, department.id);
                         const departmentDoctors = getDepartmentDoctors(department.id);
-                        return <div className={`list-group-item hospital-department-coverage ${assignedCasUsers.length === 0 ? "is-uncovered" : ""}`} key={department.id}>
+                        return <div className={`list-group-item hospital-department-coverage ${assignedUsers.length === 0 ? "is-uncovered" : ""}`} key={department.id}>
                           <div className="hospital-department-coverage-heading">
                             <strong>{department.name}</strong>
                             <span className="text-secondary">{department.head ? `Primario: ${department.head}` : "Primario non indicato"}</span>
@@ -306,7 +314,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                             </div>
                             {department.websiteUrl && <a className="btn btn-sm hospital-department-website-link" href={normalizeWebsiteUrl(department.websiteUrl)} target="_blank" rel="noopener noreferrer" aria-label={`Apri il sito web di ${department.name} in una nuova scheda`}>Visita il sito del reparto <span aria-hidden="true">↗</span></a>}
                           </div>
-                          <div className="hospital-department-cas"><span className="hospital-department-cas-label">CAS incaricati</span>{assignedCasUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{assignedCasUsers.map((casUser) => <span className="badge text-bg-success" key={casUser.id}>{casUser.username}</span>)}</div> : <span className="badge text-bg-danger">Reparto scoperto</span>}</div>
+                          <div className="hospital-department-cas"><span className="hospital-department-cas-label">CAS incaricati</span>{assignedUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{assignedUsers.map((assignedUser) => <span className="badge text-bg-success" key={assignedUser.id}><CasRoleBadge user={assignedUser} />{assignedUser.username}</span>)}</div> : <span className="badge text-bg-danger">Reparto scoperto</span>}</div>
                           <div className="hospital-department-doctors"><span className="hospital-department-cas-label">Medici del reparto</span>{departmentDoctors.length > 0 ? <div className="d-flex flex-wrap gap-1">{departmentDoctors.map((doctor) => <span className="badge text-bg-secondary" key={doctor.id}>{doctor.lastName} {doctor.firstName}</span>)}</div> : <span className="text-secondary small">Nessun medico associato</span>}</div>
                         </div>;
                       })}

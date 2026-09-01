@@ -23,6 +23,7 @@ import {
 } from "/imports/api/links";
 import { formatUserName } from "/imports/utils/formatUserName";
 import { DEFAULT_DEPARTMENT_NAMES } from "/imports/constants/departments";
+import { isProtectedPresidentAccount } from "/imports/constants/userProtection";
 import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
 import { normalizeGvpPatientSharedFields } from "/imports/constants/gvpPatientSharing";
 
@@ -436,7 +437,10 @@ const validatePatientAssignments = async (records, presidentId) => {
     const usersById = new Map(assignedUsers.map((user) => [user._id, user]));
     const belongsToOrganization = async (id, expectedRole) => {
       const user = usersById.get(id);
-      return user?.profile?.role === expectedRole &&
+      const hasExpectedRole = expectedRole === "CAS"
+        ? ["Presidente", "CAS"].includes(user?.profile?.role)
+        : user?.profile?.role === expectedRole;
+      return hasExpectedRole &&
         await getActorPresidentId(user) === presidentId;
     };
     const casChecks = await Promise.all(casIds.map((id) => belongsToOrganization(id, "CAS")));
@@ -563,6 +567,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         ? {
             $or: [
               { _id: actor._id },
+              { _id: presidentId },
               { "profile.presidentId": presidentId },
               { "profile.associationId": presidentId },
             ],
@@ -1227,10 +1232,10 @@ Meteor.methods({
     const requestedIds = [...new Set(data.inviteeIds)].filter((id) => id !== this.userId);
     const inviteeUsers = await Meteor.users.find({
       _id: { $in: requestedIds },
-      "profile.role": { $in: ["CAS", "GVP"] },
       $or: [
-        { "profile.presidentId": presidentId },
-        { "profile.associationId": presidentId },
+        { _id: presidentId, "profile.role": "Presidente" },
+        { "profile.role": { $in: ["CAS", "GVP"] }, "profile.presidentId": presidentId },
+        { "profile.role": { $in: ["CAS", "GVP"] }, "profile.associationId": presidentId },
       ],
     }, { fields: publicUserFields }).fetchAsync();
     if (inviteeUsers.length === 0) {
@@ -2047,6 +2052,9 @@ Meteor.methods({
       let account = record.id
         ? await Meteor.users.findOneAsync(record.id)
         : null;
+      if (isProtectedPresidentAccount(account) && record.role !== "Presidente") {
+        throw new Meteor.Error("protected-president", "L'account del Presidente non può cambiare ruolo o essere eliminato.");
+      }
       const isDelegatedCasRecord = actorRole === "CAS" &&
         (account ? account.profile?.role === "CAS" : record.role === "CAS");
       const isDelegatedGvpRecord = ["Presidente", "CAS", "GVP"].includes(actorRole) &&
@@ -2058,8 +2066,10 @@ Meteor.methods({
       if (isDelegatedGvpRecord) {
         for (const casId of [...new Set(requestedGvpCasIds.filter(Boolean))]) {
           const delegatedCas = await Meteor.users.findOneAsync(casId);
-          const delegatedCasPresidentId = delegatedCas?.profile?.presidentId || delegatedCas?.profile?.associationId || "";
-          if (delegatedCas?.profile?.role === "CAS" && delegatedCasPresidentId === actorPresidentId) {
+          const delegatedCasPresidentId = delegatedCas?.profile?.role === "Presidente"
+            ? delegatedCas._id
+            : delegatedCas?.profile?.presidentId || delegatedCas?.profile?.associationId || "";
+          if (["Presidente", "CAS"].includes(delegatedCas?.profile?.role) && delegatedCasPresidentId === actorPresidentId) {
             delegatedGvpCasIds.push(casId);
           }
         }
@@ -2149,7 +2159,7 @@ Meteor.methods({
       .find({ _id: { $nin: retainedIds } })
       .fetchAsync();
     for (const removedUser of removedUsers) {
-      if (removedUser.profile?.role !== "Admin" && canManage(userView(removedUser))) {
+      if (!isProtectedPresidentAccount(removedUser) && removedUser.profile?.role !== "Admin" && canManage(userView(removedUser))) {
         await Meteor.users.removeAsync(removedUser._id);
       }
     }

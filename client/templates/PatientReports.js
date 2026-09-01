@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { formatCasUserLabel } from "./CasRoleBadge.js";
 
 const COLORS = ["#0d6efd", "#198754", "#dc3545", "#fd7e14", "#6f42c1", "#0dcaf0", "#6c757d"];
 
@@ -41,7 +42,10 @@ export const PatientReports = ({ patients = [], hospitals = [], users = [], curr
   const [year, setYear] = useState("all");
   const [casFilter, setCasFilter] = useState("all");
   const availableYears = [...new Set(patients.map((patient) => patient.admissionDate?.slice(0, 4)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
-  const casUsers = users.filter((user) => user.role === "CAS" && (user.presidentId || user.associationId) === presidentId).sort((a, b) => (a.username || "").localeCompare(b.username || "", "it-IT"));
+  const casUsers = users.filter((user) =>
+    (user.role === "Presidente" && user.id === presidentId) ||
+    (user.role === "CAS" && (user.presidentId || user.associationId) === presidentId),
+  ).sort((a, b) => (a.username || "").localeCompare(b.username || "", "it-IT"));
   const visiblePatients = useMemo(() => patients.filter((patient) => {
     if (patient.presidentId !== presidentId) return false;
     if (currentUser.role === "GVP") {
@@ -63,7 +67,7 @@ export const PatientReports = ({ patients = [], hospitals = [], users = [], curr
   const completedCount = visiblePatients.filter((patient) => ["Dimesso", "Trasferito", "Deceduto"].includes(patient.status)).length;
 
   return <>
-    <div className="app-content-header"><div className="container-fluid patient-report-header"><div><h1 className="mb-0">Report pazienti</h1><p className="text-secondary mb-0">Analisi riepilogativa dei pazienti visibili.</p></div><div className="patient-report-filters"><select className="form-select" value={casFilter} onChange={(event) => setCasFilter(event.target.value)} aria-label="Filtra report per CAS"><option value="all">Tutti i CAS</option><option value="none">Senza CAS</option>{casUsers.map((cas) => <option value={cas.id} key={cas.id}>{cas.username}</option>)}</select><select className="form-select patient-report-year" value={year} onChange={(event) => setYear(event.target.value)} aria-label="Filtra report per anno"><option value="all">Tutti gli anni</option>{availableYears.map((item) => <option value={item} key={item}>{item}</option>)}</select></div></div></div>
+    <div className="app-content-header"><div className="container-fluid patient-report-header"><div><h1 className="mb-0">Report pazienti</h1><p className="text-secondary mb-0">Analisi riepilogativa dei pazienti visibili.</p></div><div className="patient-report-filters"><select className="form-select" value={casFilter} onChange={(event) => setCasFilter(event.target.value)} aria-label="Filtra report per CAS"><option value="all">Tutti i CAS</option><option value="none">Senza CAS</option>{casUsers.map((cas) => <option value={cas.id} key={cas.id}>{formatCasUserLabel(cas)}</option>)}</select><select className="form-select patient-report-year" value={year} onChange={(event) => setYear(event.target.value)} aria-label="Filtra report per anno"><option value="all">Tutti gli anni</option>{availableYears.map((item) => <option value={item} key={item}>{item}</option>)}</select></div></div></div>
     <div className="app-content"><div className="container-fluid">
       <div className="patient-report-kpis"><article><span>Totale pazienti</span><strong>{visiblePatients.length}</strong></article><article><span>In gestione</span><strong>{activeCount}</strong></article><article><span>Conclusi</span><strong>{completedCount}</strong></article><article><span>Con reparto</span><strong>{visiblePatients.filter((patient) => patient.details?.departmentId).length}</strong></article></div>
       <div className="patient-report-grid"><PieChart title="Pazienti per stato" segments={statusSegments} /><PieChart title="Tipo di accesso" segments={accessSegments} /><PieChart title="Distribuzione per sesso" segments={sexSegments} /><PieChart title="Pazienti per reparto" segments={departmentSegments} /></div>

@@ -3,6 +3,8 @@ import { Meteor } from "meteor/meteor";
 import { formatUserName } from "/imports/utils/formatUserName";
 import { confirmAction } from "./ConfirmDialog.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
+import { isProtectedPresidentAccount } from "/imports/constants/userProtection";
+import { CasRoleBadge, formatCasUserLabel } from "./CasRoleBadge.js";
 
 const roles = ["Admin", "Presidente", "CAS", "GVP"];
 
@@ -42,7 +44,7 @@ const CasMultiSelect = ({ options, value, onChange }) => {
         {selectedOptions.length > 0 ? (
           <span className="d-flex flex-wrap gap-1 pe-3">
             {selectedOptions.map((option) => (
-              <span className="badge text-bg-primary" key={option.id}>{option.username}</span>
+              <span className="badge text-bg-primary" key={option.id}>{formatCasUserLabel(option)}</span>
             ))}
           </span>
         ) : <span className="text-secondary">Seleziona uno o più CAS</span>}
@@ -67,7 +69,7 @@ const CasMultiSelect = ({ options, value, onChange }) => {
                 checked={selectedIds.includes(option.id)}
                 onChange={() => toggleOption(option.id)}
               />
-              <span>{option.username}</span>
+              <span><CasRoleBadge user={option} />{option.username}</span>
             </label>
           ))}
           {selectedIds.length > 0 && (
@@ -91,6 +93,7 @@ const getCasIds = (user) => {
 const getCasId = (user) => getCasIds(user)[0] || "";
 
 const getPresidentId = (user, users) => {
+  if (user.role === "Presidente") return user.id;
   if (user.presidentId) {
     return user.presidentId;
   }
@@ -236,20 +239,23 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   );
   const casCandidates = users.filter(
     (user) =>
-      user.role === "CAS" &&
+      ["Presidente", "CAS"].includes(user.role) &&
       user.id !== editingId &&
       getPresidentId(user, users) === formPresidentId,
   );
 
   const organizationUsers = isTeamManager
     ? users.filter((user) =>
-        (user.role === "CAS" || user.role === "GVP") &&
+        (["Presidente", "CAS", "GVP"].includes(user.role)) &&
         getPresidentId(user, users) === managerPresidentId)
     : [];
   const visibleUsers = managedRole && isTeamManager
     ? managedRole === "GVP"
       ? organizationUsers
-      : organizationUsers.filter((user) => user.role === managedRole)
+      : [
+          users.find((user) => user.role === "Presidente" && user.id === managerPresidentId),
+          ...organizationUsers.filter((user) => user.role === managedRole),
+        ].filter(Boolean)
     : isPresidentManager
     ? users.filter(
         (user) =>
@@ -279,7 +285,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   };
 
   const canEditUser = (user) =>
-    isPresidentManager ||
+    (isPresidentManager && user.role !== "Presidente") ||
     (isCasManager && getPagePermission(manager, "cas").edit && user.role === "CAS" && user.id !== manager.id) ||
     (isCasManager && getPagePermission(manager, "gvp").edit && user.role === "GVP" && getPresidentId(user, users) === managerPresidentId);
   const canEditManagedUser = (user) =>
@@ -330,7 +336,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       : form.casId ? [form.casId] : [];
     const validCasIds = role === "GVP"
       ? [...new Set(requestedCasIds)].filter((casId) => users.some(
-          (user) => user.id === casId && user.role === "CAS" &&
+          (user) => user.id === casId && ["Presidente", "CAS"].includes(user.role) &&
             getPresidentId(user, users) === (manager?.role === "CAS" ? managerPresidentId : validPresidentId),
         ))
       : [];
@@ -534,6 +540,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   };
 
   const handleDelete = async (user) => {
+    if (isProtectedPresidentAccount(user)) return;
     const canDelete =
       manager?.role === "Admin" ||
       (isTeamManager && visibleUsers.some((item) => item.id === user.id));
@@ -619,7 +626,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   };
 
   const getHospitalLabels = (user) =>
-    ["CAS", "GVP"].includes(user.role)
+    ["Presidente", "CAS", "GVP"].includes(user.role)
       ? getHospitalAssignments(user).flatMap((assignment) => {
           const hospital = hospitals.find(
             (candidate) => candidate.id === assignment.hospitalId,
@@ -646,7 +653,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   const presidents = users.filter((user) => user.role === "Presidente");
   if (managedRole === "GVP") {
     visibleUsers
-      .filter((user) => user.role === "CAS")
+      .filter((user) => ["Presidente", "CAS"].includes(user.role))
       .forEach((casUser) => {
         addUser(casUser);
         visibleUsers
@@ -670,7 +677,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
 
     const casUsers = visibleUsers.filter(
       (user) =>
-        user.role === "CAS" && getPresidentId(user, users) === president.id,
+        ["Presidente", "CAS"].includes(user.role) && getPresidentId(user, users) === president.id,
     );
     casUsers.forEach((casUser) => {
       addUser(casUser);
@@ -696,7 +703,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   const filterPresidentId = isTeamManager ? managerPresidentId : "";
   const filterCasUsers = users.filter(
     (user) =>
-      user.role === "CAS" &&
+      ["Presidente", "CAS"].includes(user.role) &&
       (!filterPresidentId || getPresidentId(user, users) === filterPresidentId),
   );
   const selectedFilterCas = filterCasUsers.find((user) => user.id === casFilter);
@@ -704,7 +711,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     ? visibleUsers
         .filter((user) => user.role === "GVP")
         .sort((first, second) => first.username.localeCompare(second.username, "it-IT"))
-    : orderedUsers;
+    : managedRole === "CAS"
+      ? [...orderedUsers].sort((first, second) => first.username.localeCompare(second.username, "it-IT"))
+      : orderedUsers;
   const casFilteredOrderedUsers = !canFilterTeam || casFilter === "all"
     ? filterableOrderedUsers
     : manager?.role === "Admin"
@@ -714,7 +723,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
           return matchesCas;
         })
       : filterableOrderedUsers.filter((user) => {
-          if (user.role === "CAS") {
+          if (["Presidente", "CAS"].includes(user.role)) {
             return casFilter !== "all" && user.id === casFilter;
           }
           if (user.role !== "GVP") return false;
@@ -982,7 +991,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                   </div>
 
                   <div className="card-footer d-flex align-items-center gap-2">
-                    {isEditing && editingUser && (
+                    {isEditing && editingUser && !isProtectedPresidentAccount(editingUser) && (
                       <button
                         className="btn btn-outline-danger me-auto"
                         type="button"
@@ -1030,7 +1039,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                           <option value="all">{managedRole === "GVP" ? "Tutti i GVP" : "Tutti i CAS"}</option>
                           {managedRole === "GVP" && <option value="none">GVP non associati</option>}
                           {filterCasUsers.map((casUser) => (
-                            <option key={casUser.id} value={casUser.id}>{casUser.username}</option>
+                            <option key={casUser.id} value={casUser.id}>{formatCasUserLabel(casUser)}</option>
                           ))}
                         </select>
                       </div>}
@@ -1104,12 +1113,13 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                             const gvpCount = users.filter(
                               (candidate) => candidate.role === "GVP" && getPresidentId(candidate, users) === user.id,
                             ).length;
+                            const canOpenUser = ["CAS", "GVP"].includes(managedRole) && canEditManagedUser(user);
 
-                            if (managedRole === "GVP" && user.role === "CAS") {
+                            if (managedRole === "GVP" && ["Presidente", "CAS"].includes(user.role)) {
                               return (
                                 <tr className="table-light" key={user._rowKey || user.id}>
                                   <td className="fw-semibold" colSpan="5">
-                                    CAS: {user.username}
+                                    CAS: <CasRoleBadge user={user} />{user.username}
                                   </td>
                                 </tr>
                               );
@@ -1129,12 +1139,12 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
 
                             return (
                               <tr
-                                className={`${isUnassigned ? "user-row-unassigned" : ""} ${managedRole === "CAS" ? "cas-clickable-row" : managedRole === "GVP" ? "gvp-clickable-row" : ""}`}
+                                className={`${isUnassigned ? "user-row-unassigned" : ""} ${canOpenUser ? managedRole === "CAS" ? "cas-clickable-row" : "gvp-clickable-row" : ""}`}
                                 key={user._rowKey || user.id}
-                                role={["CAS", "GVP"].includes(managedRole) ? "button" : undefined}
-                                tabIndex={["CAS", "GVP"].includes(managedRole) ? "0" : undefined}
-                                onClick={["CAS", "GVP"].includes(managedRole) ? () => handleEdit(user) : undefined}
-                                onKeyDown={["CAS", "GVP"].includes(managedRole) ? (event) => {
+                                role={canOpenUser ? "button" : undefined}
+                                tabIndex={canOpenUser ? "0" : undefined}
+                                onClick={canOpenUser ? () => handleEdit(user) : undefined}
+                                onKeyDown={canOpenUser ? (event) => {
                                   if (event.key === "Enter" || event.key === " ") {
                                     event.preventDefault();
                                     handleEdit(user);
@@ -1142,9 +1152,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                 } : undefined}
                               >
                                 <td className="fw-medium user-name-column" data-label="Utente">
-                                  {managedRole === "CAS" && user.isSecretary && (
-                                    <span className="cas-secretary-badge" aria-label="Segretario" title="Segretario">S</span>
-                                  )}
+                                  {managedRole === "CAS" && <CasRoleBadge user={user} />}
                                   {requiresPresident && (
                                     <span
                                       className={`user-link-arrow ${depth} ${
@@ -1182,7 +1190,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                   )}
                                 </td>}
                                 <td data-label="Sede">
-                                  {["CAS", "GVP"].includes(user.role) ? (
+                                  {["Presidente", "CAS", "GVP"].includes(user.role) ? (
                                     hospitalLabels.length > 0 ? (
                                       <div className="d-flex flex-wrap gap-1">
                                         {hospitalLabels.map((label) => (
