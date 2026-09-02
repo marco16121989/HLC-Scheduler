@@ -568,6 +568,7 @@ export const Home = ({
             doctors={doctors}
             users={users}
             invitedEvents={events}
+            absences={absences}
             currentUser={user}
             presidentId={presidentId}
           />

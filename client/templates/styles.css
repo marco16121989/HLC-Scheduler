@@ -2840,6 +2840,10 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .calendar-event.event {
   background: var(--bs-success);
 }
+.calendar-dot.absence,
+.calendar-event.absence {
+  background: #8b5cf6;
+}
 
 .calendar-grid {
   display: grid;
@@ -2922,6 +2926,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .calendar-agenda-item.presentation { border-color: var(--bs-primary); }
 .calendar-agenda-item.patient { border-color: var(--bs-danger); }
 .calendar-agenda-item.event { border-color: var(--bs-success); }
+.calendar-agenda-item.absence { border-color: #8b5cf6; }
 .calendar-agenda-item .badge { background: var(--bs-secondary-bg); color: var(--bs-body-color); }
 .calendar-agenda-item h3 { margin: 0.35rem 0 0; font-size: 1rem; }
 .calendar-agenda-item p { margin: 0.3rem 0 0; color: var(--bs-secondary-color); font-size: 0.85rem; }

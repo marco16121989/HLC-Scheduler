@@ -592,6 +592,13 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         { "profile.role": "CAS", "profile.associationId": presidentId },
       ],
     };
+    const organizationUserIds = (await Meteor.users.find({
+      $or: [
+        { _id: presidentId },
+        { "profile.presidentId": presidentId },
+        { "profile.associationId": presidentId },
+      ],
+    }, { fields: { _id: 1 } }).fetchAsync()).map((user) => user._id);
     await publishPatientCursors(this, [
       PatientsCollection.find(
         { presidentId, status: { $nin: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] },
@@ -623,7 +630,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         departmentIds: 1,
       } }),
       UsefulFilesCollection.find({ presidentId }, { sort: { createdAt: -1 } }),
-      AbsencesCollection.find({ userId: actor._id }, { sort: { startDate: 1 } }),
+      AbsencesCollection.find({ userId: { $in: organizationUserIds } }, { sort: { startDate: 1 } }),
     ];
   }
 

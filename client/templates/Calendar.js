@@ -15,7 +15,7 @@ const dateKey = (date) => {
 };
 const parseDate = (value) => value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null;
 
-export const Calendar = ({ presentations, patients, doctors, users = [], invitedEvents = [], currentUser, presidentId }) => {
+export const Calendar = ({ presentations, patients, doctors, users = [], invitedEvents = [], absences = [], currentUser, presidentId }) => {
   const [displayedMonth, setDisplayedMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -83,8 +83,28 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
           ].filter(Boolean).join(" · "),
         };
       });
-    return [...presentationEvents, ...patientEvents, ...invitationEvents].sort((a, b) => a.title.localeCompare(b.title));
-  }, [presentations, patients, doctors, invitedEvents, isGvp, presidentId]);
+    const absenceEvents = absences.flatMap((absence) => {
+      if (!absence.startDate || !absence.endDate) return [];
+      const absenceUser = users.find((user) => user.id === absence.userId);
+      const username = absenceUser?.username || absence.username || "Utente";
+      const events = [];
+      const currentDate = parseDate(absence.startDate);
+      const endDate = parseDate(absence.endDate);
+      if (!currentDate || !endDate || currentDate > endDate) return events;
+      while (currentDate <= endDate) {
+        events.push({
+          id: `absence-${absence.id}-${dateKey(currentDate)}`,
+          date: dateKey(currentDate),
+          type: "absence",
+          title: `Assenza — ${username}`,
+          detail: absence.note || `Dal ${absence.startDate} al ${absence.endDate}`,
+        });
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      return events;
+    });
+    return [...presentationEvents, ...patientEvents, ...invitationEvents, ...absenceEvents].sort((a, b) => a.title.localeCompare(b.title));
+  }, [presentations, patients, doctors, users, invitedEvents, absences, isGvp, presidentId]);
 
   const filteredEvents = eventFilter === "all"
     ? calendarEvents
@@ -160,7 +180,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
         }
       }}
     >
-      <span className="badge">{event.type === "presentation" ? "Presentazione" : event.type === "event" ? "Evento" : "Paziente"}</span>
+      <span className="badge">{event.type === "presentation" ? "Presentazione" : event.type === "event" ? "Evento" : event.type === "absence" ? "Assenza" : "Paziente"}</span>
       <h3>{event.title}</h3>
       {event.detail && <p>{event.detail}</p>}
     </article>
@@ -269,7 +289,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
             <div><h1 className="mb-1">Calendario</h1><p className="text-secondary mb-0">Consulta in un’unica vista ricoveri, presentazioni ed eventi disponibili per {currentUser.username}.</p></div>
             <div className="d-flex flex-wrap gap-2">
               {!isGvp && <div className="btn-group" role="group" aria-label="Filtro eventi">
-                {[['all', 'Tutti'], ['event', 'Eventi'], ['presentation', 'Presentazioni'], ['patient', 'Pazienti']].map(([filter, label]) => <button className={`btn ${eventFilter === filter ? "btn-secondary" : "btn-outline-secondary"}`} type="button" key={filter} onClick={() => setEventFilter(filter)}>{label}</button>)}
+                {[['all', 'Tutti'], ['event', 'Eventi'], ['presentation', 'Presentazioni'], ['patient', 'Pazienti'], ['absence', 'Assenze']].map(([filter, label]) => <button className={`btn ${eventFilter === filter ? "btn-secondary" : "btn-outline-secondary"}`} type="button" key={filter} onClick={() => setEventFilter(filter)}>{label}</button>)}
               </div>}
               <div className="btn-group" role="group" aria-label="Tipo di vista">
                 {[['month', 'Mese'], ['week', 'Settimana'], ['day', 'Giorno']].map(([mode, label]) => <button className={`btn ${viewMode === mode ? "btn-primary" : "btn-outline-primary"}`} type="button" key={mode} onClick={() => selectView(mode)}>{label}</button>)}
@@ -285,7 +305,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
       </div>
       <div className="app-content"><div className="container-fluid"><div className="row g-3">
         <div className={viewMode === "month" ? "col-12 col-xl-9" : "col-12"}><section className="card calendar-card">
-          <div className="calendar-legend"><span><i className="calendar-dot event" /> Eventi su invito</span>{!isGvp && <span><i className="calendar-dot presentation" /> Presentazioni (tutti)</span>}<span><i className="calendar-dot patient" /> {isGvp ? "Casi affidati" : "Pazienti autorizzati"}</span></div>
+          <div className="calendar-legend"><span><i className="calendar-dot event" /> Eventi su invito</span>{!isGvp && <span><i className="calendar-dot presentation" /> Presentazioni (tutti)</span>}<span><i className="calendar-dot patient" /> {isGvp ? "Casi affidati" : "Pazienti autorizzati"}</span><span><i className="calendar-dot absence" /> Assenze (tutti)</span></div>
           {viewMode === "month" && <><div className="calendar-grid calendar-week-header">{WEEK_DAYS.map((day) => <div key={day}>{day}</div>)}</div>
           <div className="calendar-grid calendar-days">{cells.map((date, index) => {
             if (!date) return <div className="calendar-day empty" key={`empty-${index}`} />;
