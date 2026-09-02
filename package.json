@@ -12,6 +12,7 @@
     "@swc/helpers": "^0.5.17",
     "admin-lte": "^4.0.2",
     "meteor-node-stubs": "^1.2.12",
+    "nodemailer": "^7.0.6",
     "pdf-lib": "^1.17.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

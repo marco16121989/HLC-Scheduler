@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { Accounts } from "meteor/accounts-base";
 import { AdminLoginMessages } from "./AdminLoginMessages.js";
+import { AdminEmailSettings } from "./AdminEmailSettings.js";
 
 export const AdminTools = ({ users = [], loginMessages = [] }) => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -87,6 +88,7 @@ export const AdminTools = ({ users = [], loginMessages = [] }) => {
       <div><span className="admin-eyebrow">Modalità assistenza</span><h2>Accedi come un utente</h2><p>Controlla ciò che vede l’utente e aiutalo senza conoscere o modificare la sua password. Ogni accesso viene registrato.</p></div>
       <button className="btn btn-primary" type="button" onClick={openModal}>Apri accesso assistenza</button>
     </section>
+    <AdminEmailSettings />
     <AdminLoginMessages messages={loginMessages} />
 
     {modalOpen && <>

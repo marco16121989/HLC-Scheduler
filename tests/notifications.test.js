@@ -1,11 +1,13 @@
 import assert from "assert";
 import {
   buildPatientNoteNotification,
+  canReceiveEmailNotification,
   getAssignedGvpIds,
   getPatientDeletionRecipientIds,
   getPatientCoordinatorIds,
   isNewCasAssignment,
   normalizePushSubscription,
+  validateEmailSettings,
 } from "../server/main.js";
 
 describe("patient note notifications", function () {
@@ -84,5 +86,42 @@ describe("push subscriptions", function () {
       }, "cas-1"),
       ["president-1", "gvp-1", "gvp-2"],
     );
+  });
+});
+
+describe("email settings", function () {
+  it("normalizes SMTP addresses and text fields", function () {
+    assert.deepStrictEqual(validateEmailSettings({
+      host: " smtp.example.com ",
+      port: 587,
+      secure: false,
+      username: " account@example.com ",
+      fromName: " HLC Scheduler ",
+      fromEmail: " Sender@Example.com ",
+      replyTo: " Reply@Example.com ",
+    }), {
+      host: "smtp.example.com",
+      port: 587,
+      secure: false,
+      username: "account@example.com",
+      fromName: "HLC Scheduler",
+      fromEmail: "sender@example.com",
+      replyTo: "reply@example.com",
+    });
+  });
+
+  it("rejects invalid SMTP ports and sender addresses", function () {
+    const valid = { host: "smtp.example.com", port: 587, secure: false, username: "user", fromName: "HLC", fromEmail: "sender@example.com", replyTo: "" };
+    assert.throws(() => validateEmailSettings({ ...valid, port: 70000 }));
+    assert.throws(() => validateEmailSettings({ ...valid, fromEmail: "invalid" }));
+  });
+});
+
+describe("notification emails", function () {
+  it("requires both a valid recipient email and explicit consent", function () {
+    assert.strictEqual(canReceiveEmailNotification({ email: "user@example.com", emailNotifications: true }), true);
+    assert.strictEqual(canReceiveEmailNotification({ email: "user@example.com", emailNotifications: false }), false);
+    assert.strictEqual(canReceiveEmailNotification({ email: "", emailNotifications: true }), false);
+    assert.strictEqual(canReceiveEmailNotification({ email: "invalid", emailNotifications: true }), false);
   });
 });

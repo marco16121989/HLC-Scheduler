@@ -7,6 +7,7 @@ const formFromUser = (user) => ({
   firstName: user.firstName || "",
   lastName: user.lastName || "",
   email: user.email || "",
+  emailNotifications: Boolean(user.emailNotifications),
   phone: user.phone || "",
   password: "",
   confirmPassword: "",
@@ -39,8 +40,8 @@ export const Profile = ({ currentUser, hospitals = [] }) => {
   }, [currentUser]);
 
   const update = (event) => {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    const { name, type, checked, value } = event.target;
+    setForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
     setError("");
     setSuccess("");
   };
@@ -106,6 +107,7 @@ export const Profile = ({ currentUser, hospitals = [] }) => {
       firstName: form.firstName,
       lastName: form.lastName,
       email: form.email,
+      emailNotifications: form.emailNotifications,
       phone: form.phone,
       password: form.password,
       hospitalAssignments: form.hospitalAssignments,

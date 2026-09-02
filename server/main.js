@@ -3,6 +3,7 @@ import { Accounts } from "meteor/accounts-base";
 import { Random } from "meteor/random";
 import { check, Match } from "meteor/check";
 import webpush from "web-push";
+import nodemailer from "nodemailer";
 import {
   AccessLogsCollection,
   LoginMessagesCollection,
@@ -11,6 +12,7 @@ import {
   DepartmentsCollection,
   DoctorsCollection,
   EventsCollection,
+  EmailSettingsCollection,
   HospitalsCollection,
   HospitalityOffersCollection,
   NotificationsCollection,
@@ -32,6 +34,7 @@ const usefulFileExtensions = new Set([
   "xls", "xlsx", "ods", "csv", "ppt", "pptx", "odp", "zip",
 ]);
 const supportRequestStatuses = new Set(["Inviata", "In lavorazione", "Risolta", "Chiusa"]);
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const impersonationSessions = new Map();
 const impersonationLoginTickets = new Map();
@@ -155,10 +158,30 @@ const sendDevicePush = async (notification) => {
   }
 };
 
+export const canReceiveEmailNotification = (profile) => Boolean(
+  profile?.emailNotifications && emailPattern.test(String(profile?.email || "").trim()),
+);
+
+async function sendNotificationEmail(notification) {
+  const recipient = await Meteor.users.findOneAsync(notification.recipientId, {
+    fields: { "profile.email": 1, "profile.emailNotifications": 1 },
+  });
+  if (!canReceiveEmailNotification(recipient?.profile)) return false;
+  await sendConfiguredEmail({
+    to: recipient.profile.email.trim().toLowerCase(),
+    subject: "Nuova notifica da HLC Scheduler",
+    text: `${notification.message}\n\nAccedi a HLC Scheduler per visualizzare i dettagli.`,
+  });
+  return true;
+}
+
 const insertNotification = async (notification) => {
   const id = await NotificationsCollection.insertAsync(notification);
   sendDevicePush({ ...notification, _id: id }).catch((error) => {
     console.error("Preparazione della notifica push non riuscita.", error?.message || error);
+  });
+  sendNotificationEmail({ ...notification, _id: id }).catch((error) => {
+    console.error("Invio della notifica email non riuscito.", error?.message || error);
   });
   return id;
 };
@@ -167,6 +190,63 @@ const requireUser = (context) => {
   if (!context.userId) {
     throw new Meteor.Error("not-authorized", "Devi effettuare l'accesso.");
   }
+};
+const requireAdmin = async (context) => {
+  requireUser(context);
+  const admin = await Meteor.users.findOneAsync(context.userId, { fields: { profile: 1 } });
+  if (admin?.profile?.role !== "Admin") {
+    throw new Meteor.Error("not-authorized", "Operazione riservata agli amministratori.");
+  }
+  return admin;
+};
+
+const publicEmailSettings = (settings) => settings ? {
+  host: settings.host || "",
+  port: settings.port || 587,
+  secure: Boolean(settings.secure),
+  username: settings.username || "",
+  fromName: settings.fromName || "HLC Scheduler",
+  fromEmail: settings.fromEmail || "",
+  replyTo: settings.replyTo || "",
+  hasPassword: Boolean(settings.password),
+  updatedAt: settings.updatedAt || null,
+} : null;
+
+export const validateEmailSettings = (settings) => {
+  const host = settings.host.trim();
+  const username = settings.username.trim();
+  const fromName = settings.fromName.trim();
+  const fromEmail = settings.fromEmail.trim().toLowerCase();
+  const replyTo = settings.replyTo.trim().toLowerCase();
+  if (!host || host.length > 255) throw new Meteor.Error("invalid-email-settings", "Inserisci un server SMTP valido.");
+  if (!Number.isInteger(settings.port) || settings.port < 1 || settings.port > 65535) throw new Meteor.Error("invalid-email-settings", "La porta SMTP non è valida.");
+  if (!username || username.length > 320) throw new Meteor.Error("invalid-email-settings", "Inserisci il nome utente SMTP.");
+  if (!fromName || fromName.length > 120) throw new Meteor.Error("invalid-email-settings", "Inserisci il nome del mittente.");
+  if (!emailPattern.test(fromEmail) || (replyTo && !emailPattern.test(replyTo))) throw new Meteor.Error("invalid-email-settings", "Inserisci indirizzi email validi.");
+  return { host, port: settings.port, secure: settings.secure, username, fromName, fromEmail, replyTo };
+};
+
+const createEmailTransport = (settings) => nodemailer.createTransport({
+  host: settings.host,
+  port: settings.port,
+  secure: settings.secure,
+  auth: { user: settings.username, pass: settings.password },
+  connectionTimeout: 15_000,
+  greetingTimeout: 15_000,
+  socketTimeout: 20_000,
+});
+
+export const sendConfiguredEmail = async ({ to, subject, text, html }) => {
+  const settings = await EmailSettingsCollection.findOneAsync("smtp");
+  if (!settings?.password) throw new Meteor.Error("email-not-configured", "La configurazione email non è completa.");
+  return createEmailTransport(settings).sendMail({
+    from: { name: settings.fromName, address: settings.fromEmail },
+    to,
+    ...(settings.replyTo ? { replyTo: settings.replyTo } : {}),
+    subject,
+    text,
+    ...(html ? { html } : {}),
+  });
 };
 const requirePageEdit = (actor, pageId) => {
   const permission = getPagePermission({ ...(actor?.profile || {}), role: actor?.profile?.role }, pageId);
@@ -718,6 +798,53 @@ Meteor.publish("hlc-login-messages", async function publishHlcLoginMessages() {
 });
 
 Meteor.methods({
+  async "hlc.getEmailSettings"() {
+    await requireAdmin(this);
+    return publicEmailSettings(await EmailSettingsCollection.findOneAsync("smtp"));
+  },
+
+  async "hlc.saveEmailSettings"(settings) {
+    await requireAdmin(this);
+    check(settings, {
+      host: String,
+      port: Number,
+      secure: Boolean,
+      username: String,
+      password: String,
+      fromName: String,
+      fromEmail: String,
+      replyTo: String,
+    });
+    const normalized = validateEmailSettings(settings);
+    const existing = await EmailSettingsCollection.findOneAsync("smtp");
+    const password = settings.password.trim();
+    if (!password && !existing?.password) throw new Meteor.Error("invalid-email-settings", "Inserisci la password SMTP.");
+    if (password.length > 1024) throw new Meteor.Error("invalid-email-settings", "La password SMTP è troppo lunga.");
+    await EmailSettingsCollection.upsertAsync("smtp", {
+      $set: { ...normalized, ...(password ? { password } : {}), updatedAt: new Date(), updatedBy: this.userId },
+      $setOnInsert: { createdAt: new Date() },
+    });
+    return publicEmailSettings(await EmailSettingsCollection.findOneAsync("smtp"));
+  },
+
+  async "hlc.sendEmailSettingsTest"(recipient) {
+    await requireAdmin(this);
+    check(recipient, String);
+    const normalizedRecipient = recipient.trim().toLowerCase();
+    if (!emailPattern.test(normalizedRecipient)) throw new Meteor.Error("invalid-recipient", "Inserisci un destinatario valido.");
+    try {
+      await sendConfiguredEmail({
+        to: normalizedRecipient,
+        subject: "Test email HLC Scheduler",
+        text: "Questa email conferma che la configurazione SMTP di HLC Scheduler funziona correttamente.",
+      });
+    } catch (error) {
+      console.error("Test SMTP non riuscito.", error?.message || error);
+      throw new Meteor.Error("email-test-failed", "Il server SMTP ha rifiutato l’invio. Controlla host, porta, sicurezza e credenziali.");
+    }
+    return true;
+  },
+
   async "hlc.saveAnnualReport"(report) {
     requireUser(this);
     check(report, {
@@ -956,6 +1083,18 @@ Meteor.methods({
     requireUser(this);
     check(endpoint, String);
     await PushSubscriptionsCollection.removeAsync({ userId: this.userId, "subscription.endpoint": endpoint });
+  },
+
+  async "hlc.updateEmailNotificationPreference"(enabled) {
+    requireUser(this);
+    check(enabled, Boolean);
+    const actor = await Meteor.users.findOneAsync(this.userId, { fields: { "profile.email": 1 } });
+    const email = String(actor?.profile?.email || "").trim();
+    if (enabled && !emailPattern.test(email)) {
+      throw new Meteor.Error("email-required", "Aggiungi un indirizzo email valido nel tuo profilo prima di attivare questa opzione.");
+    }
+    await Meteor.users.updateAsync(this.userId, { $set: { "profile.emailNotifications": enabled } });
+    return enabled;
   },
 
   async "hlc.trackAccess"() {
@@ -1613,6 +1752,7 @@ Meteor.methods({
       firstName: String,
       lastName: String,
       email: String,
+      emailNotifications: Boolean,
       phone: String,
       password: String,
       hospitalAssignments: [Object],
@@ -1627,6 +1767,13 @@ Meteor.methods({
     });
     if (duplicate) {
       throw new Meteor.Error("username-exists", "Il nome utente è già in uso.");
+    }
+    const email = data.email.trim().toLowerCase();
+    if (email && !emailPattern.test(email)) {
+      throw new Meteor.Error("invalid-email", "Inserisci un indirizzo email valido.");
+    }
+    if (data.emailNotifications && !email) {
+      throw new Meteor.Error("email-required", "Inserisci un indirizzo email per attivare le notifiche via email.");
     }
     const actor = await Meteor.users.findOneAsync(this.userId);
     const actorPresidentId = actor.profile?.role === "Presidente"
@@ -1657,7 +1804,8 @@ Meteor.methods({
         username,
         "profile.firstName": data.firstName.trim(),
         "profile.lastName": data.lastName.trim(),
-        "profile.email": data.email.trim(),
+        "profile.email": email,
+        "profile.emailNotifications": data.emailNotifications,
         "profile.phone": data.phone.trim(),
         "profile.hospitalAssignments": hospitalAssignments,
         "profile.hospitalId": firstAssignment?.hospitalId || "",

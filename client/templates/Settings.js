@@ -1,8 +1,24 @@
-export const Settings = ({ theme, onToggleTheme, fontSize, onFontSizeChange, highContrast, onToggleHighContrast, boldText, onToggleBoldText, pushNotifications }) => {
+import { useState } from "react";
+import { Meteor } from "meteor/meteor";
+
+export const Settings = ({ currentUser, theme, onToggleTheme, fontSize, onFontSizeChange, highContrast, onToggleHighContrast, boldText, onToggleBoldText, pushNotifications }) => {
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailMessage, setEmailMessage] = useState("");
   const darkModeEnabled = theme === "dark";
+  const emailNotificationsEnabled = Boolean(currentUser?.emailNotifications);
+  const profileEmail = currentUser?.email || "";
   const fontSizes = ["xsmall", "small", "normal", "large", "xlarge"];
   const fontSizeLabels = ["Molto piccolo", "Piccolo", "Normale", "Grande", "Molto grande"];
   const fontSizeIndex = Math.max(0, fontSizes.indexOf(fontSize));
+  const toggleEmailNotifications = () => {
+    if (!profileEmail || emailBusy) return;
+    setEmailBusy(true);
+    setEmailMessage("");
+    Meteor.call("hlc.updateEmailNotificationPreference", !emailNotificationsEnabled, (error) => {
+      setEmailBusy(false);
+      setEmailMessage(error ? error.reason || "Impossibile aggiornare la preferenza." : "Preferenza salvata.");
+    });
+  };
 
   return <>
     <div className="app-content-header"><div className="container-fluid"><h1 className="mb-1">Impostazioni</h1><p className="text-secondary mb-0">Personalizza l’aspetto e il comportamento dell’applicazione.</p></div></div>
@@ -33,6 +49,11 @@ export const Settings = ({ theme, onToggleTheme, fontSize, onFontSizeChange, hig
             {!pushNotifications?.supported ? <p className="settings-push-message">Questo dispositivo o browser non supporta le notifiche push.</p> : <div className="settings-push-actions"><span className={`settings-value-badge ${pushNotifications.enabled ? "is-active" : ""}`}>{pushNotifications.enabled ? "Notifiche attive" : pushNotifications.permission === "denied" ? "Autorizzazione bloccata" : "Notifiche disattivate"}</span><button className={`btn btn-sm ${pushNotifications.enabled ? "btn-outline-danger" : "btn-primary"}`} type="button" disabled={pushNotifications.busy || pushNotifications.permission === "denied"} onClick={pushNotifications.enabled ? pushNotifications.disable : pushNotifications.enable}>{pushNotifications.busy ? "Attendi…" : pushNotifications.enabled ? "Disattiva" : "Attiva notifiche"}</button></div>}
             {pushNotifications?.permission === "denied" && <p className="settings-push-message text-danger">Le notifiche sono bloccate nelle impostazioni del browser. Devi autorizzarle da lì per poterle attivare.</p>}
             {pushNotifications?.error && <p className="settings-push-message text-danger">{pushNotifications.error}</p>}
+          </section>
+          <section className="settings-panel settings-email-panel" aria-labelledby="email-notification-setting-title">
+            <div className="settings-panel-heading"><span className="settings-panel-icon settings-email-icon" aria-hidden="true">@</span><div className="settings-panel-copy"><h3 id="email-notification-setting-title">Notifiche via email</h3><p>{profileEmail ? `Invia gli avvisi anche a ${profileEmail}.` : "Aggiungi un indirizzo email nella pagina Profilo per attivare questa opzione."}</p></div><div className="form-check form-switch settings-theme-switch"><input className="form-check-input" id="email-notifications-setting" type="checkbox" role="switch" checked={emailNotificationsEnabled} disabled={!profileEmail || emailBusy} onChange={toggleEmailNotifications} /><label className="visually-hidden" htmlFor="email-notifications-setting">Invia notifiche via email</label></div></div>
+            <span className={`settings-value-badge ${emailNotificationsEnabled ? "is-active" : ""}`}>{emailNotificationsEnabled ? "Email attive" : "Email disattivate"}</span>
+            {emailMessage && <p className="settings-push-message" role="status">{emailMessage}</p>}
           </section>
         </div>
       </section>
