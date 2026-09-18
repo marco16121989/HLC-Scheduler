@@ -3941,3 +3941,14 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .page-info-body h3 { margin: 0 0 .55rem; font-size: 1rem; }
 .page-info-body ul { display: grid; gap: .5rem; margin: 0; padding-left: 1.2rem; }
 .page-info-body li { padding-left: .15rem; line-height: 1.5; }
+
+.install-app-backdrop { position: fixed; inset: 0; z-index: 13000; display: grid; place-items: center; padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom)); background: rgba(8,15,28,.62); backdrop-filter: blur(4px); }
+.install-app-dialog { position: relative; width: min(430px, 100%); padding: 1.6rem; border: 1px solid var(--bs-border-color); border-radius: 18px; background: var(--bs-body-bg); color: var(--bs-body-color); box-shadow: 0 24px 70px rgba(0,0,0,.3); text-align: center; }
+.install-app-close { position: absolute; top: .55rem; right: .75rem; display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--bs-secondary-color); font-size: 1.6rem; line-height: 1; }
+.install-app-close:hover { background: var(--bs-tertiary-bg); color: var(--bs-emphasis-color); }
+.install-app-icon { display: block; width: 66px; height: 66px; margin: 0 auto 1rem; border-radius: 15px; box-shadow: 0 5px 16px rgba(0,0,0,.18); }
+.install-app-dialog h2 { margin: 0 2rem .65rem; color: var(--bs-emphasis-color); font-size: 1.25rem; font-weight: 750; }
+.install-app-dialog p { margin: 0 auto 1.35rem; max-width: 350px; color: var(--bs-secondary-color); font-size: .94rem; line-height: 1.5; }
+.install-app-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.install-app-actions .btn { min-height: 43px; font-weight: 700; }
+@media (max-width: 575.98px) { .install-app-dialog { padding: 1.5rem 1rem 1rem; border-radius: 16px; } }
