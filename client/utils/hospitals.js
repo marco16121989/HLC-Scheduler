@@ -1,11 +1,12 @@
 export const normalizeDepartment = (department) =>
   typeof department === "string"
-    ? { id: crypto.randomUUID(), name: department, head: "", websiteUrl: "", location: "", managementLocation: "" }
+    ? { id: crypto.randomUUID(), name: department, head: "", phone: "", websiteUrl: "", location: "", managementLocation: "" }
     : {
         ...department,
         id: department.id || crypto.randomUUID(),
         name: department.name || "",
         head: department.head || "",
+        phone: department.phone || "",
         websiteUrl: department.websiteUrl || "",
         location: department.location || "",
         managementLocation: department.managementLocation || "",

@@ -1580,6 +1580,42 @@ svg.admin-nav-icon {
   white-space: pre-wrap;
 }
 
+.patient-summary-value a {
+  color: var(--bs-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.patient-summary-value a:hover,
+.patient-summary-value a:focus-visible {
+  color: color-mix(in srgb, var(--bs-primary) 78%, #000);
+}
+
+.hospital-department-phone-link {
+  color: var(--bs-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.hospital-department-phone-link:hover,
+.hospital-department-phone-link:focus-visible {
+  color: color-mix(in srgb, var(--bs-primary) 78%, #000);
+}
+
+td[data-label="Contatti e luogo"] a[href^="tel:"] {
+  color: var(--bs-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+td[data-label="Contatti e luogo"] a[href^="tel:"]:hover,
+td[data-label="Contatti e luogo"] a[href^="tel:"]:focus-visible {
+  color: color-mix(in srgb, var(--bs-primary) 78%, #000);
+}
+
 .patient-history-content {
   display: block;
   width: 100%;

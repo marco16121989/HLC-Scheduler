@@ -257,6 +257,25 @@ export const SIMPLIFIED_FIELDS = [
   ["simplifiedNotes", "Note per il CAS", "textarea"],
 ];
 
+const SUMMARY_CONTACT_FIELD_TYPES = new Map(
+  [...DETAIL_SECTIONS.flatMap((section) => section.fields), ...SIMPLIFIED_FIELDS]
+    .map(([, label, type]) => [label, type]),
+);
+
+const renderSummaryValue = (value, label) => {
+  const formattedValue = formatSummaryValue(value);
+  const fieldType = SUMMARY_CONTACT_FIELD_TYPES.get(label);
+  if (!formattedValue || formattedValue === "Non compilato" || !["tel", "email"].includes(fieldType)) return formattedValue;
+
+  const contacts = formattedValue.split(/[,;\n]+/).map((contact) => contact.trim()).filter(Boolean);
+  return contacts.map((contact, index) => {
+    const href = fieldType === "tel"
+      ? `tel:${contact.replace(/[^+\d]/g, "")}`
+      : `mailto:${contact}`;
+    return <span key={`${contact}-${index}`}>{index > 0 && ", "}<a href={href}>{contact}</a></span>;
+  });
+};
+
 const PATIENT_FORM_TABS = [
   ["summary", "Riepilogo"],
   ["main", "Info Principali"],
@@ -1400,6 +1419,7 @@ export const Patients = ({
   const mainSummaryEntries = [
     { label: "Nome", value: firstName },
     { label: "Cognome", value: lastName },
+    { label: "Patologia", value: pathology },
     { label: "Sesso", value: details.sex },
     ...(details.sex === "Femmina" ? [{ label: "Cognome da nubile", value: details.maidenName }] : []),
     { label: "DAT compilata?", value: details.datCompleted },
@@ -1634,7 +1654,7 @@ export const Patients = ({
                         {gvpSummaryEntries.map((entry) => (
                           <div className="patient-summary-item" key={`${entry.label}-${entry.value}`}>
                             <div className="patient-summary-label">{entry.label}</div>
-                            <div className="patient-summary-value">{formatSummaryValue(entry.value) || "-"}</div>
+                            <div className="patient-summary-value">{renderSummaryValue(entry.value, entry.label) || "-"}</div>
                           </div>
                         ))}
                       </div>
@@ -2498,7 +2518,7 @@ export const Patients = ({
                         {mainSummaryEntries.map((entry) => (
                           <div className="patient-summary-item" key={`${entry.label}-${entry.value}`}>
                             <div className="patient-summary-label">{entry.label}</div>
-                            <div className="patient-summary-value">{formatSummaryValue(entry.value) || "-"}</div>
+                            <div className="patient-summary-value">{renderSummaryValue(entry.value, entry.label) || "-"}</div>
                           </div>
                         ))}
                       </div>

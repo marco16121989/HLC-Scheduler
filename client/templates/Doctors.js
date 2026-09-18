@@ -813,10 +813,10 @@ export const Doctors = ({
                                 </td>
                                 <td data-label="Contatti">
                                   <div className="doctor-contact">
-                                    <a href={`tel:${doctor.phone}`}>
+                                    <a href={`tel:${doctor.phone}`} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
                                       {doctor.phone}
                                     </a>
-                                    <a href={`mailto:${doctor.email}`}>
+                                    <a href={`mailto:${doctor.email}`} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
                                       {doctor.email}
                                     </a>
                                   </div>

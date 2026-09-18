@@ -101,7 +101,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
       );
       return selected
         ? current.filter((department) => department.id !== selected.id)
-        : [...current, { id: crypto.randomUUID(), templateId: departmentTemplate.id, name: departmentTemplate.name, head: "", websiteUrl: "", location: "", managementLocation: "" }];
+        : [...current, { id: crypto.randomUUID(), templateId: departmentTemplate.id, name: departmentTemplate.name, head: "", phone: "", websiteUrl: "", location: "", managementLocation: "" }];
     });
     setError("");
   };
@@ -126,7 +126,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
         .filter((template) => !current.some(
           (department) => department.templateId === template.id || department.name.toLowerCase() === template.name.toLowerCase(),
         ))
-        .map((template) => ({ id: crypto.randomUUID(), templateId: template.id, name: template.name, head: "", websiteUrl: "", location: "", managementLocation: "" }));
+        .map((template) => ({ id: crypto.randomUUID(), templateId: template.id, name: template.name, head: "", phone: "", websiteUrl: "", location: "", managementLocation: "" }));
       return [...current, ...missingDepartments];
     });
     setError("");
@@ -206,6 +206,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
           ...(template ? { templateId: template.id } : {}),
           name: template?.name || department.name.trim(),
           head: (department.head || "").trim(),
+          phone: (department.phone || "").trim(),
           websiteUrl: normalizeWebsiteUrl(department.websiteUrl || ""),
           location: (department.location || "").trim(),
           managementLocation: (department.managementLocation || "").trim(),
@@ -312,6 +313,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                               {department.location && <span><strong>Dove si trova il reparto:</strong> {department.location}</span>}
                               {department.managementLocation && <span><strong>Dove si trova la direzione di reparto:</strong> {department.managementLocation}</span>}
                             </div>
+                            {department.phone && <span><strong>Telefono:</strong> <a className="hospital-department-phone-link" href={`tel:${department.phone.replace(/[^+\d]/g, "")}`}>{department.phone}</a></span>}
                             {department.websiteUrl && <a className="btn btn-sm hospital-department-website-link" href={normalizeWebsiteUrl(department.websiteUrl)} target="_blank" rel="noopener noreferrer" aria-label={`Apri il sito web di ${department.name} in una nuova scheda`}>Visita il sito del reparto <span aria-hidden="true">↗</span></a>}
                           </div>
                           <div className="hospital-department-cas"><span className="hospital-department-cas-label">CAS incaricati</span>{assignedUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{assignedUsers.map((assignedUser) => <span className="badge text-bg-success" key={assignedUser.id}><CasRoleBadge user={assignedUser} />{assignedUser.username}</span>)}</div> : <span className="badge text-bg-danger">Reparto scoperto</span>}</div>
@@ -417,6 +419,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                             </label>
                             {selectedDepartment && <div className="d-grid gap-2 mt-2">
                               <input className="form-control form-control-sm" type="text" value={selectedDepartment.head || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "head", event.target.value)} aria-label={`Primario di ${departmentTemplate.name}`} placeholder="Primario (facoltativo)" />
+                              <input className="form-control form-control-sm" type="tel" inputMode="tel" value={selectedDepartment.phone || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "phone", event.target.value)} aria-label={`Numero di telefono di ${departmentTemplate.name}`} placeholder="Numero di telefono (facoltativo)" />
                               <input className="form-control form-control-sm" type="text" value={selectedDepartment.location || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "location", event.target.value)} aria-label={`Dove si trova il reparto ${departmentTemplate.name}`} placeholder="Dove si trova il reparto (facoltativo)" />
                               <input className="form-control form-control-sm" type="text" value={selectedDepartment.managementLocation || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "managementLocation", event.target.value)} aria-label={`Dove si trova la direzione di reparto di ${departmentTemplate.name}`} placeholder="Dove si trova la direzione di reparto (facoltativo)" />
                               <input className="form-control form-control-sm" type="text" inputMode="url" value={selectedDepartment.websiteUrl || ""} onChange={(event) => updateDepartment(selectedDepartment.id, "websiteUrl", event.target.value)} onBlur={(event) => updateDepartment(selectedDepartment.id, "websiteUrl", normalizeWebsiteUrl(event.target.value))} aria-label={`Link web di ${departmentTemplate.name}`} placeholder="Es. www.ospedale.it/reparto" />
@@ -431,6 +434,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
                           {departments.filter((department) => !visibleDepartmentTemplates.some((template) => template.id === department.templateId || template.name.toLowerCase() === department.name.toLowerCase())).map((department) => <div className="hospital-department-row" key={department.id}>
                             <input className="form-control form-control-sm" type="text" value={department.name} onChange={(event) => updateDepartment(department.id, "name", event.target.value)} aria-label="Nome reparto" required />
                             <input className="form-control form-control-sm" type="text" value={department.head || ""} onChange={(event) => updateDepartment(department.id, "head", event.target.value)} aria-label={`Primario di ${department.name}`} placeholder="Primario (facoltativo)" />
+                            <input className="form-control form-control-sm" type="tel" inputMode="tel" value={department.phone || ""} onChange={(event) => updateDepartment(department.id, "phone", event.target.value)} aria-label={`Numero di telefono di ${department.name}`} placeholder="Numero di telefono (facoltativo)" />
                             <input className="form-control form-control-sm" type="text" value={department.location || ""} onChange={(event) => updateDepartment(department.id, "location", event.target.value)} aria-label={`Dove si trova il reparto ${department.name}`} placeholder="Dove si trova il reparto (facoltativo)" />
                             <input className="form-control form-control-sm" type="text" value={department.managementLocation || ""} onChange={(event) => updateDepartment(department.id, "managementLocation", event.target.value)} aria-label={`Dove si trova la direzione di reparto di ${department.name}`} placeholder="Dove si trova la direzione di reparto (facoltativo)" />
                             <input className="form-control form-control-sm" type="text" inputMode="url" value={department.websiteUrl || ""} onChange={(event) => updateDepartment(department.id, "websiteUrl", event.target.value)} onBlur={(event) => updateDepartment(department.id, "websiteUrl", normalizeWebsiteUrl(event.target.value))} aria-label={`Link web di ${department.name}`} placeholder="Es. www.ospedale.it/reparto" />
