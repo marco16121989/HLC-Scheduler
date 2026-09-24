@@ -2361,6 +2361,41 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 }
 
 @media (max-width: 767.98px) {
+  .card:has(input[placeholder*="nominativo"]) .table-responsive {
+    display: none;
+  }
+
+  .hospitality-mobile-list {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 0.7rem;
+  }
+
+  .hospitality-mobile-card {
+    padding: 0.75rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.7rem;
+    background: var(--bs-body-bg);
+    cursor: pointer;
+  }
+
+  .hospitality-mobile-card:focus-visible { outline: 3px solid rgba(13,110,253,.35); outline-offset: 2px; }
+
+  .hospitality-mobile-card header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.65rem;
+  }
+
+  .hospitality-mobile-card header strong,
+  .hospitality-mobile-card header small { display: block; }
+
+  .hospitality-mobile-card header strong { font-size: 0.95rem; }
+  .hospitality-mobile-card header small { margin-top: 0.12rem; color: var(--bs-secondary-color); font-size: 0.76rem; }
+  .hospitality-mobile-card p { margin: 0.55rem 0; color: var(--bs-secondary-color); font-size: 0.78rem; }
+  .hospitality-mobile-empty { margin: 0.7rem 0; color: var(--bs-secondary-color); text-align: center; }
+
   .mobile-card-table,
   .mobile-card-table tbody,
   .mobile-card-table tr,
@@ -3830,6 +3865,14 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .admin-assistance-search-results { display: grid; gap: .4rem; margin-top: .65rem; padding: .5rem; border: 1px solid var(--bs-border-color); border-radius: .65rem; background: var(--bs-tertiary-bg); }
 .admin-assistance-search-result { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: .6rem .7rem; border: 0; border-radius: .5rem; background: var(--bs-body-bg); color: var(--bs-body-color); text-align: left; }
 .admin-assistance-search-result:hover,.admin-assistance-search-result:focus-visible { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
+@media (min-width: 768px) { .hospitality-mobile-list { display: none; } }
+.hospitality-details-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+.hospitality-details-grid > div { min-width: 0; }
+.hospitality-details-grid span,.hospitality-details-grid strong { display: block; }
+.hospitality-details-grid span { margin-bottom: .2rem; color: var(--bs-secondary-color); font-size: .74rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.hospitality-details-grid strong { overflow-wrap: anywhere; font-size: .92rem; }
+.hospitality-details-grid .hospitality-details-wide { grid-column: 1 / -1; }
+@media (max-width: 575.98px) { .hospitality-details-grid { grid-template-columns: 1fr; } }
 .admin-assistance-search-result span:first-child { display: grid; }
 .admin-assistance-search-result small { color: var(--bs-secondary-color); }
 .admin-assistance-divider { display: flex; align-items: center; gap: .65rem; margin: 1rem 0; color: var(--bs-secondary-color); font-size: .75rem; text-transform: uppercase; }

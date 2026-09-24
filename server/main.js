@@ -1,4 +1,5 @@
 import { Meteor } from "meteor/meteor";
+import { WebApp } from "meteor/webapp";
 import { Accounts } from "meteor/accounts-base";
 import { Random } from "meteor/random";
 import { check, Match } from "meteor/check";
@@ -39,12 +40,46 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const impersonationSessions = new Map();
 const impersonationLoginTickets = new Map();
 const impersonationConnectionTokens = new Map();
+const usefulFileDownloadTokens = new Map();
 const clearExpiredImpersonationSessions = () => {
   const now = Date.now();
   for (const [token, session] of impersonationSessions) {
     if (session.expiresAt < now) impersonationSessions.delete(token);
   }
 };
+
+WebApp.connectHandlers.use("/useful-files/download", (request, response) => {
+  void (async () => {
+    const token = new URL(request.url, "http://localhost").searchParams.get("token");
+    const download = token ? usefulFileDownloadTokens.get(token) : null;
+    if (!download || download.expiresAt < Date.now()) {
+      if (token) usefulFileDownloadTokens.delete(token);
+      response.writeHead(404);
+      response.end();
+      return;
+    }
+    usefulFileDownloadTokens.delete(token);
+    const file = await UsefulFilesCollection.findOneAsync(download.fileId, { fields: { dataUrl: 1, name: 1, type: 1 } });
+    const encodedData = file?.dataUrl?.split(",", 2)[1];
+    if (!encodedData) {
+      response.writeHead(404);
+      response.end();
+      return;
+    }
+    const name = String(file.name || "download");
+    const fallbackName = name.replace(/[^a-zA-Z0-9._-]/g, "_") || "download";
+    response.writeHead(200, {
+      "Content-Type": file.type || "application/octet-stream",
+      "Content-Length": Buffer.byteLength(encodedData, "base64"),
+      "Content-Disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      "Cache-Control": "no-store",
+    });
+    response.end(Buffer.from(encodedData, "base64"));
+  })().catch(() => {
+    if (!response.headersSent) response.writeHead(500);
+    response.end();
+  });
+});
 
 Meteor.onConnection((connection) => {
   connection.onClose(() => {
@@ -1227,6 +1262,29 @@ Meteor.methods({
     const file = await UsefulFilesCollection.findOneAsync({ _id: fileId, presidentId }, { fields: { dataUrl: 1, name: 1, type: 1 } });
     if (!file?.dataUrl) throw new Meteor.Error("not-found", "File non trovato.");
     return { dataUrl: file.dataUrl, name: file.name, type: file.type };
+  },
+
+  async "hlc.createUsefulFileDownload"(fileId) {
+    requireUser(this);
+    check(fileId, String);
+    const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
+    const role = actor?.profile?.role;
+    if (!getPagePermission({ ...(actor?.profile || {}), role }, "useful-files").view) {
+      throw new Meteor.Error("not-authorized", "File non disponibile.");
+    }
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : ["CAS", "GVP"].includes(role) ? await getActorPresidentId(actor) : "";
+    if (!presidentId) throw new Meteor.Error("not-authorized", "File non disponibile.");
+    const file = await UsefulFilesCollection.findOneAsync({ _id: fileId, presidentId }, { fields: { _id: 1 } });
+    if (!file) throw new Meteor.Error("not-found", "File non trovato.");
+    const now = Date.now();
+    for (const [token, download] of usefulFileDownloadTokens) {
+      if (download.expiresAt < now) usefulFileDownloadTokens.delete(token);
+    }
+    const token = Random.secret();
+    usefulFileDownloadTokens.set(token, { fileId: file._id, expiresAt: now + 2 * 60 * 1000 });
+    return `/useful-files/download?token=${encodeURIComponent(token)}`;
   },
 
   async "hlc.addDoctorOperationalNote"(doctorId, text) {

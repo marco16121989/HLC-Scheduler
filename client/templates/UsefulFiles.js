@@ -100,11 +100,10 @@ export const UsefulFiles = ({ files, currentUser }) => {
 
   const downloadFile = async (file) => {
     try {
-      const loadedFile = await loadFileData(file);
-      const link = document.createElement("a");
-      link.href = loadedFile.dataUrl;
-      link.download = loadedFile.name || file.name;
-      link.click();
+      const downloadUrl = await new Promise((resolve, reject) => {
+        Meteor.call("hlc.createUsefulFileDownload", file.id, (methodError, result) => methodError ? reject(methodError) : resolve(result));
+      });
+      globalThis.location.assign(downloadUrl);
     } catch (methodError) {
       setError(methodError.reason || "Impossibile scaricare il file.");
     }

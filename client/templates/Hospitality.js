@@ -14,6 +14,7 @@ export const Hospitality = ({ offers, setOffers, presidentId, readOnly = false }
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [viewingOffer, setViewingOffer] = useState(null);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const visibleOffers = offers
@@ -32,11 +33,13 @@ export const Hospitality = ({ offers, setOffers, presidentId, readOnly = false }
     setModalOpen(false);
     setError("");
   };
+  const closeDetails = () => setViewingOffer(null);
   const openCreate = () => {
     closeModal();
     setModalOpen(true);
   };
   const openEdit = (offer) => {
+    setViewingOffer(null);
     setForm({
       hostName: offer.hostName || "", phone: offer.phone || "", address: offer.address || "",
       city: offer.city || "", hospitalityFor: offer.hospitalityFor || "both",
@@ -47,6 +50,7 @@ export const Hospitality = ({ offers, setOffers, presidentId, readOnly = false }
     setError("");
     setModalOpen(true);
   };
+  const openDetails = (offer) => setViewingOffer(offer);
   const save = (event) => {
     event.preventDefault();
     const hostName = form.hostName.trim();
@@ -81,6 +85,24 @@ export const Hospitality = ({ offers, setOffers, presidentId, readOnly = false }
   return <>
     <div className="app-content-header"><div className="container-fluid"><div className="d-flex align-items-start justify-content-between gap-3"><div><h1 className="mb-1">Ospitalità</h1><p className="text-secondary mb-0">Gestisci le persone che offrono la propria casa per ospitare pazienti o familiari.</p></div>{!readOnly && <button className="btn btn-primary" type="button" onClick={openCreate}>Inserisci</button>}</div></div></div>
     <div className="app-content"><div className="container-fluid">
+      {viewingOffer && <>
+        <button className="entity-modal-backdrop" type="button" aria-label="Chiudi dettagli disponibilità" onClick={closeDetails} />
+        <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="hospitality-details-title">
+          <section className="card entity-modal-card hospitality-details-modal">
+            <div className="card-header d-flex align-items-center"><h2 className="card-title" id="hospitality-details-title">Disponibilità</h2><button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeDetails} /></div>
+            <div className="card-body hospitality-details-grid">
+              <div><span>Nominativo</span><strong>{viewingOffer.hostName}</strong></div>
+              <div><span>Stato</span><strong>{viewingOffer.active === false ? "Non disponibile" : "Disponibile"}</strong></div>
+              <div><span>Indirizzo</span><strong>{[viewingOffer.address, viewingOffer.city].filter(Boolean).join(", ") || "-"}</strong></div>
+              <div><span>Telefono</span><strong>{viewingOffer.phone || "-"}</strong></div>
+              <div><span>Ospitalità per</span><strong>{hospitalityForLabel(viewingOffer.hospitalityFor)}</strong></div>
+              <div><span>Persone ospitabili</span><strong>{viewingOffer.capacity || 1}</strong></div>
+              {(viewingOffer.availability || viewingOffer.notes) && <div className="hospitality-details-wide"><span>Note e disponibilità</span><strong>{[viewingOffer.availability, viewingOffer.notes].filter(Boolean).join(" · ")}</strong></div>}
+            </div>
+            <div className="card-footer d-flex gap-2"><button className="btn btn-outline-secondary ms-auto" type="button" onClick={closeDetails}>Chiudi</button>{!readOnly && <button className="btn btn-primary" type="button" onClick={() => openEdit(viewingOffer)}>Modifica</button>}</div>
+          </section>
+        </div>
+      </>}
       {modalOpen && <button className="entity-modal-backdrop" type="button" aria-label="Chiudi finestra" onClick={closeModal} />}
       <div className={modalOpen ? "entity-modal-shell" : "d-none"} role="dialog" aria-modal="true" aria-labelledby="hospitality-modal-title">
         <section className="card entity-modal-card"><div className="card-header d-flex align-items-center"><h2 className="card-title" id="hospitality-modal-title">{isEditing ? "Modifica disponibilità" : "Inserisci disponibilità"}</h2><button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={closeModal} /></div>
@@ -98,6 +120,14 @@ export const Hospitality = ({ offers, setOffers, presidentId, readOnly = false }
         </section>
       </div>
       <section className="card"><div className="card-header d-flex flex-wrap align-items-center gap-3"><h2 className="card-title mb-0">Disponibilità registrate</h2><input className="form-control form-control-sm ms-auto" style={{ maxWidth: "22rem" }} type="search" placeholder="Cerca per nominativo, comune o indirizzo" value={search} onChange={(event) => setSearch(event.target.value)} /></div><div className="card-body p-0"><div className="table-responsive"><table className="table table-hover align-middle mb-0 mobile-card-table"><thead><tr><th>Nominativo</th><th>Contatti e luogo</th><th>Ospitalità</th><th>Disponibilità</th><th>Stato</th>{!readOnly && <th className="text-end">Azioni</th>}</tr></thead><tbody>{visibleOffers.length === 0 ? <tr><td className="text-center text-secondary py-4" colSpan={readOnly ? 5 : 6}>Nessuna disponibilità registrata.</td></tr> : visibleOffers.map((offer) => <tr key={offer.id}><td className="fw-medium" data-label="Nominativo">{offer.hostName}</td><td data-label="Contatti e luogo"><div>{offer.phone ? <a href={`tel:${offer.phone.replace(/[^+\d]/g, "")}`} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{offer.phone}</a> : "-"}</div><small className="text-secondary">{[offer.address, offer.city].filter(Boolean).join(", ") || "-"}</small></td><td data-label="Ospitalità">{hospitalityForLabel(offer.hospitalityFor)} · {offer.capacity || 1} {(offer.capacity || 1) === 1 ? "persona" : "persone"}</td><td data-label="Disponibilità">{offer.availability || "-"}{offer.notes && <small className="d-block text-secondary">{offer.notes}</small>}</td><td data-label="Stato"><span className={`badge ${offer.active === false ? "text-bg-secondary" : "text-bg-success"}`}>{offer.active === false ? "Non disponibile" : "Disponibile"}</span></td>{!readOnly && <td className="text-end" data-label="Azioni"><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => openEdit(offer)}>Modifica</button></td>}</tr>)}</tbody></table></div></div></section>
+      <div className="hospitality-mobile-list">
+        {visibleOffers.length === 0 ? <p className="hospitality-mobile-empty">Nessuna disponibilità registrata.</p> : visibleOffers.map((offer) => {
+          return <article className="hospitality-mobile-card" key={offer.id} role="button" tabIndex="0" onClick={() => openDetails(offer)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDetails(offer); } }}>
+            <header><strong>{offer.hostName}</strong><span className={`badge ${offer.active === false ? "text-bg-secondary" : "text-bg-success"}`}>{offer.active === false ? "Non disponibile" : "Disponibile"}</span></header>
+            <p>{offer.address || "Indirizzo non indicato"}</p>
+          </article>;
+        })}
+      </div>
     </div></div>
   </>;
 };
