@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Meteor } from "meteor/meteor";
+import { useTracker } from "meteor/react-meteor-data";
 import { Users } from "./Users.js";
 import { Hospitals } from "./Hospitals.js";
 import { Departments } from "./Departments.js";
@@ -18,7 +19,6 @@ import { Info } from "./Info.js";
 import { Settings } from "./Settings.js";
 import { Absences } from "./Absences.js";
 import { Events } from "./Events.js";
-import { AdminDashboard } from "./AdminDashboard.js";
 import { AdminTools } from "./AdminTools.js";
 import { Donations } from "./Donations.js";
 import { PageInfo } from "./PageInfo.js";
@@ -82,7 +82,6 @@ export const Home = ({
   notifications = [],
   usefulFiles = [],
   absences = [],
-  accessLogs = [],
   loginMessages = [],
   pushNotifications,
   theme,
@@ -112,6 +111,23 @@ export const Home = ({
         : "";
   const canViewPage = (pageId) => getPagePermission(user, pageId).view;
   const canEditPage = (pageId) => getPagePermission(user, pageId).edit;
+  const adminSubscriptions = useTracker(() => {
+    const isAdmin = user.role === "Admin";
+    const directory = isAdmin && ["users", "admin-tools"].includes(activeView)
+      ? Meteor.subscribe("hlc-admin-directory")
+      : null;
+    const support = isAdmin && activeView === "support"
+      ? Meteor.subscribe("hlc-admin-support")
+      : null;
+    const tools = isAdmin && activeView === "admin-tools"
+      ? Meteor.subscribe("hlc-login-messages")
+      : null;
+    return {
+      directoryReady: !directory || directory.ready(),
+      supportReady: !support || support.ready(),
+      toolsReady: !tools || tools.ready(),
+    };
+  }, [user.role, activeView]);
   const closeMobileSidebar = () => {
     if (globalThis.innerWidth < 992) setSidebarOpen(false);
   };
@@ -341,12 +357,6 @@ export const Home = ({
                 <>
               <li className="sidebar-section-label menu-order-admin">Amministrazione</li>
               <li className="nav-item menu-order-admin">
-                <button className={`nav-link w-100 ${activeView === "home" ? "active" : ""}`} type="button" onClick={() => openView("home")}>
-                  <MenuIcon name="dashboard" />
-                  <p>Dashboard</p>
-                </button>
-              </li>
-              <li className="nav-item menu-order-admin">
                 <button
                   className={`nav-link w-100 ${activeView === "users" ? "active" : ""}`}
                   type="button"
@@ -538,15 +548,10 @@ export const Home = ({
       />
 
       <main className="app-main" aria-label="Contenuto principale">
-        {activeView === "home" && user.role === "Admin" ? (
-          <AdminDashboard
-            accessLogs={accessLogs}
-            users={users}
-          />
-        ) : activeView === "admin-tools" && user.role === "Admin" ? (
-          <AdminTools users={users} loginMessages={loginMessages} />
+        {activeView === "admin-tools" && user.role === "Admin" ? (
+          <AdminTools users={users} loginMessages={loginMessages} loading={!adminSubscriptions.toolsReady || !adminSubscriptions.directoryReady} />
         ) : activeView === "support" && canViewPage("support") ? (
-          <SupportRequests requests={supportRequests} currentUser={user} />
+          <SupportRequests requests={supportRequests} currentUser={user} loading={user.role === "Admin" && !adminSubscriptions.supportReady} />
         ) : activeView === "donations" && canViewPage("donations") && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
           <Donations />
         ) : activeView === "absences" && canViewPage("absences") && ["Presidente", "CAS", "GVP"].includes(user.role) ? (

@@ -622,6 +622,9 @@ Meteor.publish("hlc-data", async function publishHlcData() {
 
   const actor = await Meteor.users.findOneAsync(this.userId);
   const role = actor?.profile?.role;
+  // L'Admin non ha viste operative dei dati sanitari. La vecchia dashboard
+  // caricava qui l'intero archivio al login, pur senza usarlo.
+  if (role === "Admin") return this.ready();
   const linkedCasId = role === "GVP"
     ? actor.profile?.casIds?.[0] || actor.profile?.casId || actor.profile?.associationId || ""
     : "";
@@ -734,7 +737,6 @@ Meteor.publish("hlc-data", async function publishHlcData() {
     DoctorsCollection.find(dataSelector),
     // Le presentazioni sono condivise soltanto all'interno della stessa organizzazione.
     PresentationsCollection.find(dataSelector),
-    AnnualReportsCollection.find(dataSelector, { sort: { year: -1 } }),
     SupportRequestsCollection.find(role === "Admin" ? {} : { createdBy: actor._id }),
     UsefulFilesCollection.find(dataSelector, { sort: { createdAt: -1 } }),
     AbsencesCollection.find({ userId: { $in: absenceUserIds } }, { sort: { startDate: 1 } }),
@@ -753,25 +755,31 @@ Meteor.publish("hlc-events", async function publishHlcEvents() {
   }, { sort: { startsAt: 1 } });
 });
 
+// I dati amministrativi vengono richiesti soltanto aprendo la relativa voce
+// di menu, non durante l'avvio della sessione Admin.
+Meteor.publish("hlc-admin-directory", async function publishHlcAdminDirectory() {
+  if (!this.userId) return this.ready();
+  const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
+  if (actor?.profile?.role !== "Admin") return this.ready();
+  return [
+    Meteor.users.find({}, { fields: publicUserFields }),
+    HospitalsCollection.find({}),
+  ];
+});
+
+Meteor.publish("hlc-admin-support", async function publishHlcAdminSupport() {
+  if (!this.userId) return this.ready();
+  const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
+  if (actor?.profile?.role !== "Admin") return this.ready();
+  return SupportRequestsCollection.find({}, { sort: { createdAt: -1 } });
+});
+
 Meteor.publish("hlc-notifications", function publishHlcNotifications() {
   if (!this.userId) {
     return this.ready();
   }
 
   return NotificationsCollection.find({ recipientId: this.userId }, { sort: { createdAt: -1 } });
-});
-
-Meteor.publish("hlc-access-logs", async function publishHlcAccessLogs() {
-  if (!this.userId) return this.ready();
-  const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
-  if (actor?.profile?.role !== "Admin") return this.ready();
-
-  const twelveMonthsAgo = new Date();
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  return AccessLogsCollection.find(
-    { createdAt: { $gte: twelveMonthsAgo } },
-    { sort: { createdAt: -1 } },
-  );
 });
 
 const buildPatientCasNoteNotification = ({ recipientId, patientId, patientName, noteAuthor, noteText }) => ({
@@ -795,6 +803,20 @@ Meteor.publish("hlc-login-messages", async function publishHlcLoginMessages() {
   if (!["Presidente", "CAS", "GVP"].includes(actor?.profile?.role)) return this.ready();
   const today = new Date().toISOString().slice(0, 10);
   return LoginMessagesCollection.find({ startDate: { $lte: today }, endDate: { $gte: today } }, { sort: { startDate: 1, createdAt: 1 } });
+});
+
+Meteor.publish("hlc-annual-reports", async function publishHlcAnnualReports(presidentId) {
+  if (!this.userId) return this.ready();
+  check(presidentId, String);
+  const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
+  const role = actor?.profile?.role;
+  const allowedPresidentId = role === "Presidente"
+    ? actor._id
+    : role === "CAS" && actor.profile?.isSecretary
+      ? actor.profile?.presidentId || actor.profile?.associationId
+      : "";
+  if (!allowedPresidentId || presidentId !== allowedPresidentId) return this.ready();
+  return AnnualReportsCollection.find({ presidentId }, { sort: { year: -1 } });
 });
 
 Meteor.methods({

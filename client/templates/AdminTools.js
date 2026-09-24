@@ -4,7 +4,7 @@ import { Accounts } from "meteor/accounts-base";
 import { AdminLoginMessages } from "./AdminLoginMessages.js";
 import { AdminEmailSettings } from "./AdminEmailSettings.js";
 
-export const AdminTools = ({ users = [], loginMessages = [] }) => {
+export const AdminTools = ({ users = [], loginMessages = [], loading = false }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [presidentId, setPresidentId] = useState("");
   const [role, setRole] = useState("Presidente");
@@ -84,12 +84,12 @@ export const AdminTools = ({ users = [], loginMessages = [] }) => {
     <header className="admin-dashboard-header">
       <div><span className="admin-eyebrow">Amministrazione</span><h1>Strumenti</h1><p>Assistenza agli utenti e comunicazioni mostrate al login.</p></div>
     </header>
-    <section className="admin-dashboard-card admin-assistance-card">
+    {loading ? <section className="admin-dashboard-card"><p className="mb-0 text-secondary">Caricamento strumenti…</p></section> : <><section className="admin-dashboard-card admin-assistance-card">
       <div><span className="admin-eyebrow">Modalità assistenza</span><h2>Accedi come un utente</h2><p>Controlla ciò che vede l’utente e aiutalo senza conoscere o modificare la sua password. Ogni accesso viene registrato.</p></div>
       <button className="btn btn-primary" type="button" onClick={openModal}>Apri accesso assistenza</button>
     </section>
     <AdminEmailSettings />
-    <AdminLoginMessages messages={loginMessages} />
+    <AdminLoginMessages messages={loginMessages} /></>}
 
     {modalOpen && <>
       <button className="entity-modal-backdrop" type="button" aria-label="Chiudi modalità assistenza" onClick={closeModal} />

@@ -15,7 +15,10 @@ const formatDate = (value) => value ? new Intl.DateTimeFormat("it-IT").format(ne
 
 export const AnnualReport = ({ presentations, users, currentUser, presidentId }) => {
   const currentYear = new Date().getFullYear();
-  const reports = useTracker(() => AnnualReportsCollection.find({ presidentId }, { sort: { year: -1 } }).fetch(), [presidentId]);
+  const reports = useTracker(() => {
+    Meteor.subscribe("hlc-annual-reports", presidentId);
+    return AnnualReportsCollection.find({ presidentId }, { sort: { year: -1 } }).fetch();
+  }, [presidentId]);
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);

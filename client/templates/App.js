@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { Home } from "./Home.js";
 import { Login } from "./Login.js";
 import {
-  AccessLogsCollection,
   LoginMessagesCollection,
   AbsencesCollection,
   DepartmentsCollection,
@@ -184,16 +183,15 @@ export const App = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
   };
 
-  const { ready, user, users, hospitals, hospitalityOffers, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, accessLogs, loginMessages } = useTracker(() => {
-    const dataSubscription = Meteor.subscribe("hlc-data");
-    const eventSubscription = Meteor.subscribe("hlc-events");
-    const notificationSubscription = Meteor.subscribe("hlc-notifications");
-    const accessSubscription = Meteor.subscribe("hlc-access-logs");
-    const loginMessagesSubscription = Meteor.subscribe("hlc-login-messages");
+  const { ready, user, users, hospitals, hospitalityOffers, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, loginMessages } = useTracker(() => {
     const account = Meteor.user();
+    const isAdmin = account?.profile?.role === "Admin";
+    const dataSubscription = Meteor.subscribe("hlc-data");
+    const eventSubscription = isAdmin ? null : Meteor.subscribe("hlc-events");
+    const notificationSubscription = isAdmin ? null : Meteor.subscribe("hlc-notifications");
 
     return {
-      ready: dataSubscription.ready() && eventSubscription.ready() && notificationSubscription.ready() && accessSubscription.ready() && loginMessagesSubscription.ready(),
+      ready: dataSubscription.ready() && (!eventSubscription || eventSubscription.ready()) && (!notificationSubscription || notificationSubscription.ready()),
       user: account ? toClientRecord(account) : null,
       users: Meteor.users.find({}, { sort: { username: 1 } }).fetch().map(toClientRecord),
       hospitals: HospitalsCollection.find().fetch().map(toClientRecord),
@@ -210,7 +208,6 @@ export const App = () => {
       })),
       usefulFiles: UsefulFilesCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
       absences: AbsencesCollection.find({}, { sort: { startDate: 1 } }).fetch().map(toClientRecord),
-      accessLogs: AccessLogsCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
       loginMessages: LoginMessagesCollection.find({}, { sort: { startDate: 1, createdAt: 1 } }).fetch().map(toClientRecord),
     };
   }, []);
@@ -237,7 +234,7 @@ export const App = () => {
   }, [impersonation?.sessionToken, user?.id, user?.role]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || user.role === "Admin") return;
     const trackingKey = `hlc-access-session:${user.id}`;
     if (globalThis.sessionStorage?.getItem(trackingKey)) return;
     globalThis.sessionStorage?.setItem(trackingKey, "tracked");
@@ -413,7 +410,6 @@ export const App = () => {
       notifications={notifications}
       usefulFiles={usefulFiles}
       absences={absences}
-      accessLogs={accessLogs}
       loginMessages={loginMessages}
       pushNotifications={pushNotifications}
       theme={theme}
