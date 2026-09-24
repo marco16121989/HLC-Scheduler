@@ -2404,16 +2404,18 @@ const ensurePerformanceIndexes = async () => {
     EventsCollection.rawCollection().createIndex({ presidentId: 1, createdBy: 1, startsAt: 1 }),
     EventsCollection.rawCollection().createIndex({ presidentId: 1, "invitees.userId": 1, startsAt: 1 }),
     NotificationsCollection.rawCollection().createIndex({ recipientId: 1, readAt: 1, createdAt: -1 }),
+    NotificationsCollection.rawCollection().createIndex({ recipientId: 1, createdAt: -1 }),
     SupportRequestsCollection.rawCollection().createIndex({ createdBy: 1, createdAt: -1 }),
     UsefulFilesCollection.rawCollection().createIndex({ presidentId: 1, createdAt: -1 }),
     AbsencesCollection.rawCollection().createIndex({ userId: 1, startDate: 1, endDate: 1 }),
     LoginMessagesCollection.rawCollection().createIndex({ startDate: 1, endDate: 1 }),
+    LoginMessagesCollection.rawCollection().createIndex({ startDate: 1, createdAt: 1 }),
     Meteor.users.rawCollection().createIndex({ "profile.presidentId": 1, "profile.role": 1 }),
     Meteor.users.rawCollection().createIndex({ "profile.associationId": 1, "profile.role": 1 }),
   ]);
 };
 
-Meteor.startup(async () => {
+const runServerMaintenance = async () => {
   await ensurePerformanceIndexes();
   await initializeWebPush();
   const adminUsername = formatUserName(
@@ -2465,4 +2467,10 @@ Meteor.startup(async () => {
       console.error("Impossibile controllare i promemoria dei ricoveri programmati.", error);
     });
   }, 60 * 60 * 1000);
+};
+
+Meteor.startup(() => {
+  runServerMaintenance().catch((error) => {
+    console.error("Manutenzione iniziale non riuscita.", error);
+  });
 });

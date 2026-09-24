@@ -38,16 +38,13 @@ const callServer = (method, ...args) => {
 };
 
 export const App = () => {
+  const startupComplete = true;
   const [impersonation, setImpersonation] = useState(() => {
     try { return JSON.parse(globalThis.sessionStorage?.getItem("hlc-impersonation") || "null"); } catch { return null; }
   });
   const [impersonationBannerOpen, setImpersonationBannerOpen] = useState(false);
   const [loginMessagesToShow, setLoginMessagesToShow] = useState([]);
   const [loginMessageIndex, setLoginMessageIndex] = useState(0);
-  const [logoReady, setLogoReady] = useState(false);
-  const [startupExiting, setStartupExiting] = useState(false);
-  const [startupComplete, setStartupComplete] = useState(false);
-  const startupStartedAt = useRef(Date.now());
   const loginMessagesShownUserRef = useRef("");
   const [theme, setTheme] = useState(() => {
     const savedTheme = globalThis.localStorage?.getItem("hlc-theme");
@@ -122,37 +119,8 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
-    const logo = new Image();
-    let cancelled = false;
-    const markLogoReady = () => {
-      if (!cancelled) setLogoReady(true);
-    };
-    const decodeLogo = () => {
-      if (typeof logo.decode !== "function") {
-        markLogoReady();
-        return;
-      }
-      logo.decode().then(markLogoReady, markLogoReady);
-    };
-    logo.onload = decodeLogo;
-    logo.onerror = markLogoReady;
-    logo.src = "/images/hlc-scheduler-logo-optimized.jpg";
-    if (logo.complete) decodeLogo();
-    return () => {
-      cancelled = true;
-      logo.onload = null;
-      logo.onerror = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const resetKey = "hlc-italian-interface-reset-v1";
     document.documentElement.lang = "it";
     globalThis.localStorage?.removeItem("hlc-language");
-    if (globalThis.sessionStorage?.getItem(resetKey) !== "done") {
-      globalThis.sessionStorage?.setItem(resetKey, "done");
-      globalThis.location.reload();
-    }
   }, []);
 
   useEffect(() => {
@@ -287,21 +255,6 @@ export const App = () => {
     badgeUpdate.catch(() => {});
   }, [notifications, user?.id]);
 
-  const initialLoadingComplete = logoReady && !Meteor.loggingIn() && !(Meteor.userId() && !ready);
-  useEffect(() => {
-    if (!initialLoadingComplete || startupComplete) return undefined;
-    const elapsed = Date.now() - startupStartedAt.current;
-    const remaining = Math.max(0, 2000 - elapsed);
-    let completionTimer;
-    const exitTimer = globalThis.setTimeout(() => {
-      setStartupExiting(true);
-      completionTimer = globalThis.setTimeout(() => setStartupComplete(true), 420);
-    }, remaining);
-    return () => {
-      globalThis.clearTimeout(exitTimer);
-      globalThis.clearTimeout(completionTimer);
-    };
-  }, [initialLoadingComplete, startupComplete]);
 
   const makeSetter = (kind, current) => (update) => {
     const next = typeof update === "function" ? update(current) : update;
@@ -338,15 +291,6 @@ export const App = () => {
     callServer("hlc.applyRecordChanges", "presentations", { upserts, removedIds });
   };
 
-  const startupLoader = <div className={`startup-loader ${startupExiting ? "is-exiting" : ""}`} role="status" aria-live="polite">
-      <div className="startup-loader-content">
-        <div className="startup-loader-emblem" aria-hidden="true"><span>HLC</span></div>
-        <div className="startup-loader-brand">HLC Scheduler</div>
-        <div className="startup-loader-tagline">Coordinamento. Cura. Precisione.</div>
-        <div className="startup-progress" aria-label="Caricamento in corso"><span /></div>
-      </div>
-    </div>;
-
   const stopImpersonation = () => {
     Meteor.call("hlc.stopImpersonation", impersonation?.sessionToken, (error, result) => {
       if (error) {
@@ -377,10 +321,6 @@ export const App = () => {
     setLoginMessagesToShow([]);
     setLoginMessageIndex(0);
   };
-
-  if (!startupComplete && !startupExiting) {
-    return startupLoader;
-  }
 
   if (user?.disabled) {
     Meteor.logout();

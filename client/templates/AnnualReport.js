@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { useTracker } from "meteor/react-meteor-data";
 import { AnnualReportsCollection } from "/imports/api/links";
-import { createAnnualReportPdf } from "../utils/createAnnualReportPdf.js";
 import { confirmAction } from "./ConfirmDialog.js";
 
 const SPECIALIZATION_COLUMNS = [
@@ -62,7 +61,10 @@ export const AnnualReport = ({ presentations, users, currentUser, presidentId })
   };
   const closeModal = () => { if (!saving) { setModalOpen(false); setDraft(null); setEditingReportId(null); setSentAt(null); setError(""); } };
   const update = (name, value) => { if (name === "year") setDraft(buildDraft(value)); else setDraft((current) => ({ ...current, [name]: value })); setError(""); };
-  const pdfFor = (report) => createAnnualReportPdf({ ...report, specializationColumns: SPECIALIZATION_COLUMNS, totalFor: (specialization) => report.specializationTotals?.[normalizeSpecialization(specialization)] || 0 });
+  const pdfFor = async (report) => {
+    const { createAnnualReportPdf } = await import("../utils/createAnnualReportPdf.js");
+    return createAnnualReportPdf({ ...report, specializationColumns: SPECIALIZATION_COLUMNS, totalFor: (specialization) => report.specializationTotals?.[normalizeSpecialization(specialization)] || 0 });
+  };
   const download = async (report) => {
     const url = await pdfFor(report);
     const link = document.createElement("a"); link.href = url; link.download = `rapporto-annuale-CAS-${report.year}.pdf`; link.click();

@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { Meteor } from "meteor/meteor";
-import { createPopulatedPatientPdf } from "../utils/populatePatientPdf.js";
-import { createSimplifiedPatientPdf } from "../utils/populateSimplifiedPatientPdf.js";
 import { confirmAction } from "./ConfirmDialog.js";
 import { CasRoleBadge, formatCasUserLabel } from "./CasRoleBadge.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
@@ -1023,6 +1021,7 @@ export const Patients = ({
     try {
       const doctor = doctors.find((item) => item.id === savedPatient.doctorId);
       const casUser = users.find((item) => item.id === savedPatient.casId);
+      const { createPopulatedPatientPdf } = await import("../utils/populatePatientPdf.js");
       const pdfUrl = await createPopulatedPatientPdf({
         patient: savedPatient,
         doctorName: doctor ? `${doctor.lastName} ${doctor.firstName}` : "",
@@ -1045,6 +1044,7 @@ export const Patients = ({
     if (!savedPatient) return;
     const pdfWindow = globalThis.open("", "_blank");
     try {
+      const { createSimplifiedPatientPdf } = await import("../utils/populateSimplifiedPatientPdf.js");
       const pdfUrl = await createSimplifiedPatientPdf(savedPatient);
       if (pdfWindow) {
         pdfWindow.location.href = pdfUrl;

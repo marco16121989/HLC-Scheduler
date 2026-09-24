@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
-import { createPopulatedPresentationPdf } from "../utils/populatePresentationPdf.js";
 import { PaginationControls, usePagination } from "./Pagination.js";
 
 const PRESENTATION_TYPES = ["In presenza", "Online", "PowerPoint", "Espositori"];
@@ -125,6 +124,7 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
     if (!saved) return;
     const pdfWindow = globalThis.open("", "_blank");
     try {
+      const { createPopulatedPresentationPdf } = await import("../utils/populatePresentationPdf.js");
       const pdfUrl = await createPopulatedPresentationPdf(saved);
       if (pdfWindow) pdfWindow.location.href = pdfUrl;
       else globalThis.location.href = pdfUrl;
