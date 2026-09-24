@@ -82,6 +82,11 @@ const MenuIcon = ({ name }) => (
   </svg>
 );
 
+const PageLoader = () => <div className="page-data-loader" role="status" aria-live="polite">
+  <span className="fa-spin page-data-loader-icon" aria-hidden="true">↻</span>
+  <span>Caricamento dati…</span>
+</div>;
+
 export const Home = ({
   user,
   users,
@@ -133,7 +138,7 @@ export const Home = ({
   const canViewPage = (pageId) => getPagePermission(user, pageId).view;
   const canEditPage = (pageId) => getPagePermission(user, pageId).edit;
   const pageResources = user.role === "Admin" ? [] : DATA_RESOURCES_BY_VIEW[activeView] || [];
-  useTracker(() => {
+  const pageSubscription = useTracker(() => {
     const data = pageResources.length ? Meteor.subscribe("hlc-data", pageResources) : null;
     const events = user.role !== "Admin" && ["calendar", "events"].includes(activeView)
       ? Meteor.subscribe("hlc-events")
@@ -157,6 +162,10 @@ export const Home = ({
       toolsReady: !tools || tools.ready(),
     };
   }, [user.role, activeView]);
+  const pageLoading = (pageResources.length > 0 && !pageSubscription.ready) ||
+    (user.role === "Admin" && activeView === "users" && !adminSubscriptions.directoryReady) ||
+    (user.role === "Admin" && activeView === "admin-tools" && (!adminSubscriptions.directoryReady || !adminSubscriptions.toolsReady)) ||
+    (user.role === "Admin" && activeView === "support" && !adminSubscriptions.supportReady);
   const closeMobileSidebar = () => {
     if (globalThis.innerWidth < 992) setSidebarOpen(false);
   };
@@ -577,7 +586,7 @@ export const Home = ({
       />
 
       <main className="app-main" aria-label="Contenuto principale">
-        {activeView === "admin-tools" && user.role === "Admin" ? (
+        {pageLoading ? <PageLoader /> : activeView === "admin-tools" && user.role === "Admin" ? (
           <AdminTools users={users} loginMessages={loginMessages} loading={!adminSubscriptions.toolsReady || !adminSubscriptions.directoryReady} />
         ) : activeView === "support" && canViewPage("support") ? (
           <SupportRequests requests={supportRequests} currentUser={user} loading={user.role === "Admin" && !adminSubscriptions.supportReady} />

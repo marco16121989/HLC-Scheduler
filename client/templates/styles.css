@@ -3812,6 +3812,10 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .admin-stat-card small { font-size: .76rem; }
 .admin-stat-blue { --stat-color: #0d6efd; } .admin-stat-violet { --stat-color: #6f42c1; } .admin-stat-green { --stat-color: #198754; } .admin-stat-orange { --stat-color: #fd7e14; }
 .admin-dashboard-card { min-width: 0; padding: 1.2rem 1.3rem; border: 1px solid var(--bs-border-color); border-radius: 14px; background: var(--bs-body-bg); box-shadow: 0 7px 24px rgba(24,39,75,.05); }
+.page-data-loader { display: flex; min-height: min(42vh,360px); align-items: center; justify-content: center; gap: .7rem; color: var(--bs-secondary-color); font-size: .95rem; }
+.page-data-loader-icon { display: inline-block; color: var(--bs-primary); font-size: 1.55rem; font-weight: 700; }
+.fa-spin { animation: fa-spin 1s linear infinite; }
+@keyframes fa-spin { to { transform: rotate(360deg); } }
 .admin-dashboard-card h2 { margin: 0 0 1rem; color: var(--bs-emphasis-color); font-size: 1.02rem; font-weight: 750; }
 .admin-assistance-card { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; border-color: rgba(13,110,253,.25); background: linear-gradient(135deg,rgba(13,110,253,.07),var(--bs-body-bg) 62%); }
 .admin-assistance-card h2 { margin: .2rem 0 .35rem; }
