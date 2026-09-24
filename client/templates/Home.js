@@ -55,6 +55,27 @@ const ICON_PATHS = {
   donation: ["M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"],
 };
 
+const DATA_RESOURCES_BY_VIEW = {
+  absences: ["users", "absences"],
+  "useful-files": ["files"],
+  profile: ["hospitals"],
+  support: ["support"],
+  calendar: ["users", "hospitals", "doctors", "patients", "presentations", "absences"],
+  events: ["users"],
+  permissions: ["users"],
+  hospitals: ["users", "hospitals", "departments", "doctors"],
+  departments: ["hospitals", "departments"],
+  doctors: ["hospitals", "doctors"],
+  patients: ["users", "hospitals", "doctors", "patients", "absences"],
+  hospitality: ["hospitality"],
+  "patient-reports": ["users", "hospitals", "patients"],
+  "presentation-reports": ["presentations"],
+  "annual-report": ["users", "presentations"],
+  presentations: ["presentations"],
+  cas: ["users", "hospitals"],
+  gvp: ["users", "hospitals"],
+};
+
 const MenuIcon = ({ name }) => (
   <svg className="nav-icon admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {ICON_PATHS[name].map((path) => <path d={path} key={path} />)}
@@ -111,6 +132,14 @@ export const Home = ({
         : "";
   const canViewPage = (pageId) => getPagePermission(user, pageId).view;
   const canEditPage = (pageId) => getPagePermission(user, pageId).edit;
+  const pageResources = user.role === "Admin" ? [] : DATA_RESOURCES_BY_VIEW[activeView] || [];
+  useTracker(() => {
+    const data = pageResources.length ? Meteor.subscribe("hlc-data", pageResources) : null;
+    const events = user.role !== "Admin" && ["calendar", "events"].includes(activeView)
+      ? Meteor.subscribe("hlc-events")
+      : null;
+    return { ready: (!data || data.ready()) && (!events || events.ready()) };
+  }, [user.role, activeView]);
   const adminSubscriptions = useTracker(() => {
     const isAdmin = user.role === "Admin";
     const directory = isAdmin && ["users", "admin-tools"].includes(activeView)

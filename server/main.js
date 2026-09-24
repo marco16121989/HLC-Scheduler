@@ -615,10 +615,14 @@ Accounts.validateLoginAttempt((attempt) => {
   return attempt.allowed;
 });
 
-Meteor.publish("hlc-data", async function publishHlcData() {
+Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
   if (!this.userId) {
     return this.ready();
   }
+  check(resources, [String]);
+  const requested = new Set(resources);
+  const wants = (resource) => requested.has(resource);
+  if (requested.size === 0) return this.ready();
 
   const actor = await Meteor.users.findOneAsync(this.userId);
   const role = actor?.profile?.role;
@@ -640,7 +644,7 @@ Meteor.publish("hlc-data", async function publishHlcData() {
             : actor.profile.associationId)
         : null;
   const dataSelector = presidentId ? { presidentId } : role === "Admin" ? {} : { _id: null };
-  await ensureDefaultDepartments(presidentId);
+  if (wants("departments")) await ensureDefaultDepartments(presidentId);
   const userSelector =
     role === "Admin"
       ? {}
@@ -658,89 +662,55 @@ Meteor.publish("hlc-data", async function publishHlcData() {
         : { _id: actor._id };
 
   if (role === "GVP") {
-    const sharedPatientFields = await getGvpPatientSharedFields(presidentId);
-    const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
-    const closedGvpFields = sharedPatientFields.filter((field) => !closedPatientHiddenFields.includes(field));
-    const canViewPermissions = getPagePermission({ ...actor.profile, role }, "permissions").view;
-    const gvpHospitalUsersSelector = canViewPermissions ? {
-      $or: [
-        { _id: actor._id },
-        { "profile.presidentId": presidentId },
-        { "profile.associationId": presidentId },
-      ],
-    } : {
-      $or: [
-        { _id: actor._id },
-        { "profile.role": "CAS", "profile.presidentId": presidentId },
-        { "profile.role": "CAS", "profile.associationId": presidentId },
-      ],
-    };
-    const organizationUserIds = (await Meteor.users.find({
-      $or: [
-        { _id: presidentId },
-        { "profile.presidentId": presidentId },
-        { "profile.associationId": presidentId },
-      ],
-    }, { fields: { _id: 1 } }).fetchAsync()).map((user) => user._id);
-    await publishPatientCursors(this, [
-      PatientsCollection.find(
-        { presidentId, status: { $nin: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] },
-        { fields: gvpPatientProjection(sharedPatientFields) },
-      ),
-      PatientsCollection.find(
-        { presidentId, status: { $in: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] },
-        { fields: gvpPatientProjection(closedGvpFields) },
-      ),
-    ]);
-    return [
-      Meteor.users.find(gvpHospitalUsersSelector, { fields: publicUserFields }),
-      HospitalsCollection.find({ presidentId }),
-      HospitalityOffersCollection.find(
-        getPagePermission({ ...actor.profile, role }, "hospitality").view ? { presidentId } : { _id: null },
-        { sort: { hostName: 1 } },
-      ),
-      DoctorsCollection.find({ presidentId }, { fields: {
-        presidentId: 1,
-        firstName: 1,
-        lastName: 1,
-        phone: 1,
-        email: 1,
-        doctorType: 1,
-        professionalRole: 1,
-        notes: 1,
-        doctorNotes: 1,
-        officeInstructions: 1,
-        departmentIds: 1,
-      } }),
-      UsefulFilesCollection.find({ presidentId }, { sort: { createdAt: -1 } }),
-      AbsencesCollection.find({ userId: { $in: organizationUserIds } }, { sort: { startDate: 1 } }),
-    ];
+    const cursors = [];
+    if (wants("patients")) {
+      const sharedPatientFields = await getGvpPatientSharedFields(presidentId);
+      const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
+      const closedGvpFields = sharedPatientFields.filter((field) => !closedPatientHiddenFields.includes(field));
+      await publishPatientCursors(this, [
+        PatientsCollection.find({ presidentId, status: { $nin: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] }, { fields: gvpPatientProjection(sharedPatientFields) }),
+        PatientsCollection.find({ presidentId, status: { $in: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] }, { fields: gvpPatientProjection(closedGvpFields) }),
+      ]);
+    }
+    if (wants("users")) {
+      const canViewPermissions = getPagePermission({ ...actor.profile, role }, "permissions").view;
+      const gvpUsersSelector = canViewPermissions ? { $or: [{ _id: actor._id }, { "profile.presidentId": presidentId }, { "profile.associationId": presidentId }] } : { $or: [{ _id: actor._id }, { "profile.role": "CAS", "profile.presidentId": presidentId }, { "profile.role": "CAS", "profile.associationId": presidentId }] };
+      cursors.push(Meteor.users.find(gvpUsersSelector, { fields: publicUserFields }));
+    }
+    if (wants("hospitals")) cursors.push(HospitalsCollection.find({ presidentId }));
+    if (wants("hospitality")) cursors.push(HospitalityOffersCollection.find(getPagePermission({ ...actor.profile, role }, "hospitality").view ? { presidentId } : { _id: null }, { sort: { hostName: 1 } }));
+    if (wants("doctors")) cursors.push(DoctorsCollection.find({ presidentId }, { fields: { presidentId: 1, firstName: 1, lastName: 1, phone: 1, email: 1, doctorType: 1, professionalRole: 1, notes: 1, doctorNotes: 1, officeInstructions: 1, departmentIds: 1 } }));
+    if (wants("files") && getPagePermission({ ...actor.profile, role }, "useful-files").view) cursors.push(UsefulFilesCollection.find({ presidentId }, { fields: { dataUrl: 0 }, sort: { createdAt: -1 } }));
+    if (wants("absences")) {
+      const organizationUserIds = (await Meteor.users.find({ $or: [{ _id: presidentId }, { "profile.presidentId": presidentId }, { "profile.associationId": presidentId }] }, { fields: { _id: 1 } }).fetchAsync()).map((user) => user._id);
+      cursors.push(AbsencesCollection.find({ userId: { $in: organizationUserIds } }, { sort: { startDate: 1 } }));
+    }
+    return cursors;
   }
 
-  const absenceUserIds = ["Presidente", "CAS"].includes(role)
-    ? (await Meteor.users.find(userSelector, { fields: { _id: 1 } }).fetchAsync()).map((user) => user._id)
-    : [actor._id];
-  const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
-  await publishPatientCursors(this, [
-    PatientsCollection.find({ ...dataSelector, status: { $nin: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection() }),
-    PatientsCollection.find({ ...dataSelector, status: { $in: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection(closedPatientHiddenFields) }),
-  ]);
-
-  return [
-    Meteor.users.find(userSelector, { fields: publicUserFields }),
-    HospitalsCollection.find(dataSelector),
-    HospitalityOffersCollection.find(
-      getPagePermission({ ...(actor.profile || {}), role }, "hospitality").view ? dataSelector : { _id: null },
-      { sort: { hostName: 1 } },
-    ),
-    DepartmentsCollection.find(dataSelector),
-    DoctorsCollection.find(dataSelector),
-    // Le presentazioni sono condivise soltanto all'interno della stessa organizzazione.
-    PresentationsCollection.find(dataSelector),
-    SupportRequestsCollection.find(role === "Admin" ? {} : { createdBy: actor._id }),
-    UsefulFilesCollection.find(dataSelector, { sort: { createdAt: -1 } }),
-    AbsencesCollection.find({ userId: { $in: absenceUserIds } }, { sort: { startDate: 1 } }),
-  ];
+  const cursors = [];
+  if (wants("patients")) {
+    const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
+    await publishPatientCursors(this, [
+      PatientsCollection.find({ ...dataSelector, status: { $nin: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection() }),
+      PatientsCollection.find({ ...dataSelector, status: { $in: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection(closedPatientHiddenFields) }),
+    ]);
+  }
+  if (wants("users")) cursors.push(Meteor.users.find(userSelector, { fields: publicUserFields }));
+  if (wants("hospitals")) cursors.push(HospitalsCollection.find(dataSelector));
+  if (wants("hospitality")) cursors.push(HospitalityOffersCollection.find(getPagePermission({ ...(actor.profile || {}), role }, "hospitality").view ? dataSelector : { _id: null }, { sort: { hostName: 1 } }));
+  if (wants("departments")) cursors.push(DepartmentsCollection.find(dataSelector));
+  if (wants("doctors")) cursors.push(DoctorsCollection.find(dataSelector));
+  if (wants("presentations")) cursors.push(PresentationsCollection.find(dataSelector));
+  if (wants("support")) cursors.push(SupportRequestsCollection.find({ createdBy: actor._id }, { sort: { createdAt: -1 } }));
+  if (wants("files") && getPagePermission({ ...(actor.profile || {}), role }, "useful-files").view) cursors.push(UsefulFilesCollection.find(dataSelector, { fields: { dataUrl: 0 }, sort: { createdAt: -1 } }));
+  if (wants("absences")) {
+    const absenceUserIds = ["Presidente", "CAS"].includes(role)
+      ? (await Meteor.users.find(userSelector, { fields: { _id: 1 } }).fetchAsync()).map((user) => user._id)
+      : [actor._id];
+    cursors.push(AbsencesCollection.find({ userId: { $in: absenceUserIds } }, { sort: { startDate: 1 } }));
+  }
+  return cursors;
 });
 
 Meteor.publish("hlc-events", async function publishHlcEvents() {
@@ -1240,6 +1210,23 @@ Meteor.methods({
       (role === "Presidente" || (["CAS", "GVP"].includes(role) && file.createdBy === actor._id));
     if (!canDelete) throw new Meteor.Error("not-authorized", "Non puoi eliminare questo file.");
     await UsefulFilesCollection.removeAsync(fileId);
+  },
+
+  async "hlc.getUsefulFileData"(fileId) {
+    requireUser(this);
+    check(fileId, String);
+    const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
+    const role = actor?.profile?.role;
+    if (!getPagePermission({ ...(actor?.profile || {}), role }, "useful-files").view) {
+      throw new Meteor.Error("not-authorized", "File non disponibile.");
+    }
+    const presidentId = role === "Presidente"
+      ? actor._id
+      : ["CAS", "GVP"].includes(role) ? await getActorPresidentId(actor) : "";
+    if (!presidentId) throw new Meteor.Error("not-authorized", "File non disponibile.");
+    const file = await UsefulFilesCollection.findOneAsync({ _id: fileId, presidentId }, { fields: { dataUrl: 1, name: 1, type: 1 } });
+    if (!file?.dataUrl) throw new Meteor.Error("not-found", "File non trovato.");
+    return { dataUrl: file.dataUrl, name: file.name, type: file.type };
   },
 
   async "hlc.addDoctorOperationalNote"(doctorId, text) {
@@ -2350,6 +2337,8 @@ const ensurePerformanceIndexes = async () => {
     PatientsCollection.rawCollection().createIndex({ presidentId: 1, casIds: 1, status: 1 }),
     PatientsCollection.rawCollection().createIndex({ presidentId: 1, gvpIds: 1, status: 1 }),
     PatientsCollection.rawCollection().createIndex({ presidentId: 1, admissionDate: 1 }),
+    HospitalsCollection.rawCollection().createIndex({ presidentId: 1 }),
+    DepartmentsCollection.rawCollection().createIndex({ presidentId: 1, name: 1 }),
     DoctorsCollection.rawCollection().createIndex({ presidentId: 1, lastName: 1, firstName: 1 }),
     HospitalityOffersCollection.rawCollection().createIndex({ presidentId: 1, hostName: 1 }),
     PresentationsCollection.rawCollection().createIndex({ presidentId: 1, presentationDate: -1 }),
@@ -2357,6 +2346,8 @@ const ensurePerformanceIndexes = async () => {
     EventsCollection.rawCollection().createIndex({ presidentId: 1, createdBy: 1, startsAt: 1 }),
     EventsCollection.rawCollection().createIndex({ presidentId: 1, "invitees.userId": 1, startsAt: 1 }),
     NotificationsCollection.rawCollection().createIndex({ recipientId: 1, readAt: 1, createdAt: -1 }),
+    SupportRequestsCollection.rawCollection().createIndex({ createdBy: 1, createdAt: -1 }),
+    UsefulFilesCollection.rawCollection().createIndex({ presidentId: 1, createdAt: -1 }),
     AbsencesCollection.rawCollection().createIndex({ userId: 1, startDate: 1, endDate: 1 }),
     LoginMessagesCollection.rawCollection().createIndex({ startDate: 1, endDate: 1 }),
     Meteor.users.rawCollection().createIndex({ "profile.presidentId": 1, "profile.role": 1 }),

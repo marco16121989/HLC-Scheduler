@@ -72,10 +72,15 @@ export const UsefulFiles = ({ files, currentUser }) => {
     });
   };
 
-  const openFile = (file) => {
+  const loadFileData = (file) => new Promise((resolve, reject) => {
+    Meteor.call("hlc.getUsefulFileData", file.id, (methodError, result) => methodError ? reject(methodError) : resolve(result));
+  });
+
+  const openFile = async (file) => {
     try {
-      const [header, encodedData] = file.dataUrl.split(",", 2);
-      const mimeType = header.match(/^data:([^;]+);base64$/i)?.[1] || file.type || "application/octet-stream";
+      const loadedFile = await loadFileData(file);
+      const [header, encodedData] = loadedFile.dataUrl.split(",", 2);
+      const mimeType = header.match(/^data:([^;]+);base64$/i)?.[1] || loadedFile.type || file.type || "application/octet-stream";
       const binary = globalThis.atob(encodedData);
       const bytes = new Uint8Array(binary.length);
       for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
@@ -90,6 +95,18 @@ export const UsefulFiles = ({ files, currentUser }) => {
       globalThis.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
     } catch {
       setError("Impossibile aprire il file.");
+    }
+  };
+
+  const downloadFile = async (file) => {
+    try {
+      const loadedFile = await loadFileData(file);
+      const link = document.createElement("a");
+      link.href = loadedFile.dataUrl;
+      link.download = loadedFile.name || file.name;
+      link.click();
+    } catch (methodError) {
+      setError(methodError.reason || "Impossibile scaricare il file.");
     }
   };
 
@@ -108,7 +125,7 @@ export const UsefulFiles = ({ files, currentUser }) => {
       <div className="col-12"><section className="card"><div className="card-header"><h2 className="card-title">Archivio file</h2></div><div className="card-body p-0"><div className="table-responsive"><table className="table table-hover align-middle mb-0 mobile-card-table"><thead><tr><th>Nome file</th><th>Dimensione</th><th>Caricato da</th><th>Data</th><th className="text-end">Azioni</th></tr></thead><tbody>
         {files.length === 0 ? <tr><td className="text-center text-secondary py-4" colSpan="5">Nessun file caricato.</td></tr> : files.map((file) => {
           const canDelete = canModifyFiles && (currentUser.role === "Presidente" || (["CAS", "GVP"].includes(currentUser.role) && file.createdBy === currentUser.id));
-          return <tr key={file.id}><td data-label="File"><button className="btn btn-link fw-medium p-0 text-start" type="button" onClick={() => openFile(file)} title={`Apri ${file.displayName || file.name}`}>{file.displayName || file.name}</button><div className="small text-secondary">{file.name}</div></td><td data-label="Dimensione">{formatSize(file.size)}</td><td data-label="Caricato da">{file.createdByUsername || "-"}</td><td data-label="Data">{file.createdAt ? new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(file.createdAt)) : "-"}</td><td className="text-end" data-label="Azioni"><div className="d-inline-flex gap-2"><a className="btn btn-outline-primary btn-sm" href={file.dataUrl} download={file.name}>Scarica</a>{canDelete && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteFile(file)}>Elimina</button>}</div></td></tr>;
+          return <tr key={file.id}><td data-label="File"><button className="btn btn-link fw-medium p-0 text-start" type="button" onClick={() => openFile(file)} title={`Apri ${file.displayName || file.name}`}>{file.displayName || file.name}</button><div className="small text-secondary">{file.name}</div></td><td data-label="Dimensione">{formatSize(file.size)}</td><td data-label="Caricato da">{file.createdByUsername || "-"}</td><td data-label="Data">{file.createdAt ? new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(file.createdAt)) : "-"}</td><td className="text-end" data-label="Azioni"><div className="d-inline-flex gap-2"><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => downloadFile(file)}>Scarica</button>{canDelete && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteFile(file)}>Elimina</button>}</div></td></tr>;
         })}
       </tbody></table></div></div></section></div>
     </div></div></div>

@@ -186,12 +186,11 @@ export const App = () => {
   const { ready, user, users, hospitals, hospitalityOffers, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, loginMessages } = useTracker(() => {
     const account = Meteor.user();
     const isAdmin = account?.profile?.role === "Admin";
-    const dataSubscription = Meteor.subscribe("hlc-data");
-    const eventSubscription = isAdmin ? null : Meteor.subscribe("hlc-events");
     const notificationSubscription = isAdmin ? null : Meteor.subscribe("hlc-notifications");
+    const loginMessagesSubscription = isAdmin ? null : Meteor.subscribe("hlc-login-messages");
 
     return {
-      ready: dataSubscription.ready() && (!eventSubscription || eventSubscription.ready()) && (!notificationSubscription || notificationSubscription.ready()),
+      ready: (!notificationSubscription || notificationSubscription.ready()) && (!loginMessagesSubscription || loginMessagesSubscription.ready()),
       user: account ? toClientRecord(account) : null,
       users: Meteor.users.find({}, { sort: { username: 1 } }).fetch().map(toClientRecord),
       hospitals: HospitalsCollection.find().fetch().map(toClientRecord),
