@@ -46,11 +46,11 @@ const PERMISSION_DESCRIPTIONS = {
   },
 };
 
-const SearchableUserSelect = ({ casUsers, gvpUsers, value, onChange }) => {
+const SearchableUserSelect = ({ presidentUsers = [], casUsers, gvpUsers, value, onChange }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const containerRef = useRef(null);
-  const allUsers = [...casUsers, ...gvpUsers];
+  const allUsers = [...presidentUsers, ...casUsers, ...gvpUsers];
   const selectedUser = allUsers.find((user) => user.id === value);
   const selectedLabel = value === "role:CAS"
     ? "Tutti i CAS"
@@ -62,6 +62,7 @@ const SearchableUserSelect = ({ casUsers, gvpUsers, value, onChange }) => {
     !normalizedSearch || (user.username || "").toLocaleLowerCase("it").includes(normalizedSearch));
   const filteredCasUsers = filterUsers(casUsers);
   const filteredGvpUsers = filterUsers(gvpUsers);
+  const filteredPresidentUsers = filterUsers(presidentUsers);
   const selectValue = (nextValue) => {
     onChange(nextValue);
     setSearch("");
@@ -86,21 +87,24 @@ const SearchableUserSelect = ({ casUsers, gvpUsers, value, onChange }) => {
           <button className={`dropdown-item ${value === "role:CAS" ? "active" : ""}`} type="button" onClick={() => selectValue("role:CAS")}>Tutti i CAS</button>
           <button className={`dropdown-item ${value === "role:GVP" ? "active" : ""}`} type="button" onClick={() => selectValue("role:GVP")}>Tutti i GVP</button>
         </>}
+        {filteredPresidentUsers.length > 0 && <><h6 className="dropdown-header">Presidenti</h6>{filteredPresidentUsers.map((user) => <button className={`dropdown-item ${value === user.id ? "active" : ""}`} type="button" role="option" aria-selected={value === user.id} key={user.id} onClick={() => selectValue(user.id)}><CasRoleBadge user={user} />{user.username}</button>)}</>}
         {filteredCasUsers.length > 0 && <><h6 className="dropdown-header">CAS</h6>{filteredCasUsers.map((user) => <button className={`dropdown-item ${value === user.id ? "active" : ""}`} type="button" role="option" aria-selected={value === user.id} key={user.id} onClick={() => selectValue(user.id)}><CasRoleBadge user={user} />{user.username}</button>)}</>}
         {filteredGvpUsers.length > 0 && <><h6 className="dropdown-header">GVP</h6>{filteredGvpUsers.map((user) => <button className={`dropdown-item ${value === user.id ? "active" : ""}`} type="button" role="option" aria-selected={value === user.id} key={user.id} onClick={() => selectValue(user.id)}>{user.username}</button>)}</>}
-        {filteredCasUsers.length === 0 && filteredGvpUsers.length === 0 && <div className="text-secondary small px-3 py-2">Nessun utente trovato.</div>}
+        {filteredPresidentUsers.length === 0 && filteredCasUsers.length === 0 && filteredGvpUsers.length === 0 && <div className="text-secondary small px-3 py-2">Nessun utente trovato.</div>}
       </div>
     </div>}
   </div>;
 };
 
-export const Permissions = ({ users, presidentId, canEdit = false }) => {
+export const Permissions = ({ users, presidentId, canEdit = false, isAdmin = false, canManagePresident = false }) => {
   const managedUsers = users.filter((user) =>
+    (isAdmin && user.role === "Presidente") ||
     (user.role === "Presidente" && user.id === presidentId) ||
     (["CAS", "GVP"].includes(user.role) && (user.presidentId === presidentId || user.associationId === presidentId)),
   );
   const sortByUsername = (first, second) => (first.username || "").localeCompare(second.username || "", "it", { sensitivity: "base" });
-  const casUsers = managedUsers.filter((user) => ["Presidente", "CAS"].includes(user.role)).sort(sortByUsername);
+  const presidentUsers = managedUsers.filter((user) => user.role === "Presidente").sort(sortByUsername);
+  const casUsers = managedUsers.filter((user) => user.role === "CAS").sort(sortByUsername);
   const gvpUsers = managedUsers.filter((user) => user.role === "GVP").sort(sortByUsername);
   const [userId, setUserId] = useState("");
   const [permissions, setPermissions] = useState({});
@@ -109,6 +113,7 @@ export const Permissions = ({ users, presidentId, canEdit = false }) => {
   const selectedRole = userId.startsWith("role:") ? userId.slice(5) : "";
   const selectedUser = selectedRole ? { role: selectedRole } : managedUsers.find((user) => user.id === userId);
   const selectedUserIsPresident = selectedUser?.role === "Presidente";
+  const canEditSelectedUser = canEdit && (!selectedUserIsPresident || isAdmin || canManagePresident);
   const permissionInfo = MANAGEABLE_PAGES.find(([pageId]) => pageId === infoPageId);
   useEffect(() => {
     if (!selectedUser) { setPermissions({}); return; }
@@ -122,5 +127,5 @@ export const Permissions = ({ users, presidentId, canEdit = false }) => {
     return { ...current, [pageId]: next };
   });
   const save = () => Meteor.call(selectedRole ? "hlc.updateRolePagePermissions" : "hlc.updatePagePermissions", selectedRole || userId, permissions, (error) => setMessage(error ? error.reason || "Impossibile salvare i permessi." : selectedRole ? `Permessi applicati a tutti i ${selectedRole}.` : "Permessi salvati."));
-  return <>{permissionInfo && <><button className="entity-modal-backdrop" type="button" aria-label="Chiudi informazioni permesso" onClick={() => setInfoPageId("")} /><div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="permission-info-title"><section className="card entity-modal-card"><div className="card-header d-flex align-items-center"><h2 className="card-title" id="permission-info-title">Permessi — {permissionInfo[1]}</h2><button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setInfoPageId("")} /></div><div className="card-body d-grid gap-3"><section className="border rounded p-3"><h3 className="h6 text-primary">Visualizza</h3><p className="mb-0">{PERMISSION_DESCRIPTIONS[permissionInfo[0]]?.view}</p></section><section className="border rounded p-3"><h3 className="h6 text-primary">Modifica</h3><p className="mb-0">{PERMISSION_DESCRIPTIONS[permissionInfo[0]]?.edit}</p></section></div><div className="card-footer d-flex justify-content-end"><button className="btn btn-outline-secondary" type="button" onClick={() => setInfoPageId("")}>Chiudi</button></div></section></div></>}<div className="app-content-header"><div className="container-fluid"><h1 className="mb-1">Permessi</h1><p className="text-secondary mb-0">Definisci quali sezioni ogni CAS o GVP può visualizzare e modificare.</p></div></div><div className="app-content"><div className="container-fluid"><section className="card"><div className="card-body">{!canEdit && <div className="alert alert-info py-2">Puoi consultare i permessi, ma non modificarli.</div>}<label className="form-label">Utente o gruppo</label><SearchableUserSelect casUsers={casUsers} gvpUsers={gvpUsers} value={userId} onChange={setUserId} />{selectedUser && <>{selectedUserIsPresident && <div className="alert alert-info py-2">Il Presidente dispone sempre di tutti i permessi.</div>}{selectedRole && canEdit && <div className="alert alert-warning py-2">Le modifiche verranno applicate a tutti gli utenti {selectedRole} dell’organizzazione.</div>}<div className="table-responsive"><table className="table align-middle"><thead><tr><th>Sezione</th><th className="text-center">Visualizza</th><th className="text-center">Modifica</th></tr></thead><tbody>{MANAGEABLE_PAGES.map(([pageId, label]) => <tr key={pageId}><td><div className="d-flex align-items-center gap-2"><span>{label}</span><button className="btn btn-outline-secondary btn-sm rounded-circle d-inline-flex align-items-center justify-content-center p-0" style={{ width: "1.6rem", height: "1.6rem" }} type="button" aria-label={`Informazioni sui permessi di ${label}`} title="Cosa permettono questi permessi" onClick={() => setInfoPageId(pageId)}><span aria-hidden="true">i</span></button></div></td><td className="text-center"><input className="form-check-input" type="checkbox" checked={Boolean(permissions[pageId]?.view)} disabled={!canEdit || selectedUserIsPresident} onChange={() => toggle(pageId, "view")} /></td><td className="text-center"><input className="form-check-input" type="checkbox" checked={Boolean(permissions[pageId]?.edit)} disabled={!canEdit || selectedUserIsPresident} onChange={() => toggle(pageId, "edit")} /></td></tr>)}</tbody></table></div>{canEdit && !selectedUserIsPresident && <div className="d-flex align-items-center justify-content-end gap-3">{message && <span className={message.includes("salvat") || message.includes("applicati") ? "text-success" : "text-danger"}>{message}</span>}<button className="btn btn-primary" type="button" onClick={save}>{selectedRole ? `Applica a tutti i ${selectedRole}` : "Salva permessi"}</button></div>}</>}</div></section></div></div></>;
+  return <>{permissionInfo && <><button className="entity-modal-backdrop" type="button" aria-label="Chiudi informazioni permesso" onClick={() => setInfoPageId("")} /><div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="permission-info-title"><section className="card entity-modal-card"><div className="card-header d-flex align-items-center"><h2 className="card-title" id="permission-info-title">Permessi — {permissionInfo[1]}</h2><button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setInfoPageId("")} /></div><div className="card-body d-grid gap-3"><section className="border rounded p-3"><h3 className="h6 text-primary">Visualizza</h3><p className="mb-0">{PERMISSION_DESCRIPTIONS[permissionInfo[0]]?.view}</p></section><section className="border rounded p-3"><h3 className="h6 text-primary">Modifica</h3><p className="mb-0">{PERMISSION_DESCRIPTIONS[permissionInfo[0]]?.edit}</p></section></div><div className="card-footer d-flex justify-content-end"><button className="btn btn-outline-secondary" type="button" onClick={() => setInfoPageId("")}>Chiudi</button></div></section></div></>}<div className="app-content-header"><div className="container-fluid"><h1 className="mb-1">Permessi</h1><p className="text-secondary mb-0">Definisci quali sezioni ogni utente può visualizzare e modificare.</p></div></div><div className="app-content"><div className="container-fluid"><section className="card"><div className="card-body">{!canEdit && <div className="alert alert-info py-2">Puoi consultare i permessi, ma non modificarli.</div>}<label className="form-label">Utente o gruppo</label><SearchableUserSelect presidentUsers={presidentUsers} casUsers={casUsers} gvpUsers={gvpUsers} value={userId} onChange={setUserId} />{selectedUser && <>{selectedUserIsPresident && canManagePresident && <div className="alert alert-info py-2">Il CAS può modificare i permessi del Presidente, tranne la sezione Permessi.</div>}{selectedRole && canEdit && <div className="alert alert-warning py-2">Le modifiche verranno applicate a tutti gli utenti {selectedRole} dell’organizzazione.</div>}<div className="table-responsive"><table className="table align-middle"><thead><tr><th>Sezione</th><th className="text-center">Visualizza</th><th className="text-center">Modifica</th></tr></thead><tbody>{MANAGEABLE_PAGES.map(([pageId, label]) => <tr key={pageId}><td><div className="d-flex align-items-center gap-2"><span>{label}</span><button className="btn btn-outline-secondary btn-sm rounded-circle d-inline-flex align-items-center justify-content-center p-0" style={{ width: "1.6rem", height: "1.6rem" }} type="button" aria-label={`Informazioni sui permessi di ${label}`} title="Cosa permettono questi permessi" onClick={() => setInfoPageId(pageId)}><span aria-hidden="true">i</span></button></div></td><td className="text-center"><input className="form-check-input" type="checkbox" checked={Boolean(permissions[pageId]?.view)} disabled={!canEditSelectedUser || pageId === "permissions"} onChange={() => toggle(pageId, "view")} /></td><td className="text-center"><input className="form-check-input" type="checkbox" checked={Boolean(permissions[pageId]?.edit)} disabled={!canEditSelectedUser || pageId === "permissions"} onChange={() => toggle(pageId, "edit")} /></td></tr>)}</tbody></table></div>{canEditSelectedUser && <div className="d-flex align-items-center justify-content-end gap-3">{message && <span className={message.includes("salvat") || message.includes("applicati") ? "text-success" : "text-danger"}>{message}</span>}<button className="btn btn-primary" type="button" onClick={save}>{selectedRole ? `Applica a tutti i ${selectedRole}` : "Salva permessi"}</button></div>}</>}</div></section></div></div></>;
 };

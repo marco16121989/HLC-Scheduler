@@ -19,6 +19,7 @@ import { Info } from "./Info.js";
 import { Settings } from "./Settings.js";
 import { Absences } from "./Absences.js";
 import { Events } from "./Events.js";
+import { AdminDashboard } from "./AdminDashboard.js";
 import { AdminTools } from "./AdminTools.js";
 import { Donations } from "./Donations.js";
 import { PageInfo } from "./PageInfo.js";
@@ -108,6 +109,7 @@ export const Home = ({
   notifications = [],
   usefulFiles = [],
   absences = [],
+  accessLogs = [],
   loginMessages = [],
   pushNotifications,
   theme,
@@ -147,8 +149,11 @@ export const Home = ({
   }, [user.role, activeView]);
   const adminSubscriptions = useTracker(() => {
     const isAdmin = user.role === "Admin";
-    const directory = isAdmin && ["users", "admin-tools"].includes(activeView)
+    const directory = isAdmin && ["users", "admin-tools", "permissions"].includes(activeView)
       ? Meteor.subscribe("hlc-admin-directory")
+      : null;
+    const accessLogs = isAdmin && activeView === "home"
+      ? Meteor.subscribe("hlc-access-logs")
       : null;
     const support = isAdmin && activeView === "support"
       ? Meteor.subscribe("hlc-admin-support")
@@ -160,10 +165,12 @@ export const Home = ({
       directoryReady: !directory || directory.ready(),
       supportReady: !support || support.ready(),
       toolsReady: !tools || tools.ready(),
+      accessLogsReady: !accessLogs || accessLogs.ready(),
     };
   }, [user.role, activeView]);
   const pageLoading = (pageResources.length > 0 && !pageSubscription.ready) ||
-    (user.role === "Admin" && activeView === "users" && !adminSubscriptions.directoryReady) ||
+    (user.role === "Admin" && activeView === "home" && !adminSubscriptions.accessLogsReady) ||
+    (user.role === "Admin" && ["users", "permissions"].includes(activeView) && !adminSubscriptions.directoryReady) ||
     (user.role === "Admin" && activeView === "admin-tools" && (!adminSubscriptions.directoryReady || !adminSubscriptions.toolsReady)) ||
     (user.role === "Admin" && activeView === "support" && !adminSubscriptions.supportReady);
   const closeMobileSidebar = () => {
@@ -395,6 +402,12 @@ export const Home = ({
                 <>
               <li className="sidebar-section-label menu-order-admin">Amministrazione</li>
               <li className="nav-item menu-order-admin">
+                <button className={`nav-link w-100 ${activeView === "home" ? "active" : ""}`} type="button" onClick={() => openView("home")}>
+                  <MenuIcon name="dashboard" />
+                  <p>Dashboard</p>
+                </button>
+              </li>
+              <li className="nav-item menu-order-admin">
                 <button
                   className={`nav-link w-100 ${activeView === "users" ? "active" : ""}`}
                   type="button"
@@ -586,7 +599,9 @@ export const Home = ({
       />
 
       <main className="app-main" aria-label="Contenuto principale">
-        {pageLoading ? <PageLoader /> : activeView === "admin-tools" && user.role === "Admin" ? (
+        {pageLoading ? <PageLoader /> : activeView === "home" && user.role === "Admin" ? (
+          <AdminDashboard accessLogs={accessLogs} users={users} />
+        ) : activeView === "admin-tools" && user.role === "Admin" ? (
           <AdminTools users={users} loginMessages={loginMessages} loading={!adminSubscriptions.toolsReady || !adminSubscriptions.directoryReady} />
         ) : activeView === "support" && canViewPage("support") ? (
           <SupportRequests requests={supportRequests} currentUser={user} loading={user.role === "Admin" && !adminSubscriptions.supportReady} />
@@ -624,8 +639,8 @@ export const Home = ({
             hospitals={hospitals}
             manager={user}
           />
-        ) : activeView === "permissions" && presidentId && canViewPage("permissions") ? (
-          <Permissions users={users} presidentId={presidentId} canEdit={canEditPage("permissions")} />
+        ) : activeView === "permissions" && (presidentId || user.role === "Admin") && canViewPage("permissions") ? (
+          <Permissions users={users} presidentId={presidentId} canEdit={canEditPage("permissions")} isAdmin={user.role === "Admin"} canManagePresident={user.role === "CAS"} />
         ) : activeView === "hospitals" && presidentId && canViewPage("hospitals") ? (
           <Hospitals
             hospitals={hospitals}

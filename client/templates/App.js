@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Home } from "./Home.js";
 import { Login } from "./Login.js";
 import {
+  AccessLogsCollection,
   LoginMessagesCollection,
   AbsencesCollection,
   DepartmentsCollection,
@@ -151,7 +152,7 @@ export const App = () => {
     setTheme((current) => current === "dark" ? "light" : "dark");
   };
 
-  const { ready, user, users, hospitals, hospitalityOffers, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, loginMessages } = useTracker(() => {
+  const { ready, user, users, hospitals, hospitalityOffers, departments, doctors, patients, presentations, events, supportRequests, notifications, usefulFiles, absences, accessLogs, loginMessages } = useTracker(() => {
     const account = Meteor.user();
     const isAdmin = account?.profile?.role === "Admin";
     const notificationSubscription = isAdmin ? null : Meteor.subscribe("hlc-notifications");
@@ -175,6 +176,7 @@ export const App = () => {
       })),
       usefulFiles: UsefulFilesCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
       absences: AbsencesCollection.find({}, { sort: { startDate: 1 } }).fetch().map(toClientRecord),
+      accessLogs: AccessLogsCollection.find({}, { sort: { createdAt: -1 } }).fetch().map(toClientRecord),
       loginMessages: LoginMessagesCollection.find({}, { sort: { startDate: 1, createdAt: 1 } }).fetch().map(toClientRecord),
     };
   }, []);
@@ -349,6 +351,7 @@ export const App = () => {
       notifications={notifications}
       usefulFiles={usefulFiles}
       absences={absences}
+      accessLogs={accessLogs}
       loginMessages={loginMessages}
       pushNotifications={pushNotifications}
       theme={theme}

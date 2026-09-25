@@ -8,7 +8,8 @@ export const MANAGEABLE_PAGES = [
 ];
 
 export const getPagePermission = (user, pageId) => {
-  if (["Admin", "Presidente"].includes(user?.role)) return { view: true, edit: true };
+  if (user?.role === "Admin") return { view: true, edit: true };
+  if (user?.role === "Presidente" && pageId === "permissions") return { view: true, edit: true };
   if (["calendar", "profile", "absences", "donations"].includes(pageId)) return { view: true, edit: true };
   if (pageId === "annual-report") {
     const view = user?.role === "CAS" && Boolean(user?.isSecretary);
@@ -34,6 +35,7 @@ export const getPagePermission = (user, pageId) => {
   }
   if (configured) return { view: Boolean(configured.view), edit: Boolean(configured.view && configured.edit) };
   const defaults = {
+    Presidente: new Set(MANAGEABLE_PAGES.map(([pageId]) => pageId)),
     CAS: new Set(["calendar", "events", "absences", "useful-files", "profile", "support", "donations", "cas", "gvp", "hospitals", "departments", "doctors", "patients", "presentations", "patient-reports", "presentation-reports"]),
     GVP: new Set(["calendar", "events", "absences", "useful-files", "profile", "donations", "hospitals", "doctors", "patients"]),
   };
