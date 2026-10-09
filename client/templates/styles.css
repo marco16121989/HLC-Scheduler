@@ -4051,3 +4051,5 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .admin-line-point { fill: var(--bs-body-bg); stroke: var(--bs-primary); stroke-width: 2; }
 .admin-line-point:hover, .admin-line-point:focus { fill: var(--bs-primary); stroke-width: 3; outline: none; }
 .admin-line-value { fill: var(--bs-emphasis-color); font-size: 11px; font-weight: 600; }
+
+.admin-president-mobile-membership { margin-top: .2rem; font-size: .75rem; font-weight: 400; white-space: normal; overflow-wrap: anywhere; }

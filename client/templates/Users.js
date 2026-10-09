@@ -198,6 +198,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [mobileFormOpen, setMobileFormOpen] = useState(false);
   const [detailPresidentId, setDetailPresidentId] = useState(null);
+  const [presidentSearch, setPresidentSearch] = useState("");
 
   useEffect(() => {
     const role = managedRole || availableRoles[0];
@@ -209,6 +210,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     setDepartmentFilter("all");
     setMobileFormOpen(false);
     setDetailPresidentId(null);
+    setPresidentSearch("");
   }, [managedRole, manager?.id]);
   const formHospitalAssignments = Array.isArray(form.hospitalAssignments)
     ? form.hospitalAssignments
@@ -699,7 +701,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   });
   visibleUsers.filter((user) => !addedUserIds.has(user.id)).forEach(addUser);
 
-  const canFilterTeam = manager?.role === "Admin" || isPresidentManager || isCasManager;
+  const canFilterTeam = isPresidentManager || isCasManager;
   const filterPresidentId = isTeamManager ? managerPresidentId : "";
   const filterCasUsers = users.filter(
     (user) =>
@@ -734,7 +736,8 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     ? availableHospitals.flatMap((hospital) => (hospital.departments || []).map((department) => ({ ...department, hospitalId: hospital.id, hospitalName: hospital.name })))
     : (filterHospital?.departments || []).map((department) => ({ ...department, hospitalId: filterHospital.id, hospitalName: filterHospital.name }));
   const filteredOrderedUsers = !["CAS", "GVP"].includes(managedRole)
-    ? casFilteredOrderedUsers
+    ? casFilteredOrderedUsers.filter((user) => manager?.role !== "Admin" ||
+        (user.username || "").toLocaleLowerCase("it-IT").includes(presidentSearch.trim().toLocaleLowerCase("it-IT")))
     : casFilteredOrderedUsers.filter((user) => {
         const assignments = getHospitalAssignments(user);
         const matchesHospital = hospitalFilter === "all" || assignments.some((assignment) => assignment.hospitalId === hospitalFilter);
@@ -1026,6 +1029,10 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                   </h2>
                 </div>
                 <div className="card-body p-0">
+                  {manager?.role === "Admin" && <div className="p-3 border-bottom">
+                    <label className="form-label" htmlFor="users-president-search">Cerca nome utente presidente</label>
+                    <input className="form-control" id="users-president-search" type="search" placeholder="Scrivi il nome utente…" value={presidentSearch} onChange={(event) => setPresidentSearch(event.target.value)} />
+                  </div>}
                   {canFilterTeam && (
                     <div className="row g-3 p-3 border-bottom">
                       {managedRole !== "CAS" && <div className="col-12 col-md-6 col-xl-4">
@@ -1087,7 +1094,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                         {filteredOrderedUsers.length === 0 ? (
                           <tr>
                             <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "5" : managedRole ? "5" : "6"}>
-                              {casFilter !== "all" || hospitalFilter !== "all" || departmentFilter !== "all"
+                              {manager?.role === "Admin" && presidentSearch.trim()
+                                ? "Nessun presidente corrisponde al nome utente cercato."
+                                : casFilter !== "all" || hospitalFilter !== "all" || departmentFilter !== "all"
                                 ? "Nessun utente corrisponde ai filtri selezionati."
                                 : manager?.role === "Admin"
                                   ? "Nessun presidente inserito."
@@ -1128,7 +1137,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                             if (manager?.role === "Admin") {
                               return (
                                 <tr key={user.id} className="admin-president-row" role="button" tabIndex="0" onClick={() => openPresidentDetails(user)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPresidentDetails(user); } }}>
-                                  <td className="fw-medium" data-label="Presidente">{user.username} {user.disabled && <span className="badge text-bg-danger ms-2">Disattivato</span>}</td>
+                                  <td className="fw-medium" data-label="Presidente">{user.username} {user.disabled && <span className="badge text-bg-danger ms-2">Disattivato</span>}<small className="d-block d-md-none text-secondary admin-president-mobile-membership">{user.casMembership || "CAS non specificato"}</small></td>
                                   <td className="admin-president-membership" data-label="CAS di appartenenza">{user.casMembership || <span className="text-secondary">-</span>}</td>
                                   <td className="admin-president-count" data-label="CAS"><span className="badge text-bg-primary user-count-badge">{casCount}</span></td>
                                   <td className="admin-president-count" data-label="GVP"><span className="badge text-bg-info user-count-badge">{gvpCount}</span></td>
