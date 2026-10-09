@@ -715,7 +715,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
         .sort((first, second) => first.username.localeCompare(second.username, "it-IT"))
     : managedRole === "CAS"
       ? [...orderedUsers].sort((first, second) => first.username.localeCompare(second.username, "it-IT"))
-      : orderedUsers;
+      : manager?.role === "Admin"
+        ? [...orderedUsers].sort((first, second) => (first.username || "").localeCompare(second.username || "", "it-IT", { sensitivity: "base" }))
+        : orderedUsers;
   const casFilteredOrderedUsers = !canFilterTeam || casFilter === "all"
     ? filterableOrderedUsers
     : manager?.role === "Admin"
@@ -737,7 +739,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     : (filterHospital?.departments || []).map((department) => ({ ...department, hospitalId: filterHospital.id, hospitalName: filterHospital.name }));
   const filteredOrderedUsers = !["CAS", "GVP"].includes(managedRole)
     ? casFilteredOrderedUsers.filter((user) => manager?.role !== "Admin" ||
-        (user.username || "").toLocaleLowerCase("it-IT").includes(presidentSearch.trim().toLocaleLowerCase("it-IT")))
+        [user.username, user.casMembership].some((value) => (value || "").toLocaleLowerCase("it-IT").includes(presidentSearch.trim().toLocaleLowerCase("it-IT"))))
     : casFilteredOrderedUsers.filter((user) => {
         const assignments = getHospitalAssignments(user);
         const matchesHospital = hospitalFilter === "all" || assignments.some((assignment) => assignment.hospitalId === hospitalFilter);
@@ -1030,8 +1032,8 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                 </div>
                 <div className="card-body p-0">
                   {manager?.role === "Admin" && <div className="p-3 border-bottom">
-                    <label className="form-label" htmlFor="users-president-search">Cerca nome utente presidente</label>
-                    <input className="form-control" id="users-president-search" type="search" placeholder="Scrivi il nome utente…" value={presidentSearch} onChange={(event) => setPresidentSearch(event.target.value)} />
+                    <label className="form-label" htmlFor="users-president-search">Cerca presidente per nome utente o città del CAS</label>
+                    <input className="form-control" id="users-president-search" type="search" placeholder="Scrivi il nome utente o la città…" value={presidentSearch} onChange={(event) => setPresidentSearch(event.target.value)} />
                   </div>}
                   {canFilterTeam && (
                     <div className="row g-3 p-3 border-bottom">
@@ -1095,7 +1097,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                           <tr>
                             <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "5" : managedRole ? "5" : "6"}>
                               {manager?.role === "Admin" && presidentSearch.trim()
-                                ? "Nessun presidente corrisponde al nome utente cercato."
+                                ? "Nessun presidente corrisponde al nome utente o alla città cercati."
                                 : casFilter !== "all" || hospitalFilter !== "all" || departmentFilter !== "all"
                                 ? "Nessun utente corrisponde ai filtri selezionati."
                                 : manager?.role === "Admin"
