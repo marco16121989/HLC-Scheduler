@@ -37,6 +37,23 @@ describe("hlcScheduler", function () {
     );
   });
 
+  it("defaults president patient access on and respects configured flags", function () {
+    assert.deepStrictEqual(getPagePermission({ role: "Presidente" }, "patients"),
+      { view: true, edit: true });
+    assert.deepStrictEqual(getPagePermission({
+      role: "Presidente", pagePermissions: { patients: { view: false, edit: false } },
+    }, "patients"), { view: false, edit: false });
+    assert.deepStrictEqual(getPagePermission({
+      role: "Presidente", pagePermissions: { patients: { view: false, edit: true } },
+    }, "patients"), { view: false, edit: false });
+    assert.deepStrictEqual(getPagePermission({
+      role: "Presidente", pagePermissions: { patients: { view: true, edit: false } },
+    }, "patients"), { view: true, edit: false });
+    assert.deepStrictEqual(getPagePermission({
+      role: "Presidente", pagePermissions: { permissions: { view: false, edit: false } },
+    }, "permissions"), { view: true, edit: true });
+  });
+
   it("recognizes a department assigned through the president profile", function () {
     const president = {
       role: "Presidente",

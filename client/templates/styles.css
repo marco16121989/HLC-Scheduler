@@ -3827,7 +3827,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   }
 }
 /* Dashboard amministrativa */
-.admin-dashboard { max-width: 1500px; margin: 0 auto; padding-bottom: 2rem; }
+.admin-dashboard { width: 100%; max-width: none; margin: 0; padding-bottom: 2rem; }
 .admin-dashboard-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; }
 .admin-dashboard-header .admin-eyebrow { display: block; }
 .admin-dashboard-header h1 { margin: .15rem 0 .25rem; font-size: clamp(1.65rem, 2.4vw, 2.35rem); font-weight: 750; color: var(--bs-emphasis-color); }
@@ -4035,3 +4035,19 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .install-app-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .install-app-actions .btn { min-height: 43px; font-weight: 700; }
 @media (max-width: 575.98px) { .install-app-dialog { padding: 1.5rem 1rem 1rem; border-radius: 16px; } }
+
+.admin-monthly-chart-scroll { overflow-x: auto; padding-top: 1rem; }
+.admin-monthly-bars { min-width: 540px; }
+
+.admin-daily-bars { min-width: 850px; }
+@media (max-width: 575.98px) { .admin-access-chart .admin-card-heading { flex-direction: column; } .admin-access-chart .admin-chart-period-filter { width: 100%; } }
+
+.admin-access-line-chart { display: block; width: 100%; min-width: 640px; }
+.admin-access-line-chart-month { min-width: 1050px; }
+.admin-line-grid line { stroke: var(--bs-border-color); stroke-dasharray: 4 4; }
+.admin-line-grid text, .admin-line-label { fill: var(--bs-secondary-color); font-size: 12px; }
+.admin-line-area { fill: var(--bs-primary); opacity: .08; }
+.admin-access-line { fill: none; stroke: var(--bs-primary); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.admin-line-point { fill: var(--bs-body-bg); stroke: var(--bs-primary); stroke-width: 2; }
+.admin-line-point:hover, .admin-line-point:focus { fill: var(--bs-primary); stroke-width: 3; outline: none; }
+.admin-line-value { fill: var(--bs-emphasis-color); font-size: 11px; font-weight: 600; }

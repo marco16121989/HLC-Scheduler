@@ -780,18 +780,22 @@ Meteor.publish("hlc-admin-support", async function publishHlcAdminSupport() {
 });
 
 // La dashboard Admin riceve esclusivamente i log degli accessi effettivi
-// degli ultimi tre giorni, con i soli CAS necessari a identificarne l'appartenenza.
+// degli ultimi dodici mesi, con i soli CAS necessari per l'elenco recente.
 Meteor.publish("hlc-access-logs", async function publishHlcAccessLogs() {
   if (!this.userId) return this.ready();
   const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
   if (actor?.profile?.role !== "Admin") return this.ready();
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
   const selector = { createdAt: { $gte: threeDaysAgo }, action: { $exists: false } };
+  const romeMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+  const year = Number(romeMonth.find((part) => part.type === "year").value);
+  const month = Number(romeMonth.find((part) => part.type === "month").value);
+  const chartStart = new Date(Date.UTC(year, month - 12, 1) - 2 * 60 * 60 * 1000);
   const presidentIds = [...new Set((await AccessLogsCollection.find(selector, { fields: { presidentId: 1 } }).fetchAsync())
     .map((log) => log.presidentId)
     .filter(Boolean))];
   return [
-    AccessLogsCollection.find(selector, { sort: { createdAt: -1 } }),
+    AccessLogsCollection.find({ createdAt: { $gte: chartStart }, action: { $exists: false } }, { sort: { createdAt: -1 } }),
     Meteor.users.find({ _id: { $in: presidentIds } }, { fields: publicUserFields }),
   ];
 });
@@ -975,7 +979,7 @@ Meteor.methods({
     const target = await Meteor.users.findOneAsync(targetUserId, { fields: publicUserFields });
     const belongsToPresident = target && (isAdmin
       ? target.profile?.role === "Presidente"
-      : (target.profile?.role === "Presidente" && actorRole === "CAS" && target._id === actorPresidentId) ||
+      : (target.profile?.role === "Presidente" && ["CAS", "Presidente"].includes(actorRole) && target._id === actorPresidentId) ||
         (["CAS", "GVP"].includes(target.profile?.role) && (target.profile?.presidentId === actorPresidentId || target.profile?.associationId === actorPresidentId)));
     if (!belongsToPresident) throw new Meteor.Error("not-authorized", "Utente non disponibile.");
     const allowedPageIds = new Set(MANAGEABLE_PAGES.map(([pageId]) => pageId));
@@ -984,7 +988,9 @@ Meteor.methods({
       if (!allowedPageIds.has(pageId) || !permission || typeof permission !== "object") continue;
       normalized[pageId] = { view: Boolean(permission.view), edit: Boolean(permission.view && permission.edit) };
     }
-    if (target.profile?.role === "Presidente") normalized.permissions = { view: true, edit: true };
+    if (target.profile?.role === "Presidente") {
+      normalized.permissions = { view: true, edit: true };
+    }
     await Meteor.users.updateAsync(targetUserId, { $set: { "profile.pagePermissions": normalized } });
     return true;
   },

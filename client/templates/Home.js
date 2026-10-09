@@ -640,7 +640,7 @@ export const Home = ({
             manager={user}
           />
         ) : activeView === "permissions" && (presidentId || user.role === "Admin") && canViewPage("permissions") ? (
-          <Permissions users={users} presidentId={presidentId} canEdit={canEditPage("permissions")} isAdmin={user.role === "Admin"} canManagePresident={user.role === "CAS"} />
+          <Permissions users={users} presidentId={presidentId} canEdit={canEditPage("permissions")} isAdmin={user.role === "Admin"} canManagePresident={["CAS", "Presidente"].includes(user.role)} />
         ) : activeView === "hospitals" && presidentId && canViewPage("hospitals") ? (
           <Hospitals
             hospitals={hospitals}
