@@ -1561,7 +1561,10 @@ Meteor.methods({
     check(eventId, String);
     check(response, Match.OneOf("accepted", "declined"));
     const actor = await Meteor.users.findOneAsync(this.userId);
-    if (actor?.profile?.role === "GVP") requirePageEdit(actor, "events");
+    if (!["Presidente", "CAS", "GVP"].includes(actor?.profile?.role)
+      || !getPagePermission(actor.profile, "events").view) {
+      throw new Meteor.Error("not-authorized", "Non hai il permesso di rispondere agli eventi.");
+    }
     const presidentId = await getActorPresidentId(actor);
     const event = await EventsCollection.findOneAsync({
       _id: eventId,

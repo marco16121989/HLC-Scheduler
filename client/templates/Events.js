@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { confirmAction } from "./ConfirmDialog.js";
 import { PaginationControls, usePagination } from "./Pagination.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
 import { CasRoleBadge } from "./CasRoleBadge.js";
+import { filterEventsByPeriod, filterEventsByResponse, getEventEndTime } from "../../imports/api/eventFilters.js";
 
 const emptyForm = () => ({
   title: "",
@@ -25,6 +26,12 @@ const statusClass = {
   accepted: "text-bg-success",
   declined: "text-bg-danger",
 };
+
+const EventIcon = ({ name }) => <svg className="event-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  {name === "calendar" ? <><path d="M4 5h16v15H4z" /><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2" /></>
+    : name === "location" ? <><path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>
+      : <path d={name === "check" ? "m5 12 4 4L19 6" : "m6 6 12 12M18 6 6 18"} />}
+</svg>;
 
 const formatEventDate = (value) => value
   ? new Intl.DateTimeFormat("it-IT", { dateStyle: "full", timeStyle: "short" }).format(new Date(value))
@@ -66,9 +73,22 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState("upcoming");
+  const [responseFilter, setResponseFilter] = useState("all");
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const refreshTime = () => setNow(Date.now());
+    const nextEnd = Math.min(...events.map(getEventEndTime).filter((time) => time > now));
+    const timer = globalThis.setTimeout(refreshTime, Math.min(60_000, Math.max(100, nextEnd - now + 50)));
+    globalThis.addEventListener("focus", refreshTime);
+    return () => {
+      globalThis.clearTimeout(timer);
+      globalThis.removeEventListener("focus", refreshTime);
+    };
+  }, [events, now]);
   const canModifyEvents = getPagePermission(currentUser, "events").edit;
   const canCreate = ["Presidente", "CAS"].includes(currentUser.role) && canModifyEvents;
-  const canRespond = currentUser.role !== "GVP" || getPagePermission(currentUser, "events").edit;
+  const canRespond = getPagePermission(currentUser, "events").view;
   const organizationUsers = useMemo(() => users.filter((user) =>
     user.id !== currentUser.id &&
     ((user.role === "Presidente" && user.id === presidentId) ||
@@ -78,7 +98,10 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
     .filter((user) => ["Presidente", "CAS"].includes(user.role))
     .sort((first, second) => (first.username || "").localeCompare(second.username || "", "it-IT"));
   const gvpUsers = organizationUsers.filter((user) => user.role === "GVP");
-  const eventPagination = usePagination(events, 12);
+  const visibleEvents = useMemo(() => filterEventsByResponse(
+    filterEventsByPeriod(events, periodFilter, now, currentUser.id), responseFilter, currentUser.id,
+  ), [events, periodFilter, responseFilter, now, currentUser.id]);
+  const eventPagination = usePagination(visibleEvents, 12, `${periodFilter}:${responseFilter}`);
 
   const closeModal = () => {
     setForm(emptyForm());
@@ -137,9 +160,27 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
 
   return <>
     <div className="app-content-header">
-      <div className="container-fluid d-flex align-items-center justify-content-between gap-3">
+      <div className="container-fluid d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div><h1 className="mb-1">Eventi</h1><p className="text-secondary mb-0">Crea eventi, gestisci gli invitati e consulta le risposte ricevute.</p></div>
-        {canCreate && <button className="btn btn-primary" type="button" onClick={() => setModalOpen(true)}>Crea evento</button>}
+        <div className="d-flex flex-wrap align-items-center gap-2 event-page-controls">
+          <label className="visually-hidden" htmlFor="event-period-filter">Filtra eventi</label>
+          <select className="form-select w-auto" id="event-period-filter" value={periodFilter} onChange={(event) => {
+            setPeriodFilter(event.target.value);
+            if (event.target.value === "mine") setResponseFilter("all");
+          }}>
+            <option value="upcoming">In corso e futuri</option>
+            <option value="past">Eventi passati</option>
+            <option value="mine">Miei eventi</option>
+          </select>
+          {periodFilter !== "mine" && <><label className="visually-hidden" htmlFor="event-response-filter">Filtra per la tua risposta</label>
+          <select className="form-select w-auto" id="event-response-filter" value={responseFilter} onChange={(event) => setResponseFilter(event.target.value)}>
+            <option value="all">Tutte le risposte</option>
+            <option value="accepted">Accettati</option>
+            <option value="declined">Rifiutati</option>
+            <option value="pending">Non risposto</option>
+          </select></>}
+          {canCreate && <button className="btn btn-primary" type="button" onClick={() => setModalOpen(true)}>Crea evento</button>}
+        </div>
       </div>
     </div>
     <div className="app-content events-page">
@@ -179,17 +220,23 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
           </section>
         </div>
 
-        {events.length === 0 ? <section className="card"><div className="card-body text-center text-secondary py-5">Nessun evento disponibile.</div></section> : <><div className="event-card-grid">{eventPagination.pageItems.map((event) => {
+        {visibleEvents.length === 0 ? <section className="card"><div className="card-body text-center text-secondary py-5">{responseFilter !== "all" ? "Nessun evento con questa risposta nel periodo selezionato." : periodFilter === "mine" ? "Non hai ancora creato eventi." : periodFilter === "past" ? "Nessun evento passato." : "Nessun evento in corso o futuro."}</div></section> : <><div className="event-card-grid">{eventPagination.pageItems.map((event) => {
           const isOwner = event.createdBy === currentUser.id;
           const invitation = event.invitees?.find((item) => item.userId === currentUser.id);
           const invitees = event.invitees || [];
           return <article className="card event-card" key={event.id}>
             <div className="card-body">
-              <div className="d-flex align-items-start justify-content-between gap-3">
-                <div className="min-w-0"><div className="event-card-heading"><h2 className="h5 mb-0">{event.title}</h2><time dateTime={event.startsAt}>{formatEventPeriod(event.startsAt, event.endsAt)}</time>{event.location && <span className="event-card-location">{event.location}</span>}</div><div className="text-secondary small mt-1">Creato da {event.creatorName}</div></div>
-                {invitation && <span className={`badge ${statusClass[invitation.status] || statusClass.pending}`}>{statusLabel[invitation.status] || statusLabel.pending}</span>}
+              <div className="event-card-topline">
+                <span className="event-card-eyebrow">{isOwner ? "Evento organizzato" : "Invito evento"}</span>
+                {invitation && <span className={`event-status event-status-${invitation.status || "pending"}`}>{statusLabel[invitation.status] || statusLabel.pending}</span>}
               </div>
-              {event.description && <p className="event-description mt-3 mb-0">{event.description}</p>}
+              <h2 className="event-card-title">{event.title}</h2>
+              <div className="event-card-meta">
+                <div className="event-meta-row"><span className="event-meta-icon"><EventIcon name="calendar" /></span><time dateTime={event.startsAt}>{formatEventPeriod(event.startsAt, event.endsAt)}</time></div>
+                {event.location && <div className="event-meta-row"><span className="event-meta-icon"><EventIcon name="location" /></span><span>{event.location}</span></div>}
+              </div>
+              {event.description && <p className="event-description">{event.description}</p>}
+              <p className="event-card-creator">Organizzato da <strong>{event.creatorName}</strong></p>
               {isOwner && <details className="event-response-details">
                 <summary aria-label="Mostra o nascondi l’elenco degli invitati">
                   <EventResponseDonut invitees={invitees} />
@@ -197,8 +244,11 @@ export const Events = ({ events = [], users = [], currentUser, presidentId }) =>
                 <div className="table-responsive mt-3"><table className="table table-sm align-middle mb-0"><thead><tr><th>Invitato</th><th>Ruolo</th><th>Risposta</th></tr></thead><tbody>{invitees.map((invitee) => <tr key={invitee.userId}><td>{invitee.username}</td><td>{invitee.role}</td><td><span className={`badge ${statusClass[invitee.status] || statusClass.pending}`}>{statusLabel[invitee.status] || statusLabel.pending}</span></td></tr>)}</tbody></table></div>
               </details>}
             </div>
-            <div className="card-footer d-flex align-items-center justify-content-end gap-2">
-              {isOwner ? canModifyEvents && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => removeEvent(event)}>Elimina evento</button> : canRespond ? <><button className={`btn btn-sm ${invitation?.status === "declined" ? "btn-danger" : "btn-outline-danger"}`} type="button" onClick={() => respond(event.id, "declined")}>Non partecipo</button><button className={`btn btn-sm ${invitation?.status === "accepted" ? "btn-success" : "btn-outline-success"}`} type="button" onClick={() => respond(event.id, "accepted")}>Partecipo</button></> : <span className="text-secondary small">Risposta non autorizzata</span>}
+            <div className="card-footer">
+              {!isOwner && canRespond && invitation && <p className="event-response-prompt">La tua partecipazione</p>}
+              <div className={`event-card-actions ${isOwner ? "event-owner-actions" : ""}`}>
+                {isOwner ? canModifyEvents && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => removeEvent(event)}>Elimina evento</button> : canRespond && invitation ? <><button className={`btn event-response-button ${invitation.status === "declined" ? "btn-danger" : "btn-light"}`} type="button" aria-pressed={invitation.status === "declined"} onClick={() => respond(event.id, "declined")}><EventIcon name="close" />Non partecipo</button><button className={`btn event-response-button ${invitation.status === "accepted" ? "btn-success" : "btn-primary"}`} type="button" aria-pressed={invitation.status === "accepted"} onClick={() => respond(event.id, "accepted")}><EventIcon name="check" />Partecipo</button></> : <span className="text-secondary small">Risposta non autorizzata</span>}
+              </div>
             </div>
           </article>;
         })}</div><PaginationControls {...eventPagination} /></>}
