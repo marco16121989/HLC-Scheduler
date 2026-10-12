@@ -1,4 +1,6 @@
 import assert from "assert";
+import "./patientStatusConfirmation.test.js";
+import "./patientFollowUp.test.js";
 import { getDefaultPresidentId } from "../client/templates/Users.js";
 import { isUserAssignedToDepartment } from "../client/templates/Hospitals.js";
 import { getPagePermission } from "../imports/constants/pagePermissions.js";

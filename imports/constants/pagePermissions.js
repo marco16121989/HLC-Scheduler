@@ -9,6 +9,7 @@ export const MANAGEABLE_PAGES = [
 ];
 
 export const getPagePermission = (user, pageId) => {
+  if (pageId === "follow-up") return { view: ["Presidente", "CAS"].includes(user?.role), edit: false };
   if (user?.role === "Admin") return { view: true, edit: true };
   if (user?.role === "Presidente" && pageId === "permissions") return { view: true, edit: true };
   if (["calendar", "profile", "absences", "donations"].includes(pageId)) return { view: true, edit: true };

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { confirmAction } from "./ConfirmDialog.js";
+import { confirmPatientClosure } from "./patientStatusConfirmation.js";
+import { canViewPatientFollowUp, formatFollowUpActivationDate, getFollowUpActivationDate, getPatientsForView, isFollowUpPatient } from "../../imports/api/patientFollowUp.js";
 import { CasRoleBadge, formatCasUserLabel } from "./CasRoleBadge.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
 import {
@@ -15,7 +17,7 @@ const CLOSED_PATIENT_HIDDEN_FIELDS = ["firstName", "lastName"];
 const CLOSED_PATIENT_STATUSES = ["Dimesso", "Deceduto", "Trasferito"];
 const TRANSFERRED_PATIENT_PRIVACY_NOTE = "Come da istruzioni dello schiavo il nome e cognome del paziente sono stati eliminati.";
 const maskClosedPatientForDisplay = (patient) => {
-  if (!CLOSED_PATIENT_STATUSES.includes(patient?.status)) return patient;
+  if (!CLOSED_PATIENT_STATUSES.includes(patient?.status) || isFollowUpPatient(patient)) return patient;
   const masked = { ...patient, details: { ...(patient.details || {}) } };
   CLOSED_PATIENT_HIDDEN_FIELDS.forEach((path) => {
     const parts = path.split(".");
@@ -338,6 +340,9 @@ const PATIENT_HISTORY_FIELD_LABELS = new Map([
   ["firstName", "Nome"], ["lastName", "Cognome"], ["admissionType", "Tipo di accesso"],
   ["status", "Stato"], ["transferNotes", "Note del trasferimento"],
   ["admissionDate", "Data di accesso"], ["dischargeDate", "Data di dimissione"],
+  ["followUpEnabled", "Follow up attivo"],
+  ["followUpActivatedAt", "Data attivazione follow up"],
+  ["followUpStoppedAt", "Data interruzione follow up"],
   ["pathology", "Patologia"], ["doctorId", "Medico responsabile"],
   ["recommendedDoctorIds", "Medici consigliati"], ["casId", "CAS principale"],
   ["casIds", "CAS assegnati"], ["gvpId", "GVP principale"], ["gvpIds", "GVP assegnati"],
@@ -375,17 +380,22 @@ export const Patients = ({
   presidentId,
   absences = [],
   notifications = [],
+  followUpOnly = false,
 }) => {
   const isGvp = currentUser.role === "GVP";
   const isAdminOperator = ["Admin", "Presidente"].includes(currentUser.role)
     || Boolean(globalThis.sessionStorage?.getItem("hlc-impersonation"));
-  const canEditPatients = getPagePermission(currentUser, "patients").edit;
-  const canViewGvpSharing = getPagePermission(currentUser, "patient-gvp-sharing").view;
+  const canEditPatients = getPagePermission(currentUser, followUpOnly ? "follow-up" : "patients").edit;
+  const canViewGvpSharing = !followUpOnly && getPagePermission(currentUser, "patient-gvp-sharing").view;
   const canEditGvpSharing = getPagePermission(currentUser, "patient-gvp-sharing").edit;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [admissionType, setAdmissionType] = useState("emergency");
   const [patientStatus, setPatientStatus] = useState("");
+  const [followUpEnabled, setFollowUpEnabled] = useState(false);
+  const [followUpActivatedAt, setFollowUpActivatedAt] = useState(null);
+  const [stoppingFollowUp, setStoppingFollowUp] = useState(false);
+  const [followUpStopError, setFollowUpStopError] = useState("");
   const [transferNotes, setTransferNotes] = useState("");
   const [admissionDate, setAdmissionDate] = useState(getToday);
   const [dischargeDate, setDischargeDate] = useState("");
@@ -403,7 +413,7 @@ export const Patients = ({
     currentUser.role === "CAS" ? currentUser.id : "all",
   );
   const [gvpPatientScope, setGvpPatientScope] = useState("mine");
-  const [statusFilter, setStatusFilter] = useState("Ricoverato");
+  const [statusFilter, setStatusFilter] = useState(followUpOnly ? "Dimesso" : "Ricoverato");
   const [notes, setNotes] = useState("");
   const [details, setDetails] = useState({ isMinorOrNewborn: "No" });
   const [departmentHistory, setDepartmentHistory] = useState([]);
@@ -429,6 +439,7 @@ export const Patients = ({
   const [externalDepartmentTransferDestination, setExternalDepartmentTransferDestination] = useState("");
   const [externalDepartmentTransferError, setExternalDepartmentTransferError] = useState("");
   const [transferAutoSavePending, setTransferAutoSavePending] = useState(false);
+  const [statusAutoSavePending, setStatusAutoSavePending] = useState(false);
   const [departmentSearch, setDepartmentSearch] = useState("");
   const [departmentChangeDate, setDepartmentChangeDate] = useState(getToday);
   const [casSelectionModalOpen, setCasSelectionModalOpen] = useState(false);
@@ -471,8 +482,7 @@ export const Patients = ({
   const canDeleteTransfer = transferTarget?.type === "form"
     ? patientStatus === "Trasferito"
     : transferTargetPatient?.status === "Trasferito";
-  const organizationPatients = patients
-    .filter((patient) => patient.presidentId === presidentId)
+  const organizationPatients = getPatientsForView(patients, currentUser, presidentId, followUpOnly)
     .map(maskClosedPatientForDisplay);
   const roleFilteredPatients = isGvp
     ? organizationPatients.filter((patient) => {
@@ -681,6 +691,9 @@ export const Patients = ({
     setLastName("");
     setAdmissionType("emergency");
     setPatientStatus("");
+    setFollowUpEnabled(false);
+    setFollowUpActivatedAt(null);
+    setFollowUpStopError("");
     setTransferNotes("");
     setAdmissionDate(getToday());
     setDischargeDate("");
@@ -961,6 +974,7 @@ export const Patients = ({
       lastName: normalizedLastName,
       admissionType: ADMISSION_TYPES.includes(admissionType) ? admissionType : "emergency",
       status: PATIENT_RECORD_STATUSES.includes(patientStatus) ? patientStatus : "",
+      followUpEnabled: patientStatus === "Dimesso" && followUpEnabled,
       transferNotes: patientStatus === "Trasferito" ? transferNotes.trim() : "",
       admissionDate,
       dischargeDate,
@@ -1007,6 +1021,12 @@ export const Patients = ({
     setTransferAutoSavePending(false);
     savePatient();
   }, [transferAutoSavePending]);
+
+  useEffect(() => {
+    if (!statusAutoSavePending) return;
+    setStatusAutoSavePending(false);
+    savePatient();
+  }, [statusAutoSavePending]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -1066,6 +1086,8 @@ export const Patients = ({
     setPatientStatus(
       PATIENT_RECORD_STATUSES.includes(patient.status) ? patient.status : "",
     );
+    setFollowUpEnabled(patient.status === "Dimesso" && Boolean(patient.followUpEnabled));
+    setFollowUpActivatedAt(getFollowUpActivationDate(patient));
     setTransferNotes(patient.transferNotes || "");
     setAdmissionDate(patient.admissionDate || getToday());
     setDischargeDate(patient.dischargeDate || "");
@@ -1102,6 +1124,27 @@ export const Patients = ({
     });
   };
 
+  const stopFollowUp = async () => {
+    if (!editingId || stoppingFollowUp) return;
+    setStoppingFollowUp(true);
+    setFollowUpStopError("");
+    const confirmed = await confirmAction("Vuoi interrompere il follow up del paziente? Il paziente resterà dimesso nella lista Pazienti.", {
+      title: "Interrompi follow-up", confirmLabel: "Interrompi follow-up",
+    });
+    if (!confirmed) {
+      setStoppingFollowUp(false);
+      return;
+    }
+    Meteor.call("hlc.stopPatientFollowUp", editingId, (methodError) => {
+      setStoppingFollowUp(false);
+      if (methodError) {
+        setFollowUpStopError(methodError.reason || "Impossibile interrompere il follow up.");
+        return;
+      }
+      resetForm();
+    });
+  };
+
   const handleDelete = async () => {
     const patient = patients.find((item) => item.id === editingId);
 
@@ -1123,9 +1166,10 @@ export const Patients = ({
   const updatePatientStatus = async (patientId, status) => {
     if (status !== "" && !PATIENT_STATUSES.includes(status)) return;
     const patient = patients.find((item) => item.id === patientId);
+    let closure = null;
     if (["Dimesso", "Deceduto"].includes(status) && patient?.status !== status) {
-      const confirmed = await confirmAction(`Impostare il paziente come ${status}? Dopo la conferma il paziente non sarà più modificabile.`);
-      if (!confirmed) return;
+      closure = await confirmPatientClosure(status, confirmAction);
+      if (!closure) return;
     }
     if (status === "Trasferito") {
       if (!patient) return;
@@ -1135,15 +1179,19 @@ export const Patients = ({
       return;
     }
     setPatients((current) => current.map((patient) =>
-      patient.id === patientId ? { ...patient, status, transferNotes: "" } : patient,
+      patient.id === patientId ? {
+        ...patient, status, transferNotes: "",
+        followUpEnabled: status === "Dimesso" && (closure?.followUpEnabled ?? Boolean(patient.followUpEnabled)),
+      } : patient,
     ));
     if (statusFilter !== "all" && statusFilter !== status) setStatusFilter("all");
   };
 
   const requestFormStatusChange = async (status) => {
+    let closure = null;
     if (["Dimesso", "Deceduto"].includes(status) && patientStatus !== status) {
-      const confirmed = await confirmAction(`Impostare il paziente come ${status}? Dopo la conferma il paziente non sarà più modificabile.`);
-      if (!confirmed) return;
+      closure = await confirmPatientClosure(status, confirmAction);
+      if (!closure) return;
     }
     if (status === "Trasferito") {
       setTransferTarget({ type: "form" });
@@ -1152,8 +1200,10 @@ export const Patients = ({
       return;
     }
     setPatientStatus(status);
+    setFollowUpEnabled(status === "Dimesso" && (closure?.followUpEnabled ?? followUpEnabled));
     setTransferNotes("");
     setError("");
+    if (closure && editingId) setStatusAutoSavePending(true);
   };
 
   const closeTransferModal = () => {
@@ -1381,6 +1431,7 @@ export const Patients = ({
     { label: "DAT registrata?", value: details.datRegistered },
     { label: "Tipo di accesso", value: admissionType === MASKED_VALUE ? MASKED_VALUE : admissionTypeLabel(admissionType) },
     { label: "Stato", value: patientStatus },
+    ...(patientStatus === "Dimesso" && followUpEnabled ? [{ label: "Data attivazione follow up", value: formatFollowUpActivationDate(followUpActivatedAt) }] : []),
     ...(patientStatus === "Trasferito" ? [{ label: "Dove è stato trasferito", value: transferNotes }] : []),
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
     { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join("\n") : "Nessun medico consigliato" },
@@ -1396,7 +1447,7 @@ export const Patients = ({
   ];
 
   const getSharingSummaryValue = (field) => {
-    if (CLOSED_PATIENT_STATUSES.includes(patientStatus) && CLOSED_PATIENT_HIDDEN_FIELDS.includes(field)) return MASKED_VALUE;
+    if (CLOSED_PATIENT_STATUSES.includes(patientStatus) && !isFollowUpPatient({ status: patientStatus, followUpEnabled }) && CLOSED_PATIENT_HIDDEN_FIELDS.includes(field)) return MASKED_VALUE;
     if (field === "firstName") return firstName;
     if (field === "lastName") return lastName;
     if (field === "admissionType") return admissionTypeLabel(admissionType);
@@ -1447,9 +1498,9 @@ export const Patients = ({
       <div className="app-content-header patient-page-header">
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between gap-3">
-            <div><h1 className="mb-1">Pazienti</h1><p className="text-secondary mb-0">Gestisci le informazioni, le assegnazioni e lo storico dei pazienti.</p></div>
+            <div><h1 className="mb-1">{followUpOnly ? "Follow up" : "Pazienti"}</h1><p className="text-secondary mb-0">{followUpOnly ? "Consulta tutti i dati e lo storico dei pazienti dimessi con follow up attivo." : "Gestisci le informazioni, le assegnazioni e lo storico dei pazienti."}</p></div>
             <div className="d-flex align-items-center gap-2 flex-nowrap patient-header-actions">
-              <select
+              {!followUpOnly && <select
                 className="form-select w-auto flex-shrink-0"
                 aria-label="Filtra pazienti per stato"
                 value={statusFilter}
@@ -1460,14 +1511,14 @@ export const Patients = ({
                 {PATIENT_STATUSES.map((status) => (
                   <option key={status} value={status}>{status}</option>
                 ))}
-              </select>
+              </select>}
               {isGvp && (
                 <select className="form-select w-auto flex-shrink-0" aria-label="Filtra pazienti del GVP" value={gvpPatientScope} onChange={(event) => setGvpPatientScope(event.target.value)}>
                   <option value="mine">I miei pazienti</option>
                   <option value="all">Tutti i pazienti</option>
                 </select>
               )}
-              {!isGvp && currentUser.role === "CAS" && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra pazienti per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
+              {!followUpOnly && !isGvp && currentUser.role === "CAS" && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra pazienti per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
                 <option value={currentUser.id}>I miei pazienti</option>
                 <option value="all">Tutti i pazienti</option>
                 {visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{formatCasUserLabel(casUser)}</option>)}
@@ -1579,9 +1630,10 @@ export const Patients = ({
               <div className="card-header">
                 <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
                   <h2 className="card-title mb-0" id="patient-modal-title">
-                    {isEditing ? "Modifica paziente" : "Inserisci paziente"}
+                    {followUpOnly ? "Paziente in follow up" : isEditing ? "Modifica paziente" : "Inserisci paziente"}
                   </h2>
                   <div className="d-flex align-items-center gap-2 ms-auto patient-header-status">
+                    {!(patientStatus === "Dimesso" && followUpEnabled) && <>
                     <label className="form-label mb-0" htmlFor="patient-header-status">Stato</label>
                     <select
                       className="form-select form-select-sm w-auto"
@@ -1596,6 +1648,19 @@ export const Patients = ({
                         <option key={status} value={status}>{status}</option>
                       ))}
                     </select>
+                    </>}
+                    {patientStatus === "Dimesso" && followUpEnabled && (
+                      <div className="patient-header-follow-up d-flex flex-wrap align-items-center gap-2"><span className="badge text-bg-primary">
+                        Follow-up attivo{followUpActivatedAt ? ` dal ${formatFollowUpActivationDate(followUpActivatedAt)}` : " — data non disponibile"}
+                      </span>
+                        {editingId && canViewPatientFollowUp(currentUser, patients.find((patient) => patient.id === editingId)) && (
+                          <button className="btn btn-outline-danger btn-sm" type="button" onClick={stopFollowUp} disabled={stoppingFollowUp}>
+                            {stoppingFollowUp ? "Interruzione…" : "Interrompi follow-up"}
+                          </button>
+                        )}
+                        {followUpStopError && <div className="text-danger w-100" role="alert">{followUpStopError}</div>}
+                      </div>
+                    )}
                   </div>
                   <button
                     className="btn-close"
@@ -2913,6 +2978,7 @@ export const Patients = ({
                       <th>Accesso</th>
                       <th>Stato</th>
                       <th>Data</th>
+                      {followUpOnly && <th>Data attivazione follow up</th>}
                       <th>CAS</th>
                       <th>GVP</th>
                       <th className="text-center patient-actions-column">Azioni</th>
@@ -2921,7 +2987,7 @@ export const Patients = ({
                   <tbody>
                     {visiblePatients.length === 0 ? (
                       <tr>
-                        <td className="text-center text-secondary py-4" colSpan={isGvp ? 2 : 7}>
+                        <td className="text-center text-secondary py-4" colSpan={isGvp ? 2 : followUpOnly ? 8 : 7}>
                           Nessun paziente inserito.
                         </td>
                       </tr>
@@ -2968,7 +3034,10 @@ export const Patients = ({
                             }}
                           >
                             <td className="fw-medium" data-label="Paziente">
-                              {formatPatientListName(patient)}
+                              <div className="patient-name-line">
+                                <span>{formatPatientListName(patient)}</span>
+                                {isFollowUpPatient(patient) && <span className="badge text-bg-primary d-md-none patient-follow-up-badge">Follow up attivo</span>}
+                              </div>
                               <PatientMobileLocation patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} />
                             </td>
                             <td data-label="Accesso">
@@ -3000,6 +3069,9 @@ export const Patients = ({
                                   <option key={status} value={status}>{status}</option>
                                 ))}
                               </select>
+                              {patient.status === "Dimesso" && patient.followUpEnabled && (
+                                <span className="badge text-bg-primary mt-1">Follow up attivo</span>
+                              )}
                             </td>
                             <td data-label="Data">
                               {patient.admissionDate === MASKED_VALUE
@@ -3012,6 +3084,9 @@ export const Patients = ({
                                   )
                                 : "-"}
                             </td>
+                            {followUpOnly && <td data-label="Data attivazione follow up">
+                              {formatFollowUpActivationDate(getFollowUpActivationDate(patient))}
+                            </td>}
                             <td data-label="CAS">
                               {casUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{casUsers.map((casUser) => <span className="badge text-bg-success" key={casUser.id}><CasRoleBadge user={casUser} />{casUser.username}</span>)}</div> : (
                                 <span className="badge text-bg-warning">

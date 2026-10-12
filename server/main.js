@@ -5,6 +5,8 @@ import { Random } from "meteor/random";
 import { check, Match } from "meteor/check";
 import webpush from "web-push";
 import nodemailer from "nodemailer";
+import { buildEmailHtml } from "./emailTemplate.js";
+import { canViewPatientFollowUp, getFollowUpPatientSelector, isFollowUpPatient, NON_FOLLOW_UP_PATIENT_SELECTOR, withFollowUpActivationDate } from "../imports/api/patientFollowUp.js";
 import {
   AccessLogsCollection,
   LoginMessagesCollection,
@@ -280,7 +282,14 @@ export const sendConfiguredEmail = async ({ to, subject, text, html }) => {
     ...(settings.replyTo ? { replyTo: settings.replyTo } : {}),
     subject,
     text,
-    ...(html ? { html } : {}),
+    html: buildEmailHtml({ subject, text, html }),
+    attachments: [{
+      filename: "hlc-scheduler-logo.jpg",
+      content: Buffer.from(await Assets.getBinaryAsync("images/hlc-scheduler-logo.jpg")),
+      contentType: "image/jpeg",
+      contentDisposition: "inline",
+      cid: "hlc-scheduler-logo",
+    }],
   });
 };
 const requirePageEdit = (actor, pageId) => {
@@ -296,6 +305,11 @@ const getGvpPatientSharedFields = async (presidentId) => {
 };
 
 const CLOSED_PATIENT_STATUSES = ["Dimesso", "Deceduto", "Trasferito"];
+const requireFollowUpPatientAccess = (actor, patient) => {
+  if (isFollowUpPatient(patient) && !canViewPatientFollowUp(actor, patient)) {
+    throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
+  }
+};
 const getClosedPatientHiddenFields = async () => ["firstName", "lastName"];
 
 const gvpPatientProjection = (sharedFields) => Object.fromEntries([
@@ -331,7 +345,7 @@ const pickGvpPatientFields = (patient, sharedFields) => {
 };
 
 const maskClosedPatientFields = (patient, hiddenFields) => {
-  if (!patient || !CLOSED_PATIENT_STATUSES.includes(patient.status)) return patient;
+  if (!patient || !CLOSED_PATIENT_STATUSES.includes(patient.status) || isFollowUpPatient(patient)) return patient;
   const masked = { ...patient, details: { ...(patient.details || {}) } };
   hiddenFields.forEach((path) => setNestedValue(masked, path, "********"));
   if (Array.isArray(patient.changeHistory)) {
@@ -400,7 +414,7 @@ const buildPatientChangeHistory = ({ existing, updated, actor }) => {
 const standardPatientProjection = (hiddenFields = []) => {
   const projection = Object.fromEntries([
     "presidentId", "casId", "casIds", "gvpId", "gvpIds", "firstName", "lastName",
-    "admissionDate", "dischargeDate", "admissionType", "status", "transferNotes", "pathology",
+    "admissionDate", "dischargeDate", "admissionType", "status", "followUpEnabled", "followUpActivatedAt", "transferNotes", "pathology",
     "doctorId", "details.sex", "details.maidenName", "details.departmentId", "details.hospitalRoom",
     "details.hospitalBed", "details.anesthesiologistDate", "details.anesthesiologistTime",
     "details.anesthesiologistName",
@@ -703,8 +717,8 @@ Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
       const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
       const closedGvpFields = sharedPatientFields.filter((field) => !closedPatientHiddenFields.includes(field));
       await publishPatientCursors(this, [
-        PatientsCollection.find({ presidentId, status: { $nin: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] }, { fields: gvpPatientProjection(sharedPatientFields) }),
-        PatientsCollection.find({ presidentId, status: { $in: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] }, { fields: gvpPatientProjection(closedGvpFields) }),
+        PatientsCollection.find({ presidentId, ...NON_FOLLOW_UP_PATIENT_SELECTOR, status: { $nin: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] }, { fields: gvpPatientProjection(sharedPatientFields) }),
+        PatientsCollection.find({ presidentId, ...NON_FOLLOW_UP_PATIENT_SELECTOR, status: { $in: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] }, { fields: gvpPatientProjection(closedGvpFields) }),
       ]);
     }
     if (wants("users")) {
@@ -724,12 +738,14 @@ Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
   }
 
   const cursors = [];
-  if (wants("patients")) {
+  if (wants("patients") || wants("follow-up")) {
     const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
-    await publishPatientCursors(this, [
-      PatientsCollection.find({ ...dataSelector, status: { $nin: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection() }),
-      PatientsCollection.find({ ...dataSelector, status: { $in: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection(closedPatientHiddenFields) }),
-    ]);
+    const patientCursors = wants("patients") ? [
+      PatientsCollection.find({ ...dataSelector, ...NON_FOLLOW_UP_PATIENT_SELECTOR, status: { $nin: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection() }),
+      PatientsCollection.find({ ...dataSelector, ...NON_FOLLOW_UP_PATIENT_SELECTOR, status: { $in: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection(closedPatientHiddenFields) }),
+    ] : [];
+    patientCursors.push(PatientsCollection.find(getFollowUpPatientSelector(actor)));
+    await publishPatientCursors(this, patientCursors);
   }
   if (wants("users")) cursors.push(Meteor.users.find(userSelector, { fields: publicUserFields }));
   if (wants("hospitals")) cursors.push(HospitalsCollection.find(dataSelector));
@@ -1373,7 +1389,8 @@ Meteor.methods({
       presidentId,
       ...(role === "GVP" ? { $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] } : {}),
     });
-    if (!patient || !["Presidente", "CAS", "GVP"].includes(role)) {
+    if (!patient || !["Presidente", "CAS", "GVP"].includes(role)
+      || (isFollowUpPatient(patient) && !canViewPatientFollowUp(actor, patient))) {
       throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
     }
     if (role === "GVP") {
@@ -1382,6 +1399,29 @@ Meteor.methods({
       return maskClosedPatientFields(pickGvpPatientFields(patient, sharedFields), hiddenFields);
     }
     return maskClosedPatientFields(patient, await getClosedPatientHiddenFields(presidentId));
+  },
+
+  async "hlc.stopPatientFollowUp"(patientId) {
+    requireUser(this);
+    check(patientId, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const selector = { _id: patientId, ...getFollowUpPatientSelector(actor) };
+    const patient = await PatientsCollection.findOneAsync(selector);
+    if (!patient || !canViewPatientFollowUp(actor, patient)) {
+      throw new Meteor.Error("not-authorized", "Follow up non disponibile per il tuo profilo.");
+    }
+    const now = new Date();
+    const historyEntries = buildPatientChangeHistory({
+      existing: { followUpEnabled: true, followUpStoppedAt: patient.followUpStoppedAt },
+      updated: { followUpEnabled: false, followUpStoppedAt: now },
+      actor,
+    });
+    const updated = await PatientsCollection.updateAsync(selector, {
+      $set: { followUpEnabled: false, followUpStoppedAt: now, updatedAt: now },
+      $push: { changeHistory: { $each: historyEntries } },
+    });
+    if (!updated) throw new Meteor.Error("follow-up-inactive", "Il follow up è già stato interrotto.");
+    return true;
   },
 
   async "hlc.updateTransferredPatientNotes"(patientId, transferNotes) {
@@ -1580,6 +1620,7 @@ Meteor.methods({
         : {}),
     };
     const patient = await PatientsCollection.findOneAsync(patientSelector);
+    requireFollowUpPatientAccess(actor, patient);
     if (!patient) {
       throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
     }
@@ -1620,7 +1661,7 @@ Meteor.methods({
       }
     }
 
-    if (["CAS", "Presidente"].includes(actorRole)) {
+    if (["CAS", "Presidente"].includes(actorRole) && !isFollowUpPatient(patient)) {
       const assignedGvpIds = getAssignedGvpIds(patient);
       for (const gvpId of assignedGvpIds) {
         const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
@@ -1659,6 +1700,7 @@ Meteor.methods({
         : {}),
       gvpNotes: { $elemMatch: { id: noteId, authorId: this.userId } },
     });
+    requireFollowUpPatientAccess(actor, patient);
     if (!patient) {
       throw new Meteor.Error("not-authorized", "Puoi eliminare soltanto le tue note.");
     }
@@ -1684,6 +1726,7 @@ Meteor.methods({
       ? actor._id
       : actor.profile?.presidentId || actor.profile?.associationId || "";
     const patient = await PatientsCollection.findOneAsync({ _id: patientId, presidentId });
+    requireFollowUpPatientAccess(actor, patient);
     if (!patient) throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
     const normalizedText = noteText.trim().slice(0, 4000);
     if (!normalizedText) throw new Meteor.Error("note-required", "Inserisci una nota CAS.");
@@ -1727,6 +1770,7 @@ Meteor.methods({
       presidentId,
       casNotes: { $elemMatch: { id: noteId, authorId: this.userId } },
     });
+    requireFollowUpPatientAccess(actor, patient);
     if (!patient) throw new Meteor.Error("not-authorized", "Puoi eliminare soltanto le tue note CAS.");
     await PatientsCollection.updateAsync(patientId, { $pull: { casNotes: { id: noteId, authorId: this.userId } } });
   },
@@ -1938,6 +1982,16 @@ Meteor.methods({
       throw new Meteor.Error("not-authorized", "Dati fuori dalla tua organizzazione.");
     }
     if (kind === "patients" && !this.hlcPatientAssignmentsAlreadyValidated) {
+      // I client che inviano l'intero elenco non possono sovrascrivere o eliminare
+      // pazienti in follow up che non sono autorizzati a vedere.
+      const protectedPatients = (await PatientsCollection.find({
+        ...(presidentId ? { presidentId } : {}), status: "Dimesso", followUpEnabled: true,
+      }).fetchAsync()).filter((patient) => !canViewPatientFollowUp(actor, patient));
+      const protectedIds = new Set(protectedPatients.map((patient) => patient._id));
+      records = [
+        ...records.filter((record) => !protectedIds.has(record.id || record._id)),
+        ...protectedPatients,
+      ];
       await validatePatientAssignments(records, presidentId);
     }
 
@@ -1963,9 +2017,12 @@ Meteor.methods({
       }).fetchAsync();
       const previousPatients = await PatientsCollection.find(
         { _id: { $in: recordIds }, ...(presidentId ? { presidentId } : {}) },
-        { fields: { casId: 1, casIds: 1, gvpId: 1, gvpIds: 1, status: 1 } },
+        { fields: { casId: 1, casIds: 1, gvpId: 1, gvpIds: 1, status: 1, followUpEnabled: 1, followUpActivatedAt: 1, changeHistory: 1 } },
       ).fetchAsync();
       const previousPatientsById = new Map(previousPatients.map((patient) => [patient._id, patient]));
+      if (!this.hlcPatientAssignmentsAlreadyValidated) {
+        records = records.map((record) => withFollowUpActivationDate(record, previousPatientsById.get(record.id || record._id)));
+      }
       for (const record of records) {
         const recordId = record.id || record._id;
         if (!recordId) continue;
@@ -2149,6 +2206,7 @@ Meteor.methods({
     const assistanceSession = impersonationSessions.get(impersonationConnectionTokens.get(this.connection?.id));
     const canDeleteClosedPatients = role === "Presidente" || assistanceSession?.targetId === this.userId;
     for (const removedId of changes.removedIds) {
+      requireFollowUpPatientAccess(actor, recordsById.get(removedId));
       if (CLOSED_PATIENT_STATUSES.includes(recordsById.get(removedId)?.status) && !canDeleteClosedPatients) {
         throw new Meteor.Error("patient-locked", "Un paziente concluso non può essere modificato o eliminato.");
       }
@@ -2161,17 +2219,19 @@ Meteor.methods({
       const recordId = record.id || record._id;
       const recordExists = recordsById.has(recordId);
       const existing = recordsById.get(recordId) || {};
+      requireFollowUpPatientAccess(actor, existing);
+      check(record.followUpEnabled, Match.Optional(Boolean));
       if (CLOSED_PATIENT_STATUSES.includes(existing.status)) {
         throw new Meteor.Error("patient-locked", "Un paziente concluso non può essere modificato o eliminato.");
       }
-      const mergedRecord = restoreProtectedPatientFields({
+      const mergedRecord = withFollowUpActivationDate(restoreProtectedPatientFields({
         ...existing,
         ...record,
         id: recordId,
         details: record.details === undefined ? existing.details : record.details,
         departmentHistory: record.departmentHistory === undefined ? existing.departmentHistory : record.departmentHistory,
         notes: record.notes === undefined ? existing.notes : record.notes,
-      }, existing, closedPatientHiddenFields);
+      }, existing, closedPatientHiddenFields), existing);
       const existingHistory = Array.isArray(existing.changeHistory) ? existing.changeHistory : [];
       mergedRecord.changeHistory = recordExists
         ? [...existingHistory, ...buildPatientChangeHistory({ existing, updated: mergedRecord, actor })]

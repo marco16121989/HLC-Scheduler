@@ -29,7 +29,9 @@ export const AdminEmailSettings = () => {
         return;
       }
       if (!settings) return;
-      setForm({ ...EMPTY_FORM, ...settings, password: "" });
+      setForm(Object.fromEntries(Object.keys(EMPTY_FORM).map((field) => [
+        field, field === "password" ? "" : settings[field] ?? EMPTY_FORM[field],
+      ])));
       setHasPassword(settings.hasPassword);
       setTestRecipient(settings.fromEmail || "");
     });

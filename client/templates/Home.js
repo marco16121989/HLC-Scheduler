@@ -68,6 +68,7 @@ const DATA_RESOURCES_BY_VIEW = {
   departments: ["hospitals", "departments"],
   doctors: ["hospitals", "doctors"],
   patients: ["users", "hospitals", "doctors", "patients", "absences"],
+  "follow-up": ["users", "hospitals", "doctors", "follow-up", "absences"],
   hospitality: ["hospitality"],
   "patient-reports": ["users", "hospitals", "patients"],
   "presentation-reports": ["presentations"],
@@ -540,6 +541,12 @@ export const Home = ({
                   </li>
                 </>
               )}
+              {canViewPage("follow-up") && <li className="nav-item menu-order-health">
+                <button className={`nav-link w-100 ${activeView === "follow-up" ? "active" : ""}`} type="button" onClick={() => openView("follow-up")}>
+                  <MenuIcon name="patient" />
+                  <p>Follow up</p>
+                </button>
+              </li>}
               {(user.role === "Presidente" || (user.role === "CAS" && user.isSecretary)) && <li className="nav-item menu-order-reports">
                 <button className={`nav-link w-100 ${activeView === "annual-report" ? "active" : ""}`} type="button" onClick={() => openView("annual-report")}>
                   <MenuIcon name="annualReport" />
@@ -668,8 +675,10 @@ export const Home = ({
             currentUser={user}
             readOnly={!canEditPage("doctors")}
           />
-        ) : activeView === "patients" && presidentId && canViewPage("patients") ? (
+        ) : ["patients", "follow-up"].includes(activeView) && presidentId && canViewPage(activeView) ? (
           <Patients
+            key={activeView}
+            followUpOnly={activeView === "follow-up"}
             patients={patients}
             setPatients={setPatients}
             doctors={doctors}
