@@ -2,6 +2,7 @@ import { useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
 import { normalizeHospital } from "../utils/hospitals.js";
 import { CasRoleBadge } from "./CasRoleBadge.js";
+import { DoctorContactSearch } from "./DoctorContactSearch.js";
 
 const DEFAULT_DEPARTMENTS = [
   "Anestesiologia", "Cardiochirurgia", "Centro ustioni", "Chirurgia colorettale",
@@ -39,6 +40,7 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [contactSearchOpen, setContactSearchOpen] = useState(false);
   const [departmentListHospital, setDepartmentListHospital] = useState(null);
   const [departmentListSearch, setDepartmentListSearch] = useState("");
 
@@ -268,8 +270,9 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
     <>
       <div className="app-content-header hospital-page-header">
         <div className="container-fluid">
-          <div className="d-flex align-items-center justify-content-between gap-3">
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div><h1 className="mb-1">Ospedali</h1><p className="text-secondary mb-0">{readOnly ? "Consulta le strutture ospedaliere e i relativi reparti." : "Gestisci le strutture ospedaliere e i relativi reparti."}</p></div>
+            <div className="d-flex flex-wrap gap-2 flex-shrink-0">
             {!readOnly && <button
               className="btn btn-primary"
               type="button"
@@ -277,12 +280,16 @@ export const Hospitals = ({ hospitals, setHospitals, departmentTemplates = [], d
             >
               Inserisci
             </button>}
+            <button className="btn btn-outline-primary" type="button" onClick={() => setContactSearchOpen(true)}>Cerca contatti</button>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="app-content hospital-page-content">
         <div className="container-fluid">
+          {contactSearchOpen && <DoctorContactSearch doctors={doctors} hospitals={hospitals} presidentId={presidentId}
+            mode="hospitals" onClose={() => setContactSearchOpen(false)} />}
           <div className="row g-3">
             {departmentListHospital && <>
               <button className="entity-modal-backdrop" type="button" aria-label="Chiudi elenco reparti" onClick={() => setDepartmentListHospital(null)} />

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
 import { PaginationControls, usePagination } from "./Pagination.js";
+import { DoctorContactSearch } from "./DoctorContactSearch.js";
 
 const doctorTypes = [
   "Consulente",
@@ -98,6 +99,7 @@ export const Doctors = ({
   const [noteDoctor, setNoteDoctor] = useState(null);
   const [newDoctorNote, setNewDoctorNote] = useState("");
   const [doctorNoteError, setDoctorNoteError] = useState("");
+  const [contactSearchOpen, setContactSearchOpen] = useState(false);
 
   const isEditing = editingId !== null;
   const visibleDoctors = doctors.filter(
@@ -385,8 +387,9 @@ export const Doctors = ({
     <>
       <div className="app-content-header">
         <div className="container-fluid">
-          <div className="d-flex align-items-center justify-content-between gap-3">
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div><h1 className="mb-1">Medici</h1><p className="text-secondary mb-0">{readOnly ? "Consulta i contatti dei medici e i reparti in cui operano." : "Gestisci i contatti dei medici e le indicazioni sugli studi in cui ricevono."}</p></div>
+            <div className="d-flex flex-wrap gap-2 flex-shrink-0">
             {!readOnly && <button
               className="btn btn-primary"
               type="button"
@@ -394,12 +397,15 @@ export const Doctors = ({
             >
               Inserisci
             </button>}
+            <button className="btn btn-outline-primary" type="button" onClick={() => setContactSearchOpen(true)}>Cerca contatti</button>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="app-content">
         <div className="container-fluid">
+          {contactSearchOpen && <DoctorContactSearch doctors={doctors} hospitals={hospitals} presidentId={presidentId} onClose={() => setContactSearchOpen(false)} />}
           {noteDoctor && <>
             <button className="entity-modal-backdrop" type="button" aria-label="Chiudi note operative" onClick={closeDoctorNotes} />
             <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="doctor-notes-title">
