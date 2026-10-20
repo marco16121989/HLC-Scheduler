@@ -30,13 +30,21 @@ describe("hlcScheduler", function () {
     assert.strictEqual(getDefaultPresidentId("GVP", manager, []), "pres-1");
   });
 
-  it("allows only the CAS secretary to access the annual report", function () {
+  it("allows the president and CAS secretary to access the annual report", function () {
+    assert.deepStrictEqual(
+      getPagePermission({ role: "Presidente" }, "annual-report"),
+      { view: true, edit: true },
+    );
     assert.deepStrictEqual(
       getPagePermission({ role: "CAS", isSecretary: true }, "annual-report"),
       { view: true, edit: true },
     );
     assert.deepStrictEqual(
       getPagePermission({ role: "CAS", isSecretary: false }, "annual-report"),
+      { view: false, edit: false },
+    );
+    assert.deepStrictEqual(
+      getPagePermission({ role: "GVP" }, "annual-report"),
       { view: false, edit: false },
     );
   });

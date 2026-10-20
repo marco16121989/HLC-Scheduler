@@ -1218,6 +1218,18 @@ svg.admin-nav-icon {
   gap: 1rem;
 }
 
+.contact-search-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  flex-shrink: 0;
+  font-family: Georgia, serif;
+  font-weight: 700;
+}
+
 .contact-search-hospital {
   border: 1px solid var(--bs-border-color, #dee2e6);
   border-radius: .75rem;

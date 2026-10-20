@@ -7,6 +7,7 @@ export const DoctorContactSearch = ({ doctors, hospitals, presidentId, onClose, 
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [copyStatus, setCopyStatus] = useState("");
+  const [infoOpen, setInfoOpen] = useState(false);
   const outputRef = useRef(null);
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(globalThis.document?.activeElement);
@@ -82,11 +83,22 @@ export const DoctorContactSearch = ({ doctors, hospitals, presidentId, onClose, 
     <button className="entity-modal-backdrop" type="button" aria-label="Chiudi ricerca contatti" onClick={onClose} tabIndex={-1} />
     <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="doctor-contact-search-title" onKeyDown={handleKeyDown} ref={dialogRef}>
       <section className="card entity-modal-card">
-        <div className="card-header d-flex align-items-center">
+        <div className="card-header d-flex align-items-center gap-2">
+          <button className="btn btn-outline-info rounded-circle contact-search-info" type="button"
+            aria-label="Come funziona la ricerca contatti" title="Come funziona"
+            aria-expanded={infoOpen} aria-controls="contact-search-help" onClick={() => setInfoOpen((current) => !current)}>
+            <span aria-hidden="true">i</span>
+          </button>
           <h2 className="card-title" id="doctor-contact-search-title">{hospitalSearch ? "Cerca ospedali e medici per reparto" : "Cerca e copia contatti medici"}</h2>
           <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={onClose} />
         </div>
         <div className="card-body">
+          {infoOpen && <div className="alert alert-info" id="contact-search-help">
+            <h3 className="h6">Come funziona</h3>
+            <p>Scrivi il nome di un reparto e selezionalo dai suggerimenti. Puoi scegliere più reparti: la ricerca include i medici associati ad almeno uno di quelli selezionati. Per rimuovere un reparto, premi la × accanto al suo nome.</p>
+            <p>Gli ospedali sono raggruppati in schede con i medici dei reparti scelti, il telefono e l’email disponibili. Gli ospedali senza medici corrispondenti non vengono mostrati. Se la ricerca non trova contatti, compare “Nessun risultato”.</p>
+            <p className="mb-0">Premi “Copia contatti” per copiare tutti i risultati come testo ordinato, senza asterischi, pronto da incollare in WhatsApp, email o altri messaggi.</p>
+          </div>}
           <label className="form-label" htmlFor="doctor-contact-query">Reparto <span className="text-danger">*</span></label>
           <div className="select2-style mb-3">
             <input className="form-control" id="doctor-contact-query" type="text" value={query}

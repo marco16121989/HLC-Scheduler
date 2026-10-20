@@ -14,7 +14,7 @@ export const getPagePermission = (user, pageId) => {
   if (user?.role === "Presidente" && pageId === "permissions") return { view: true, edit: true };
   if (["calendar", "profile", "absences", "donations"].includes(pageId)) return { view: true, edit: true };
   if (pageId === "annual-report") {
-    const view = user?.role === "CAS" && Boolean(user?.isSecretary);
+    const view = user?.role === "Presidente" || (user?.role === "CAS" && Boolean(user?.isSecretary));
     return { view, edit: view };
   }
   if (pageId === "support") {

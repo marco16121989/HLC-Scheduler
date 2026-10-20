@@ -739,7 +739,7 @@ export const Home = ({
             </div>
           </div>
         )}
-        <PageInfo activeView={activeView} />
+        {!pageLoading && <PageInfo key={`page-info-${activeView}`} activeView={activeView} />}
       </main>
 
       <footer className="app-footer">
