@@ -4267,6 +4267,52 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   .admin-chart-period-filter { width: 100%; margin-top: .75rem; }
   .admin-inline-legend { margin-top: .6rem; }
 }
+.admin-presidents-table tbody tr.admin-president-region {
+  display: table-row;
+}
+
+.admin-presidents-table .admin-president-region th {
+  padding: 0;
+  background: var(--bs-tertiary-bg, #f8f9fa);
+  color: var(--bs-primary);
+  font-size: 1rem;
+}
+
+.admin-president-region-toggle {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  width: 100%;
+  padding: .85rem 1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.admin-president-region-toggle:hover {
+  background: var(--bs-secondary-bg, #e9ecef);
+}
+
+@media (max-width: 767.98px) {
+  .admin-presidents-table tbody tr.admin-president-region {
+    display: block;
+    grid-column: 1 / -1;
+  }
+  .admin-presidents-table tbody tr.admin-president-region-empty {
+    display: block;
+    grid-column: 1 / -1;
+  }
+  .admin-presidents-table .admin-president-region-empty td {
+    display: block;
+  }
+  .admin-presidents-table .admin-president-region th {
+    display: block;
+    border-radius: .5rem;
+  }
+}
+
 .has-page-info { display: inline-block; vertical-align: middle; }
 .page-info-host { display: inline-flex; margin-left: .55rem; vertical-align: middle; }
 .page-info-button { display: inline-grid; width: 1.65rem; height: 1.65rem; padding: 0; place-items: center; border: 1.5px solid var(--bs-primary); border-radius: 50%; background: color-mix(in srgb,var(--bs-primary) 8%,var(--bs-body-bg)); color: var(--bs-primary); font-family: Georgia,serif; font-size: 1rem; font-weight: 800; line-height: 1; transition: transform .15s ease,background-color .15s ease,color .15s ease; }

@@ -5,6 +5,7 @@ import { confirmAction } from "./ConfirmDialog.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
 import { isProtectedPresidentAccount } from "/imports/constants/userProtection";
 import { CasRoleBadge, formatCasUserLabel } from "./CasRoleBadge.js";
+import { groupPresidentsByRegion } from "../../imports/utils/presidentRegions.js";
 
 const roles = ["Admin", "Presidente", "CAS", "GVP"];
 
@@ -199,6 +200,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
   const [mobileFormOpen, setMobileFormOpen] = useState(false);
   const [detailPresidentId, setDetailPresidentId] = useState(null);
   const [presidentSearch, setPresidentSearch] = useState("");
+  const [expandedPresidentRegions, setExpandedPresidentRegions] = useState([]);
 
   useEffect(() => {
     const role = managedRole || availableRoles[0];
@@ -752,6 +754,15 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
         return matchesHospital && matchesDepartment;
       });
 
+  const displayRows = manager?.role === "Admin"
+    ? groupPresidentsByRegion(filteredOrderedUsers, { includeAllRegions: true }).flatMap(({ region, users: presidents }) => [
+        { _regionHeading: true, region, count: presidents.length },
+        ...(expandedPresidentRegions.includes(region)
+          ? presidents.length ? presidents : [{ _emptyRegion: true, region }]
+          : []),
+      ])
+    : filteredOrderedUsers;
+
   return (
     <>
       <div className="app-content-header">
@@ -1093,7 +1104,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                         )}
                       </thead>
                       <tbody>
-                        {filteredOrderedUsers.length === 0 ? (
+                        {displayRows.length === 0 ? (
                           <tr>
                             <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "5" : managedRole ? "5" : "6"}>
                               {manager?.role === "Admin" && presidentSearch.trim()
@@ -1106,7 +1117,20 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                             </td>
                           </tr>
                         ) : (
-                          filteredOrderedUsers.map((user) => {
+                          displayRows.map((user) => {
+                            if (user._regionHeading) return <tr className="admin-president-region" key={`region:${user.region}`}>
+                              <th colSpan={5} scope="rowgroup">
+                                <button className="admin-president-region-toggle" type="button" aria-expanded={expandedPresidentRegions.includes(user.region)}
+                                  onClick={() => setExpandedPresidentRegions((current) => current.includes(user.region)
+                                    ? current.filter((region) => region !== user.region) : [...current, user.region])}>
+                                  <span aria-hidden="true">{expandedPresidentRegions.includes(user.region) ? "▾" : "▸"}</span>
+                                  <span>{user.region}</span><span className="badge text-bg-secondary ms-auto">{user.count}</span>
+                                </button>
+                              </th>
+                            </tr>;
+                            if (user._emptyRegion) return <tr className="admin-president-region-empty" key={`empty-region:${user.region}`}>
+                              <td colSpan={5} className="text-secondary p-3">{presidentSearch.trim() ? "Nessun presidente corrisponde alla ricerca in questa regione." : "Nessun presidente in questa regione."}</td>
+                            </tr>;
                             const associationLabel = getAssociationLabel(user);
                             const hospitalLabels = getHospitalLabels(user);
                             const casId = getCasId(user);
