@@ -1,7 +1,7 @@
-// La data di accesso serve al calendario anche quando i campi facoltativi
+// Le date di accesso e dimissione servono al calendario anche quando i campi facoltativi
 // condivisi con il GVP sono stati personalizzati dal Presidente.
 const REQUIRED_FIELDS = [
-  "presidentId", "casId", "casIds", "gvpId", "gvpIds", "gvpNotes", "transferNotes", "admissionDate",
+  "presidentId", "casId", "casIds", "gvpId", "gvpIds", "gvpNotes", "transferNotes", "admissionDate", "dischargeDate",
 ];
 
 export const gvpPatientProjection = (sharedFields) => Object.fromEntries(

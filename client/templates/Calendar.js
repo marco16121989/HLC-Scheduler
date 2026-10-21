@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Meteor } from "meteor/meteor";
+import { getPatientCalendarDateRange, isCalendarEventOnDate } from "../../imports/api/calendarPatientDates.js";
 import {
   DETAIL_SECTIONS,
   SIMPLIFIED_FIELDS,
@@ -40,9 +41,10 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
     const patientEvents = patients.flatMap((patient) => {
         const doctor = doctors.find((item) => item.id === patient.doctorId);
         const events = [];
-        if (patient.admissionDate) events.push({
+        const stayDates = getPatientCalendarDateRange(patient);
+        if (stayDates) events.push({
           id: `patient-${patient.id}`,
-          date: patient.admissionDate.slice(0, 10),
+          ...stayDates,
           type: "patient",
           patient,
           title: `${patient.lastName} ${patient.firstName}`,
@@ -118,7 +120,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
     const day = index - firstDayOffset + 1;
     cells.push(day >= 1 && day <= daysInMonth ? new Date(displayedMonth.getFullYear(), displayedMonth.getMonth(), day) : null);
   }
-  const selectedEvents = filteredEvents.filter((event) => event.date === selectedDate);
+  const selectedEvents = filteredEvents.filter((event) => isCalendarEventOnDate(event, selectedDate));
   const todayKey = dateKey(new Date());
   const selectedDateValue = parseDate(selectedDate);
   const startOfWeek = new Date(selectedDateValue);
@@ -310,7 +312,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
           <div className="calendar-grid calendar-days">{cells.map((date, index) => {
             if (!date) return <div className="calendar-day empty" key={`empty-${index}`} />;
             const key = dateKey(date);
-            const dayEvents = filteredEvents.filter((event) => event.date === key);
+            const dayEvents = filteredEvents.filter((event) => isCalendarEventOnDate(event, key));
             return <div className={`calendar-day ${key === selectedDate ? "selected" : ""} ${key === todayKey ? "today" : ""}`} key={key} role="button" tabIndex="0" onClick={() => setSelectedDate(key)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedDate(key); }} aria-label={`${date.getDate()}, ${dayEvents.length} eventi`}>
               <span className="calendar-day-number">{date.getDate()}</span>
               <span className="calendar-day-events">{dayEvents.slice(0, 3).map((event) => event.type === "patient" ? <button className={`calendar-event ${event.type}`} type="button" key={event.id} title={event.title} onClick={(clickEvent) => { clickEvent.stopPropagation(); openEvent(event); }}>{event.title}</button> : <span className={`calendar-event ${event.type}`} key={event.id} title={event.title}>{event.title}</span>)}{dayEvents.length > 3 && <span className="calendar-more">+{dayEvents.length - 3}</span>}</span>
@@ -318,7 +320,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
           })}</div></>}
           {viewMode === "week" && <div className="calendar-week-view">{weekDates.map((date) => {
             const key = dateKey(date);
-            const dayEvents = filteredEvents.filter((event) => event.date === key);
+            const dayEvents = filteredEvents.filter((event) => isCalendarEventOnDate(event, key));
             return <section className={`calendar-week-column ${key === todayKey ? "today" : ""}`} key={key}>
               <button className="calendar-week-date" type="button" onClick={() => { setSelectedDate(key); setViewMode("day"); }}><span>{WEEK_DAYS[(date.getDay() + 6) % 7]}</span><strong>{date.getDate()}</strong></button>
               <div className="calendar-week-events">{dayEvents.length ? dayEvents.map(renderEvent) : <span className="text-secondary small">Nessun evento</span>}</div>

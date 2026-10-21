@@ -1,11 +1,12 @@
 import assert from "assert";
 import { gvpPatientProjection, pickGvpPatientFields } from "../imports/api/gvpPatientVisibility.js";
 import { DEFAULT_GVP_PATIENT_SHARED_FIELDS, normalizeGvpPatientSharedFields } from "../imports/constants/gvpPatientSharing.js";
+import { getPatientCalendarDateRange, isCalendarEventOnDate } from "../imports/api/calendarPatientDates.js";
 
 describe("assigned GVP patient calendar data", function () {
   const patient = {
     _id: "patient-1", presidentId: "pres-1", gvpIds: ["gvp-1"],
-    firstName: "Mario", lastName: "Rossi", admissionDate: "2026-10-21",
+    firstName: "Mario", lastName: "Rossi", admissionDate: "2026-10-21", dischargeDate: "2026-10-24",
     pathology: "Private information", changeHistory: [{ field: "pathology" }],
     details: { anesthesiologistDate: "2026-10-22", healthProblems: "Private details" },
   };
@@ -18,8 +19,14 @@ describe("assigned GVP patient calendar data", function () {
     it(`preserves the calendar date with ${label}`, function () {
       const projection = gvpPatientProjection(fields);
       assert.strictEqual(projection.admissionDate, 1);
+      assert.strictEqual(projection.dischargeDate, 1);
       const visible = pickGvpPatientFields(patient, fields);
       assert.strictEqual(visible.admissionDate, patient.admissionDate);
+      assert.strictEqual(visible.dischargeDate, patient.dischargeDate);
+      const stay = getPatientCalendarDateRange(visible);
+      assert.ok(isCalendarEventOnDate(stay, "2026-10-22"));
+      assert.ok(isCalendarEventOnDate(stay, "2026-10-24"));
+      assert.ok(!isCalendarEventOnDate(stay, "2026-10-25"));
       assert.strictEqual(visible.admissionDate.slice(0, 10), "2026-10-21");
       assert.deepStrictEqual(visible.gvpIds, ["gvp-1"]);
       assert.strictEqual(visible.pathology, undefined);

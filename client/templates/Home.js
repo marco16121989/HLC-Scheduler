@@ -129,7 +129,12 @@ export const Home = ({
   const [activeView, setActiveView] = useState(() => globalThis.history?.state?.hlcView || "home");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsMenuRef = useRef(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+  const userMenuButtonRef = useRef(null);
   const unreadNotifications = notifications.filter((notification) => !notification.readAt);
+  const loggedInDisplayName = [user.firstName, user.lastName]
+    .map((part) => (part || "").trim()).filter(Boolean).join(" ") || user.username;
   const markNotificationRead = (notificationId) => Meteor.call("hlc.markNotificationAsRead", notificationId);
   const markAllNotificationsRead = () => Meteor.call("hlc.markAllNotificationsAsRead");
   const presidentId =
@@ -206,14 +211,21 @@ export const Home = ({
   }, []);
 
   useEffect(() => {
-    if (!notificationsOpen) return undefined;
+    if (!notificationsOpen && !userMenuOpen) return undefined;
     const closeOnOutsideClick = (event) => {
       if (!notificationsMenuRef.current?.contains(event.target)) {
         setNotificationsOpen(false);
       }
+      if (!userMenuRef.current?.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
     };
     const closeOnEscape = (event) => {
-      if (event.key === "Escape") setNotificationsOpen(false);
+      if (event.key === "Escape") {
+        setNotificationsOpen(false);
+        setUserMenuOpen(false);
+        if (userMenuOpen) userMenuButtonRef.current?.focus();
+      }
     };
     document.addEventListener("pointerdown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);
@@ -221,7 +233,7 @@ export const Home = ({
       document.removeEventListener("pointerdown", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [notificationsOpen]);
+  }, [notificationsOpen, userMenuOpen]);
 
   useEffect(() => {
     const desktopViewport = globalThis.matchMedia?.("(min-width: 992px)");
@@ -261,7 +273,7 @@ export const Home = ({
           <ul className="navbar-nav ms-auto align-items-center">
             {(["CAS", "Presidente", "GVP"].includes(user.role)) && (
               <li className="nav-item me-2 position-relative" ref={notificationsMenuRef}>
-                <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setNotificationsOpen((current) => !current)} aria-label="Mostra notifiche" aria-expanded={notificationsOpen}>
+                <button className="btn btn-outline-primary btn-sm header-action-button" type="button" onClick={() => { setUserMenuOpen(false); setNotificationsOpen((current) => !current); }} aria-label="Mostra notifiche" aria-expanded={notificationsOpen}>
                   🔔
                   {unreadNotifications.length > 0 && <span className="badge text-bg-danger ms-2">{unreadNotifications.length}</span>}
                 </button>
@@ -284,19 +296,31 @@ export const Home = ({
                 )}
               </li>
             )}
-            <li className="nav-item d-none d-sm-block">
-              <span className="nav-link admin-user-email">
-                {user.username} · {user.role}
-              </span>
-            </li>
-            <li className="nav-item">
+            <li className="nav-item position-relative" ref={userMenuRef}>
               <button
-                className="btn btn-outline-danger btn-sm"
+                className="btn btn-outline-primary btn-sm header-action-button"
                 type="button"
-                onClick={onLogout}
+                ref={userMenuButtonRef}
+                aria-label="Apri menu utente"
+                aria-expanded={userMenuOpen}
+                aria-controls="header-user-dropdown"
+                title="Account"
+                onClick={() => { setNotificationsOpen(false); setUserMenuOpen((current) => !current); }}
               >
-                Esci
+                <svg className="header-user-symbol" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="12" cy="8" r="3.5" />
+                  <path d="M5 20a7 7 0 0 1 14 0v.5H5z" />
+                </svg>
               </button>
+              {userMenuOpen && <div className="dropdown-menu show header-user-dropdown" id="header-user-dropdown" data-bs-theme="dark">
+                <div className="header-user-dropdown-heading">Account</div>
+                <strong className="header-current-user-name">{loggedInDisplayName}</strong>
+                <div className="header-user-dropdown-footer">
+                  <button className="header-user-logout" type="button" onClick={() => { setUserMenuOpen(false); onLogout(); }}>
+                    <span>Esci</span>
+                  </button>
+                </div>
+              </div>}
             </li>
           </ul>
         </div>

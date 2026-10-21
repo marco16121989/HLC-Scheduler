@@ -32,6 +32,7 @@ import { isProtectedPresidentAccount } from "/imports/constants/userProtection";
 import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
 import { normalizeGvpPatientSharedFields } from "/imports/constants/gvpPatientSharing";
 import { getGvpUsersSelector } from "../imports/api/userDirectory.js";
+import { buildUserProfileUpdate, hasUserProfileChanges } from "../imports/api/userProfileUpdates.js";
 import { gvpPatientProjection, pickGvpPatientFields } from "../imports/api/gvpPatientVisibility.js";
 
 const usefulFileExtensions = new Set([
@@ -2428,16 +2429,13 @@ Meteor.methods({
       }
 
       const changed =
-        account.username !== username ||
-        JSON.stringify(account.profile || {}) !== JSON.stringify(profile) ||
+        hasUserProfileChanges(account, username, profile) ||
         Boolean(record.password);
       if (changed) {
         if (!canManage(record)) {
           throw new Meteor.Error("not-authorized", "Utente fuori dalla tua squadra.");
         }
-        await Meteor.users.updateAsync(account._id, {
-          $set: { username, profile },
-        });
+        await Meteor.users.updateAsync(account._id, buildUserProfileUpdate(username, profile));
         if (record.password) {
           await Accounts.setPasswordAsync(account._id, record.password, {
             logout: false,

@@ -808,12 +808,74 @@ a {
   font-size: 1.25rem;
 }
 
-.admin-user-email {
-  max-width: 18rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.header-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 2rem;
+  background: #fff;
 }
+
+.header-user-logout:focus-visible {
+  outline: 2px solid #8ebcff;
+  outline-offset: 3px;
+}
+
+.header-user-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + .4rem);
+  width: min(12rem, calc(100vw - 2rem));
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #353c47;
+  border-radius: .5rem;
+  background: #171b21;
+  color: #f5f6f8;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 25%), 0 3px 8px rgb(0 0 0 / 12%);
+  z-index: 1100;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.header-user-dropdown-heading {
+  padding: .65rem .75rem .25rem;
+  color: #aeb6c2;
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.header-current-user-name {
+  display: block;
+  padding: 0 .75rem .65rem;
+  font-weight: 600;
+  font-size: .8rem;
+  line-height: 1.35;
+}
+
+.header-user-dropdown-footer {
+  padding: .25rem;
+  border-top: 1px solid #303640;
+  background: #13171c;
+}
+
+.header-user-logout {
+  width: 100%;
+  padding: .4rem .5rem;
+  border: 0;
+  border-radius: .5rem;
+  background: transparent;
+  color: #f2b0b0;
+  font-size: .75rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.header-user-logout:hover { background: #342329; color: #ffd4d4; }
 
 .sidebar-section-label {
   margin: 0.9rem 0.75rem 0.35rem;

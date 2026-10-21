@@ -6,6 +6,8 @@ import "./doctorContactSearch.test.js";
 import "./presidentRegions.test.js";
 import "./hospitalCoverage.test.js";
 import "./gvpPatientCalendar.test.js";
+import "./calendarPatientDates.test.js";
+import "./userProfilePermissions.test.js";
 import { getDefaultPresidentId } from "../client/templates/Users.js";
 import { isUserAssignedToDepartment } from "../client/templates/Hospitals.js";
 import { getPagePermission } from "../imports/constants/pagePermissions.js";
