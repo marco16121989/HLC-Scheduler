@@ -31,6 +31,8 @@ import { DEFAULT_DEPARTMENT_NAMES } from "/imports/constants/departments";
 import { isProtectedPresidentAccount } from "/imports/constants/userProtection";
 import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
 import { normalizeGvpPatientSharedFields } from "/imports/constants/gvpPatientSharing";
+import { getGvpUsersSelector } from "../imports/api/userDirectory.js";
+import { gvpPatientProjection, pickGvpPatientFields } from "../imports/api/gvpPatientVisibility.js";
 
 const usefulFileExtensions = new Set([
   "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
@@ -312,11 +314,6 @@ const requireFollowUpPatientAccess = (actor, patient) => {
 };
 const getClosedPatientHiddenFields = async () => ["firstName", "lastName"];
 
-const gvpPatientProjection = (sharedFields) => Object.fromEntries([
-  "presidentId", "casId", "casIds", "gvpId", "gvpIds", "gvpNotes", "transferNotes",
-  ...sharedFields,
-].map((field) => [field, 1]));
-
 const setNestedValue = (target, path, value) => {
   const parts = path.split(".");
   let cursor = target;
@@ -324,24 +321,6 @@ const setNestedValue = (target, path, value) => {
     if (index === parts.length - 1) cursor[part] = value;
     else cursor = cursor[part] ||= {};
   });
-};
-
-const pickGvpPatientFields = (patient, sharedFields) => {
-  const visible = {
-    _id: patient._id,
-    presidentId: patient.presidentId,
-    casId: patient.casId,
-    casIds: patient.casIds,
-    gvpId: patient.gvpId,
-    gvpIds: patient.gvpIds,
-    gvpNotes: patient.gvpNotes,
-    transferNotes: patient.transferNotes,
-  };
-  for (const path of sharedFields) {
-    const value = path.split(".").reduce((current, part) => current?.[part], patient);
-    if (value !== undefined) setNestedValue(visible, path, value);
-  }
-  return visible;
 };
 
 const maskClosedPatientFields = (patient, hiddenFields) => {
@@ -723,7 +702,7 @@ Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
     }
     if (wants("users")) {
       const canViewPermissions = getPagePermission({ ...actor.profile, role }, "permissions").view;
-      const gvpUsersSelector = canViewPermissions ? { $or: [{ _id: actor._id }, { "profile.presidentId": presidentId }, { "profile.associationId": presidentId }] } : { $or: [{ _id: actor._id }, { "profile.role": "CAS", "profile.presidentId": presidentId }, { "profile.role": "CAS", "profile.associationId": presidentId }] };
+      const gvpUsersSelector = getGvpUsersSelector(actor._id, presidentId, canViewPermissions);
       cursors.push(Meteor.users.find(gvpUsersSelector, { fields: publicUserFields }));
     }
     if (wants("hospitals")) cursors.push(HospitalsCollection.find({ presidentId }));
