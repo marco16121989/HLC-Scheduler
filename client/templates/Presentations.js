@@ -60,7 +60,7 @@ const Field = ({ label, name, value, onChange, type = "text", required = false, 
   </div>
 );
 
-export const Presentations = ({ presentations, setPresentations, currentUser, presidentId }) => {
+export const Presentations = ({ presentations, setPresentations, currentUser, presidentId, readOnly = false }) => {
   const [form, setForm] = useState(() => emptyPresentation(currentUser));
   const [editingId, setEditingId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -90,6 +90,7 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
   );
 
   const savePresentation = () => {
+    if (readOnly) return null;
     if (!form.presentationDate || !form.event.trim() || !form.casName.trim() || !form.casMember.trim()) {
       setError("Completa data, evento, nome CAS e membro CAS.");
       return null;
@@ -120,7 +121,7 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
     savePresentation();
   };
   const handleSaveAndOpen = async () => {
-    const saved = savePresentation();
+    const saved = readOnly ? form : savePresentation();
     if (!saved) return;
     const pdfWindow = globalThis.open("", "_blank");
     try {
@@ -141,6 +142,7 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
     setModalOpen(true);
   };
   const handleDelete = async () => {
+    if (readOnly) return;
     const item = presentations.find((presentation) => presentation.id === editingId);
     if (!item || !await confirmAction(`Eliminare la presentazione “${item.event}”?`)) return;
     setPresentations((current) => current.filter((presentation) => presentation.id !== editingId));
@@ -152,7 +154,7 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
       <div className="app-content-header">
         <div className="container-fluid d-flex align-items-center justify-content-between gap-3">
           <div><h1 className="mb-1">Presentazioni</h1><p className="text-secondary mb-0">Programma e consulta le presentazioni dell’organizzazione.</p></div>
-          <button className="btn btn-primary" type="button" onClick={() => { resetForm(); setModalOpen(true); }}>Crea presentazione</button>
+          {!readOnly && <button className="btn btn-primary" type="button" onClick={() => { resetForm(); setModalOpen(true); }}>Crea presentazione</button>}
         </div>
       </div>
       <div className="app-content">
@@ -161,13 +163,13 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
           <div className={modalOpen ? "entity-modal-shell" : "d-none"} role="dialog" aria-modal="true" aria-labelledby="presentation-modal-title">
             <section className="card entity-modal-card">
               <div className="card-header d-flex align-items-center">
-                <h2 className="card-title" id="presentation-modal-title">{isEditing ? "Modifica presentazione" : "Nuova presentazione"}</h2>
+                <h2 className="card-title" id="presentation-modal-title">{readOnly ? "Dettagli presentazione" : isEditing ? "Modifica presentazione" : "Nuova presentazione"}</h2>
                 <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={resetForm} />
               </div>
               <form onSubmit={handleSubmit}>
                 <div className="card-body">
                   {error && <div className="alert alert-danger py-2" role="alert">{error}</div>}
-                  <fieldset className="patient-detail-section mt-0">
+                  <fieldset disabled={readOnly} className="patient-detail-section mt-0">
                     <legend>Sezione 1 — Tipo di presentazione</legend>
                     <div className="row g-3">
                       <div className="col-12">
@@ -187,7 +189,7 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
                       <Field label="Commenti" name="comments" type="textarea" value={form.comments} onChange={update} />
                     </div>
                   </fieldset>
-                  <fieldset className="patient-detail-section">
+                  <fieldset disabled={readOnly} className="patient-detail-section">
                     <legend>Sezione 2 — Informazioni sulla presentazione</legend>
                     <div className="row g-3">
                       <Field label="Data della presentazione" name="presentationDate" type="date" value={form.presentationDate} onChange={update} required />
@@ -210,7 +212,7 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
                       <Field label="Esperienze positive" name="positiveExperiences" type="textarea" value={form.positiveExperiences} onChange={update} />
                     </div>
                   </fieldset>
-                  <fieldset className="patient-detail-section">
+                  <fieldset disabled={readOnly} className="patient-detail-section">
                     <legend>Sezione 3 — Dichiarazione CAS</legend>
                     <p className="text-secondary small">Con il salvataggio si dichiara che le persone indicate hanno consentito alla raccolta e alla gestione dei propri dati personali da parte del CAS.</p>
                     <div className="row g-3">
@@ -221,10 +223,10 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
                   </fieldset>
                 </div>
                 <div className="card-footer d-flex align-items-center gap-2 flex-wrap">
-                  {isEditing && <button className="btn btn-outline-danger me-auto" type="button" onClick={handleDelete}>Elimina</button>}
+                  {isEditing && !readOnly && <button className="btn btn-outline-danger me-auto" type="button" onClick={handleDelete}>Elimina</button>}
                   {isEditing && <button className="btn btn-outline-secondary" type="button" onClick={resetForm}>Annulla</button>}
-                  <button className="btn btn-outline-primary" type="button" onClick={handleSaveAndOpen}>Salva e apri HLC-33-I</button>
-                  <button className="btn btn-primary" type="submit">{isEditing ? "Salva modifiche" : "Crea"}</button>
+                  <button className="btn btn-outline-primary" type="button" onClick={handleSaveAndOpen}>{readOnly ? "Apri HLC-33-I" : "Salva e apri HLC-33-I"}</button>
+                  {!readOnly && <button className="btn btn-primary" type="submit">{isEditing ? "Salva modifiche" : "Crea"}</button>}
                 </div>
               </form>
             </section>
@@ -234,7 +236,7 @@ export const Presentations = ({ presentations, setPresentations, currentUser, pr
             <div className="card-body p-0"><div className="table-responsive"><table className="table table-hover align-middle mb-0 mobile-card-table presentation-list-table">
               <thead><tr><th>Data</th><th>Evento</th><th>Tipo</th><th>Presenti</th><th>Struttura</th><th className="text-end">Azioni</th></tr></thead>
               <tbody>{visiblePresentations.length === 0 ? <tr><td className="text-center text-secondary py-4" colSpan="6">Nessuna presentazione inserita.</td></tr> : presentationPagination.pageItems.map((item) => (
-                <tr className="presentation-clickable-row" key={item.id} role="button" tabIndex="0" onClick={() => handleEdit(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleEdit(item); } }}><td data-label="Data">{item.presentationDate ? new Intl.DateTimeFormat("it-IT").format(new Date(`${item.presentationDate}T00:00:00`)) : "-"}</td><td className="fw-medium" data-label="Evento">{item.event}</td><td data-label="Tipo">{item.presentationTypes?.join(", ") || "-"}</td><td data-label="Presenti">{item.attendeesCount || "-"}</td><td data-label="Struttura">{item.facility || "-"}</td><td className="text-end" data-label="Azioni"><button className="btn btn-outline-primary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); handleEdit(item); }}>Modifica</button></td></tr>
+                <tr className="presentation-clickable-row" key={item.id} role="button" tabIndex="0" onClick={() => handleEdit(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleEdit(item); } }}><td data-label="Data">{item.presentationDate ? new Intl.DateTimeFormat("it-IT").format(new Date(`${item.presentationDate}T00:00:00`)) : "-"}</td><td className="fw-medium" data-label="Evento">{item.event}</td><td data-label="Tipo">{item.presentationTypes?.join(", ") || "-"}</td><td data-label="Presenti">{item.attendeesCount || "-"}</td><td data-label="Struttura">{item.facility || "-"}</td><td className="text-end" data-label="Azioni"><button className="btn btn-outline-primary btn-sm" type="button" onClick={(event) => { event.stopPropagation(); handleEdit(item); }}>{readOnly ? "Apri" : "Modifica"}</button></td></tr>
               ))}</tbody>
             </table></div><PaginationControls {...presentationPagination} /></div>
           </section>

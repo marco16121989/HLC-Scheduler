@@ -2,17 +2,13 @@ import { useMemo, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { useTracker } from "meteor/react-meteor-data";
 import { AnnualReportsCollection } from "/imports/api/links";
+import { SPECIALIZATION_COLUMNS, normalizeSpecialization, countAnnualReportDoctors, refreshAnnualReportDoctors } from "/imports/api/annualReport.js";
 import { confirmAction } from "./ConfirmDialog.js";
 
-const SPECIALIZATION_COLUMNS = [
-  ["Anestesiologia", "Cardiochirurgia", "Centro ustioni", "Chirurgia colorettale", "Chirurgia generale", "Chirurgia orale e maxillo-facciale", "Chirurgia ortopedica", "Chirurgia toracica", "Chirurgia traumatologica", "Chirurgia vascolare", "Ematologia", "Gastroenterologia", "Ginecologia", "Ginecologia oncologica", "Medicina d’urgenza", "Medicina interna"],
-  ["Medicina ospedaliera", "Medico del travaglio", "Medico notturno", "Nefrologia", "Neonatologia", "Neurochirurgia", "Oncologia", "Ostetricia", "Otorinolaringoiatria e Chirurgia della testa e del collo", "Perinatologia (gravidanze ad alto rischio)", "Pneumologia", "Radiologia interventistica", "Terapia intensiva/Rianimazione", "Trapianti", "Urologia", "Altro"],
-];
-const normalizeSpecialization = (value) => String(value || "").replaceAll("'", "’").trim().toLocaleLowerCase("it");
 const today = () => new Date().toISOString().slice(0, 10);
 const formatDate = (value) => value ? new Intl.DateTimeFormat("it-IT").format(new Date(`${value}T00:00:00`)) : "-";
 
-export const AnnualReport = ({ presentations, users, currentUser, presidentId }) => {
+export const AnnualReport = ({ presentations, doctors, hospitals, users, currentUser, presidentId }) => {
   const currentYear = new Date().getFullYear();
   const { reports, reportsReady } = useTracker(() => {
     const subscription = Meteor.subscribe("hlc-annual-reports", presidentId);
@@ -31,14 +27,10 @@ export const AnnualReport = ({ presentations, users, currentUser, presidentId })
   const president = organizationUsers.find((user) => user.role === "Presidente");
   const availableYears = useMemo(() => Array.from(new Set([currentYear, ...presentations.filter((item) => item.presidentId === presidentId && item.presentationDate).map((item) => Number(String(item.presentationDate).slice(0, 4))).filter(Number.isInteger)])).sort((a, b) => b - a), [presentations, presidentId, currentYear]);
 
+  const specializationTotals = useMemo(() => countAnnualReportDoctors({ doctors, hospitals, presidentId }), [doctors, hospitals, presidentId]);
   const buildDraft = (year) => {
     const yearText = String(year);
     const yearPresentations = presentations.filter((item) => item.presidentId === presidentId && String(item.presentationDate || "").slice(0, 4) === yearText);
-    const specializationTotals = {};
-    yearPresentations.forEach((item) => {
-      const key = normalizeSpecialization(item.attendeeSpecialization || "Altro");
-      specializationTotals[key] = (specializationTotals[key] || 0) + (Number(item.attendeesCount) || 0);
-    });
     return {
       year: yearText,
       casName: president?.casMembership || yearPresentations.find((item) => item.casName)?.casName || president?.username || "-",
@@ -55,7 +47,8 @@ export const AnnualReport = ({ presentations, users, currentUser, presidentId })
     const firstUnsavedYear = availableYears.find((year) => !reports.some((report) => report.year === String(year))) || currentYear;
     setDraft(buildDraft(firstUnsavedYear)); setEditingReportId(null); setSentAt(null); setError(""); setModalOpen(true);
   };
-  const openSaved = (report) => {
+  const openSaved = (savedReport) => {
+    const report = refreshAnnualReportDoctors(savedReport, specializationTotals);
     setDraft({ year: report.year, casName: report.casName, casMemberCount: report.casMemberCount, gvpMemberCount: report.gvpMemberCount, presentationCount: report.presentationCount, specializationTotals: report.specializationTotals || {}, significantIssues: report.significantIssues || "", reportDate: report.reportDate || today(), casMember: report.casMember || currentUser.username || "" });
     setEditingReportId(report._id); setSentAt(report.sentAt || null); setError(""); setModalOpen(true);
   };
@@ -63,7 +56,8 @@ export const AnnualReport = ({ presentations, users, currentUser, presidentId })
   const update = (name, value) => { if (name === "year") setDraft(buildDraft(value)); else setDraft((current) => ({ ...current, [name]: value })); setError(""); };
   const pdfFor = async (report) => {
     const { createAnnualReportPdf } = await import("../utils/createAnnualReportPdf.js");
-    return createAnnualReportPdf({ ...report, specializationColumns: SPECIALIZATION_COLUMNS, totalFor: (specialization) => report.specializationTotals?.[normalizeSpecialization(specialization)] || 0 });
+    const pdfReport = refreshAnnualReportDoctors({ ...report, sentAt: report.sentAt || (report === draft ? sentAt : null) }, specializationTotals);
+    return createAnnualReportPdf({ ...pdfReport, specializationColumns: SPECIALIZATION_COLUMNS, totalFor: (specialization) => pdfReport.specializationTotals?.[normalizeSpecialization(specialization)] || 0 });
   };
   const download = async (report) => {
     const url = await pdfFor(report);
@@ -74,8 +68,9 @@ export const AnnualReport = ({ presentations, users, currentUser, presidentId })
     if (!draft.reportDate || !draft.casMember.trim()) return setError("Completa data e membro CAS.");
     setSaving(true); setError("");
     try {
-      await new Promise((resolve, reject) => Meteor.call("hlc.saveAnnualReport", draft, (methodError) => methodError ? reject(methodError) : resolve()));
-      await download(draft); setModalOpen(false); setDraft(null);
+      const report = { ...draft, specializationTotals };
+      await new Promise((resolve, reject) => Meteor.call("hlc.saveAnnualReport", report, (methodError) => methodError ? reject(methodError) : resolve()));
+      await download(report); setModalOpen(false); setDraft(null);
     } catch (saveError) { setError(saveError.reason || saveError.message || "Impossibile salvare il rapporto."); }
     finally { setSaving(false); }
   };
@@ -88,7 +83,9 @@ export const AnnualReport = ({ presentations, users, currentUser, presidentId })
     if (!confirmed) return;
     setSaving(true); setError("");
     try {
+      await new Promise((resolve, reject) => Meteor.call("hlc.saveAnnualReport", { ...draft, specializationTotals }, (methodError) => methodError ? reject(methodError) : resolve()));
       await new Promise((resolve, reject) => Meteor.call("hlc.markAnnualReportAsSent", editingReportId, (methodError) => methodError ? reject(methodError) : resolve()));
+      setDraft((current) => ({ ...current, specializationTotals }));
       setSentAt(new Date());
     } catch (sendError) { setError(sendError.reason || sendError.message || "Impossibile contrassegnare il rapporto come inviato."); }
     finally { setSaving(false); }

@@ -72,7 +72,7 @@ const DATA_RESOURCES_BY_VIEW = {
   hospitality: ["hospitality"],
   "patient-reports": ["users", "hospitals", "patients"],
   "presentation-reports": ["presentations"],
-  "annual-report": ["users", "presentations"],
+  "annual-report": ["users", "presentations", "doctors", "hospitals"],
   presentations: ["presentations"],
   cas: ["users", "hospitals"],
   gvp: ["users", "hospitals"],
@@ -720,9 +720,10 @@ export const Home = ({
         ) : activeView === "presentation-reports" && presidentId && canViewPage("presentation-reports") ? (
           <PresentationReports presentations={presentations} presidentId={presidentId} />
         ) : activeView === "annual-report" && presidentId && (user.role === "Presidente" || (user.role === "CAS" && user.isSecretary)) ? (
-          <AnnualReport presentations={presentations} users={users} currentUser={user} presidentId={presidentId} />
+          <AnnualReport doctors={doctors} hospitals={hospitals} presentations={presentations} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "presentations" && presidentId && canViewPage("presentations") ? (
           <Presentations
+            readOnly={!canEditPage("presentations")}
             presentations={presentations}
             setPresentations={setPresentations}
             currentUser={user}

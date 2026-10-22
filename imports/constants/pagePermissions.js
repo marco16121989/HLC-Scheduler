@@ -3,6 +3,7 @@ export const MANAGEABLE_PAGES = [
   ["events", "Eventi"], ["useful-files", "File utili"],
   ["cas", "CAS"], ["gvp", "GVP"],
   ["hospitals", "Ospedali"], ["departments", "Reparti"], ["doctors", "Medici"],
+  ["presentations", "Presentazioni"],
   ["hospitality", "Ospitalità"],
   ["patient-gvp-sharing", "Condivisione info pazienti con GVP"],
   ["permissions", "Permessi"],
@@ -31,7 +32,14 @@ export const getPagePermission = (user, pageId) => {
     const view = ["CAS", "GVP"].includes(user?.role);
     return { view, edit: user?.role === "CAS" };
   }
-  if (["presentations", "patient-reports", "presentation-reports"].includes(pageId)) {
+  if (pageId === "presentations") {
+    const view = ["Presidente", "CAS"].includes(user?.role);
+    const configured = user?.pagePermissions?.presentations;
+    return configured
+      ? { view: view && Boolean(configured.view), edit: view && Boolean(configured.view && configured.edit) }
+      : { view, edit: view };
+  }
+  if (["patient-reports", "presentation-reports"].includes(pageId)) {
     const view = user?.role === "CAS";
     return { view, edit: pageId === "presentations" && view };
   }
