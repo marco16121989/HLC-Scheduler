@@ -32,6 +32,7 @@ import { isProtectedPresidentAccount } from "/imports/constants/userProtection";
 import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
 import { normalizeGvpPatientSharedFields } from "/imports/constants/gvpPatientSharing";
 import { getGvpUsersSelector } from "../imports/api/userDirectory.js";
+import { legacyGvpOrganizationSelector } from "../imports/api/patientAssignmentUsers.js";
 import { buildUserProfileUpdate, hasUserProfileChanges } from "../imports/api/userProfileUpdates.js";
 import { gvpPatientProjection, pickGvpPatientFields } from "../imports/api/gvpPatientVisibility.js";
 
@@ -674,6 +675,9 @@ Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
         : null;
   const dataSelector = presidentId ? { presidentId } : role === "Admin" ? {} : { _id: null };
   if (wants("departments")) await ensureDefaultDepartments(presidentId);
+  const organizationCasIds = wants("users") && presidentId && ["Presidente", "CAS"].includes(role)
+    ? (await Meteor.users.find({ "profile.role": "CAS", $or: [{ "profile.presidentId": presidentId }, { "profile.associationId": presidentId }] }, { fields: { _id: 1 } }).fetchAsync()).map(user => user._id)
+    : [];
   const userSelector =
     role === "Admin"
       ? {}
@@ -686,6 +690,7 @@ Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
               { _id: presidentId },
               { "profile.presidentId": presidentId },
               { "profile.associationId": presidentId },
+              ...(["Presidente", "CAS"].includes(role) ? [legacyGvpOrganizationSelector(presidentId, organizationCasIds)] : []),
             ],
           }
         : { _id: actor._id };

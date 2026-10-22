@@ -4,6 +4,7 @@ export const MANAGEABLE_PAGES = [
   ["cas", "CAS"], ["gvp", "GVP"],
   ["hospitals", "Ospedali"], ["departments", "Reparti"], ["doctors", "Medici"],
   ["presentations", "Presentazioni"],
+  ["reports", "Report"],
   ["hospitality", "Ospitalità"],
   ["patient-gvp-sharing", "Condivisione info pazienti con GVP"],
   ["permissions", "Permessi"],
@@ -12,6 +13,11 @@ export const MANAGEABLE_PAGES = [
 export const getPagePermission = (user, pageId) => {
   if (pageId === "follow-up") return { view: ["Presidente", "CAS"].includes(user?.role), edit: false };
   if (user?.role === "Admin") return { view: true, edit: true };
+  if (pageId === "reports") {
+    const eligible = ["Presidente", "CAS"].includes(user?.role);
+    const configured = user?.pagePermissions?.reports;
+    return { view: eligible && (configured ? Boolean(configured.view) : true), edit: false };
+  }
   if (user?.role === "Presidente" && pageId === "permissions") return { view: true, edit: true };
   if (["calendar", "profile", "absences", "donations"].includes(pageId)) return { view: true, edit: true };
   if (pageId === "annual-report") {

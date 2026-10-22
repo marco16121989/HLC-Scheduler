@@ -12,6 +12,11 @@ const { defineConfig } = require("@meteorjs/rspack");
  */
 module.exports = defineConfig((Meteor) => {
   return {
+    // Avoid stale code-generation artifacts after HMR rebuilds on Windows.
+    ...(process.platform === "win32" && Meteor.isDevelopment ? {
+      cache: false,
+      experiments: { cache: false, incremental: false },
+    } : {}),
     module: {
       rules: [
         // Add support for importing SVGs as React components

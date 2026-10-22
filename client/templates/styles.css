@@ -1962,8 +1962,145 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 }
 
 @media (max-width: 767.98px) {
+  .annual-report-page-header {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .annual-report-page-header > .btn {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .annual-report-list-table tbody td[data-label="Anno"],
+  .annual-report-list-table tbody td[data-label="Ultimo aggiornamento"] {
+    grid-column: 1 / -1;
+  }
+
+  .annual-report-list-table tbody td[data-label="Anno"] {
+    background: var(--bs-tertiary-bg);
+    font-size: 1.1rem;
+  }
+
+  .annual-report-list-table.mobile-card-table tbody td[data-label="Azioni"] {
+    display: block;
+  }
+
+  .annual-report-list-table tbody td[data-label="Azioni"]::before {
+    display: none;
+  }
+
+  .annual-report-list-table tbody td[data-label="Azioni"] > .d-inline-flex {
+    flex-wrap: wrap;
+  }
+
+  .annual-report-list-table.mobile-card-table tbody td[data-label="Azioni"] .btn {
+    min-height: 2.75rem;
+  }
+
+  .annual-report-modal > .card-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .5rem;
+    background: var(--bs-body-bg);
+  }
+
+  .annual-report-modal > .card-header .card-title {
+    font-size: 1.05rem;
+  }
+
+  .annual-report-modal > .card-header .badge {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+    margin-left: 0 !important;
+    white-space: normal;
+  }
+
+  .annual-report-modal > .card-header .btn-close {
+    grid-column: 2;
+    grid-row: 1;
+    padding: .75rem;
+  }
+
+  .annual-report-modal > .card-body {
+    min-width: 0;
+    padding: .75rem;
+  }
+
+  .annual-report-modal > .card-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    background: var(--bs-body-bg);
+  }
+
+  .annual-report-modal > .card-footer .btn-primary {
+    grid-column: 1 / -1;
+  }
+
+  .annual-report-modal > .card-footer .btn {
+    width: 100%;
+    min-height: 2.75rem;
+    white-space: normal;
+  }
+
+  .annual-report-modal .form-control,
+  .annual-report-modal .form-select {
+    min-width: 0;
+    min-height: 2.75rem;
+    font-size: 1rem;
+  }
+
+  .annual-report-modal fieldset {
+    min-width: 0;
+  }
+
   .annual-report-sheet {
-    padding: 1rem;
+    min-width: 0;
+    margin-bottom: 0;
+    padding: .65rem;
+  }
+
+  .annual-report-sheet > h2 {
+    margin-bottom: 1rem;
+    font-size: 1.05rem;
+    overflow-wrap: anywhere;
+  }
+
+  .annual-report-section {
+    margin-top: 1rem;
+  }
+
+  .annual-report-section h3 small {
+    display: block;
+    margin-top: .25rem;
+  }
+
+  .annual-report-section-one > div,
+  .annual-report-specialization {
+    gap: .5rem;
+    padding: .5rem;
+    overflow-wrap: anywhere;
+  }
+
+  .annual-report-section-one > div > span,
+  .annual-report-specialization > span {
+    min-width: 0;
+  }
+
+  .annual-report-section-one strong {
+    max-width: 50%;
+  }
+
+  .annual-report-section-four label {
+    grid-template-columns: minmax(0, 1fr);
+    gap: .35rem;
   }
 
   .annual-report-section-one,
@@ -4098,6 +4235,58 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .patient-report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .patient-report-chart-card { min-width: 0; overflow: hidden; }
 .patient-pie-layout { display: grid; grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); align-items: center; gap: 1.25rem; }
+.activity-year-filter { display: grid; gap: .35rem; min-width: 11rem; }
+.activity-year-filter label { font-size: .8rem; font-weight: 600; color: var(--bs-secondary-color); }
+.activity-reports .patient-report-kpis article { min-width: 0; }
+.activity-report-note { font-size: .8rem; color: var(--bs-secondary-color); line-height: 1.5; }
+.activity-trend-card { min-width: 0; }
+.activity-trend { display: block; width: 100%; height: auto; margin: .75rem 0; overflow: visible; }
+.activity-trend text { fill: var(--bs-secondary-color); font-size: 11px; }
+.activity-grid-line { stroke: var(--bs-border-color); stroke-width: 1; }
+.activity-chart-legend { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .8rem; }
+.activity-chart-legend span { display: inline-flex; align-items: center; gap: .4rem; }
+.activity-chart-legend i { width: 1.25rem; height: .2rem; border-radius: 2px; }
+.activity-chart-legend i.is-previous { height: 0; border-top: 2px dashed #8793a5; }
+.activity-chart-empty { display: grid; place-items: center; min-height: 10rem; color: var(--bs-secondary-color); }
+.activity-chart-data { border-top: 1px solid var(--bs-border-color); padding-top: .65rem; font-size: .85rem; }
+.activity-chart-data summary { cursor: pointer; color: var(--bs-primary); padding: .4rem 0; }
+.activity-chart-data table { margin-top: .5rem; }
+.patient-combined-chart { padding: 1.5rem; border-radius: 1.25rem; box-shadow: 0 8px 30px rgb(30 50 90 / 5%); }
+.patient-combined-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.patient-chart-eyebrow { color: var(--bs-secondary-color); font-size: .68rem; font-weight: 700; letter-spacing: .14em; }
+.patient-combined-heading h2 { margin: .35rem 0; font-size: 1.35rem; font-weight: 700; letter-spacing: -.025em; }
+.patient-combined-heading p { margin: 0; font-size: .85rem; color: var(--bs-secondary-color); }
+.patient-chart-period { border-radius: 2rem; background: var(--bs-tertiary-bg); color: var(--bs-secondary-color); padding: .45rem .85rem; font-size: .8rem; white-space: nowrap; }
+.patient-combined-chart .activity-chart-legend { gap: .5rem 1rem; }
+.patient-combined-chart .activity-chart-legend span { padding: .35rem .65rem; border-radius: 2rem; background: var(--bs-tertiary-bg); }
+.patient-combined-chart .activity-chart-legend i { width: .55rem; height: .55rem; border-radius: 50%; }
+.patient-chart-canvas { position: relative; width: 100%; min-width: 0; margin-top: .75rem; }
+.patient-combined-chart .activity-trend { margin: 0; }
+.patient-combined-chart .activity-trend text { font-size: 12px; }
+.patient-combined-chart .activity-grid-line { stroke-dasharray: 3 6; opacity: .65; }
+.patient-chart-label-hidden { display: none; }
+.patient-chart-tooltip { position: absolute; top: 1rem; z-index: 1; width: 180px; padding: .8rem; border: 1px solid var(--bs-border-color); border-radius: .85rem; background: var(--bs-body-bg); box-shadow: 0 8px 24px rgb(0 0 0 / 12%); pointer-events: none; font-size: .75rem; }
+.patient-chart-tooltip > strong { display: block; margin-bottom: .5rem; }
+.patient-chart-tooltip > span { display: flex; align-items: center; gap: .4rem; margin-top: .35rem; }
+.patient-chart-tooltip i { width: .45rem; height: .45rem; border-radius: 50%; }
+.patient-chart-tooltip b { margin-left: auto; }
+.patient-combined-chart .activity-chart-data { margin-top: .65rem; }
+@media (max-width: 575.98px) {
+  .patient-combined-chart { padding: .9rem .6rem; border-radius: 1rem; }
+  .patient-combined-heading { padding-inline: .25rem; gap: .5rem; }
+  .patient-combined-heading h2 { font-size: 1.15rem; }
+  .patient-combined-chart .activity-chart-legend { gap: .35rem; font-size: .72rem; }
+  .patient-combined-chart .activity-chart-data { margin-inline: .25rem; }
+  .activity-year-filter { width: 100%; }
+  .activity-year-filter .form-select { min-height: 2.75rem; font-size: 1rem; }
+  .activity-reports .patient-report-kpis article > span { font-size: .78rem; }
+  .activity-reports .patient-report-kpis article > strong { font-size: 1.7rem; }
+  .activity-reports .card-title { font-size: 1rem; }
+  .activity-chart-data summary { min-height: 2.75rem; }
+  .activity-trend text { font-size: 17px; }
+  .activity-trend .activity-month-alternate { display: none; }
+}
+
 .patient-pie-wrap { position: relative; aspect-ratio: 1; }
 .patient-pie { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
 .patient-pie-base { fill: none; stroke: var(--bs-tertiary-bg); stroke-width: 8; }

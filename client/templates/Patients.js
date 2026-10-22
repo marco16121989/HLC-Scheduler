@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Meteor } from "meteor/meteor";
+import { getPatientAssignmentGvpUsers, getPatientAssignmentGvpLabel as getGvpDisplayName } from "/imports/api/patientAssignmentUsers.js";
 import { confirmAction } from "./ConfirmDialog.js";
 import { confirmPatientClosure } from "./patientStatusConfirmation.js";
 import { canViewPatientFollowUp, formatFollowUpActivationDate, getFollowUpActivationDate, getPatientsForView, isFollowUpPatient } from "../../imports/api/patientFollowUp.js";
@@ -580,11 +581,7 @@ export const Patients = ({
   }).filter((group) => group.doctors.length > 0);
   const assignedDoctorIds = new Set(doctorsByHospital.flatMap((group) => group.doctors.map((doctor) => doctor.id)));
   const doctorsWithoutHospital = searchedVisibleDoctors.filter((doctor) => !assignedDoctorIds.has(doctor.id));
-  const visibleGvpUsers = users.filter(
-    (user) =>
-      user.role === "GVP" &&
-      (user.presidentId || user.associationId) === presidentId,
-  );
+  const visibleGvpUsers = getPatientAssignmentGvpUsers(users, presidentId);
   const getAbsenceOnAdmissionDate = (userId) => Boolean(admissionDate) && absences.find(
     (absence) => absence.userId === userId &&
       absence.startDate <= admissionDate && absence.endDate >= admissionDate,
@@ -610,14 +607,6 @@ export const Patients = ({
   const filteredCasUsers = (casModalTab === "recommended" ? recommendedCasUsers : orderedCasUsers).filter((user) =>
     (user.username || "").toLowerCase().includes(casSearch.trim().toLowerCase()),
   );
-  const getGvpDisplayName = (user) => {
-    const firstName = user.firstName?.trim();
-    const lastName = user.lastName?.trim();
-    if (firstName || lastName) {
-      return [firstName, lastName].filter(Boolean).join(" ");
-    }
-    return user.username || "";
-  };
   const parseHistoryValue = (value) => {
     try { return JSON.parse(value); } catch { return value; }
   };
@@ -735,7 +724,8 @@ export const Patients = ({
   const openGvpSelectionModal = () => {
     setError("");
     setGvpSearch("");
-    setGvpModalTab("recommended");
+    setCasSelectionModalOpen(false);
+    setGvpModalTab("all");
     setGvpSelectionModalOpen(true);
   };
 
@@ -743,6 +733,7 @@ export const Patients = ({
     if (!selectedDepartment) return;
     setError("");
     setCasSearch("");
+    setGvpSelectionModalOpen(false);
     setCasModalTab("recommended");
     setCasSelectionModalOpen(true);
   };
@@ -907,6 +898,7 @@ export const Patients = ({
   };
 
   const toggleGvpSelection = (gvpUser) => {
+    if (!visibleGvpUsers.some(user => user.id === gvpUser.id)) return;
     setGvpIds((current) => current.includes(gvpUser.id)
       ? current.filter((id) => id !== gvpUser.id)
       : [...current, gvpUser.id]);
@@ -932,12 +924,7 @@ export const Patients = ({
       ? casIds.filter((selectedCasId) => visibleCasUsers.some((user) => user.id === selectedCasId))
       : [];
     const validCasId = validCasIds[0] || "";
-    const validGvpIds = gvpIds.filter((gvpUserId) => users.some(
-      (user) =>
-        user.id === gvpUserId &&
-        user.role === "GVP" &&
-        (user.presidentId || user.associationId) === presidentId,
-    ));
+    const validGvpIds = gvpIds.filter((gvpUserId) => visibleGvpUsers.some(user => user.id === gvpUserId));
     const resolvedDepartmentHistory = departmentHistory.length > 0 || !selectedDepartment
       ? departmentHistory
       : [{
@@ -1391,7 +1378,7 @@ export const Patients = ({
   const recommendedDoctors = visibleDoctors.filter((item) => recommendedDoctorIds.includes(item.id));
   const selectedCasUsers = users.filter((item) => casIds.includes(item.id));
   const selectedCasUser = selectedCasUsers[0];
-  const selectedGvpUsers = users.filter((item) => gvpIds.includes(item.id));
+  const selectedGvpUsers = visibleGvpUsers.filter((item) => gvpIds.includes(item.id));
   const sharingOptions = GVP_PATIENT_SUMMARY_FIELDS;
 
   const openSharingModal = () => {
@@ -2426,8 +2413,8 @@ export const Patients = ({
                                       <input className="form-check-input" type="checkbox" checked={gvpIds.includes(gvpUser.id)} onChange={() => toggleGvpSelection(gvpUser)} />
                                       <span className="form-check-label">
                                         {getGvpDisplayName(gvpUser)}
-                                        {gvpModalTab === "recommended" && casIds.some((selectedCasId) => isGvpAssignedToCas(gvpUser, selectedCasId)) && <span className="badge text-bg-info ms-2">CAS</span>}
-                                        {gvpModalTab === "recommended" && isGvpAssignedToDepartment(gvpUser, selectedDepartment) && <span className="badge text-bg-secondary ms-2">Reparto</span>}
+                                        {gvpModalTab === "recommended" && casIds.some((selectedCasId) => isGvpAssignedToCas(gvpUser, selectedCasId)) && <span className="badge text-bg-info ms-2 text-wrap text-start">Collegato al CAS selezionato</span>}
+                                        {gvpModalTab === "recommended" && isGvpAssignedToDepartment(gvpUser, selectedDepartment) && <span className="badge text-bg-secondary ms-2 text-wrap text-start">Copre il reparto selezionato</span>}
                                         {isAbsentOnAdmissionDate(gvpUser.id) && <span className="badge text-bg-warning ms-2">{getAbsenceLabel(gvpUser.id)}</span>}
                                       </span>
                                     </label>
@@ -3015,7 +3002,7 @@ export const Patients = ({
                             );
                           }
                           const casUsers = users.filter((item) => getPatientCasIds(patient).includes(item.id));
-                          const gvpUsers = users.filter((item) =>
+                          const gvpUsers = visibleGvpUsers.filter((item) =>
                             getPatientGvpIds(patient).includes(item.id),
                           );
 

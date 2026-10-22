@@ -26,6 +26,7 @@ import { PageInfo } from "./PageInfo.js";
 import { Permissions } from "./Permissions.js";
 import { Hospitality } from "./Hospitality.js";
 import { AnnualReport } from "./AnnualReport.js";
+import { Reports } from "./Reports.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
 
 const ICON_PATHS = {
@@ -72,6 +73,7 @@ const DATA_RESOURCES_BY_VIEW = {
   hospitality: ["hospitality"],
   "patient-reports": ["users", "hospitals", "patients"],
   "presentation-reports": ["presentations"],
+  reports: ["patients"],
   "annual-report": ["users", "presentations", "doctors", "hospitals"],
   presentations: ["presentations"],
   cas: ["users", "hospitals"],
@@ -531,6 +533,11 @@ export const Home = ({
                     </button>
                   </li>
                   <li className="sidebar-section-label menu-order-reports">Report</li>
+                  {canViewPage("reports") && <li className="nav-item menu-order-reports">
+                    <button className={`nav-link w-100 ${activeView === "reports" ? "active" : ""}`} type="button" onClick={() => openView("reports")}>
+                      <MenuIcon name="reports" /><p>Report</p>
+                    </button>
+                  </li>}
                   <li className="nav-item menu-order-reports">
                     <button className={`nav-link w-100 ${!canViewPage("presentation-reports") ? "d-none" : ""} ${activeView === "presentation-reports" ? "active" : ""}`} type="button" onClick={() => openView("presentation-reports")}>
                       <MenuIcon name="presentationReports" />
@@ -715,6 +722,8 @@ export const Home = ({
           />
         ) : activeView === "hospitality" && presidentId && canViewPage("hospitality") ? (
           <Hospitality offers={hospitalityOffers} setOffers={setHospitalityOffers} presidentId={presidentId} readOnly={!canEditPage("hospitality")} />
+        ) : activeView === "reports" && presidentId && canViewPage("reports") ? (
+          <Reports patients={patients} presidentId={presidentId} />
         ) : activeView === "patient-reports" && presidentId && canViewPage("patient-reports") ? (
           <PatientReports patients={patients} hospitals={hospitals} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "presentation-reports" && presidentId && canViewPage("presentation-reports") ? (
