@@ -74,7 +74,7 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
-    const getOpenModalShells = () => [...document.querySelectorAll(".entity-modal-shell:not(.d-none), .login-message-shell")];
+    const getOpenModalShells = () => [...document.querySelectorAll(".entity-modal-shell:not(.d-none), .login-message-shell, dialog.patient-phone-delete-dialog[open]")];
     let openModalCount = getOpenModalShells().length;
     let closingFromHistory = false;
     let ignoringHistoryEvent = false;
@@ -111,7 +111,7 @@ export const App = () => {
       }
     };
 
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "open"] });
     globalThis.addEventListener("popstate", handleModalHistory);
     return () => {
       observer.disconnect();

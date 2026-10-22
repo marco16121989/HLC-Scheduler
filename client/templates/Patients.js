@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Meteor } from "meteor/meteor";
+import { PatientPhoneNumbers } from "./PatientPhoneNumbers.js";
+import { preparePatientPhoneContacts, removesPatientPhoneNumber } from "/imports/api/patientPhoneContacts.js";
 import { getPatientAssignmentGvpUsers, getPatientAssignmentGvpLabel as getGvpDisplayName } from "/imports/api/patientAssignmentUsers.js";
 import { confirmAction } from "./ConfirmDialog.js";
 import { confirmPatientClosure } from "./patientStatusConfirmation.js";
@@ -281,6 +283,7 @@ const PATIENT_FORM_TABS = [
   ["summary", "Riepilogo"],
   ["main", "Info Principali"],
   ["insertion", "Info Complete"],
+  ["phones", "Numeri di telefono"],
   ["departments", "Trasferimenti"],
   ["history", "Storico modifiche"],
 ];
@@ -905,7 +908,24 @@ export const Patients = ({
     setError("");
   };
 
+  const savePhoneNumbers = async (changes, deletionConfirmed = false) => {
+    if (!canEditPatients || isPatientReadOnly) throw new Error("Non puoi modificare i numeri del paziente.");
+    if (removesPatientPhoneNumber(details, changes) && !deletionConfirmed) {
+      throw new Error("Conferma l’eliminazione dalla finestra del numero di telefono.");
+    }
+    const saved = editingId
+      ? await new Promise((resolve, reject) => Meteor.call("hlc.updatePatientPhoneNumbers", editingId, changes, deletionConfirmed, (methodError, result) => methodError ? reject(methodError) : resolve(result)))
+      : changes;
+    setDetails(current => ({ ...current, ...saved }));
+  };
+
   const savePatient = () => {
+    const phoneContacts = preparePatientPhoneContacts(details.phoneContacts);
+    if (!phoneContacts.valid) {
+      setError("Completa nome e numero di telefono per ogni contatto aggiunto.");
+      setActiveTab("phones");
+      return false;
+    }
     const normalizedFirstName = firstName.trim();
     const normalizedLastName = lastName.trim();
     const normalizedPathology = pathology.trim();
@@ -973,7 +993,7 @@ export const Patients = ({
       gvpIds: validGvpIds,
       gvpId: validGvpIds[0] || "",
       notes: normalizedNotes,
-      details,
+      details: { ...details, phoneContacts: phoneContacts.contacts },
       departmentHistory: resolvedDepartmentHistory,
       presidentId,
     };
@@ -1656,7 +1676,7 @@ export const Patients = ({
                     onClick={resetForm}
                   />
                 </div>
-                {canEditPatients && !isPatientReadOnly && (
+                {canEditPatients && !isPatientReadOnly && activeTab !== "phones" && (
                   <div className="d-flex flex-wrap gap-2 mt-2">
                     <button
                       className="btn btn-outline-secondary btn-sm"
@@ -1677,9 +1697,9 @@ export const Patients = ({
               </div>
               <form onSubmit={handleSubmit}>
                 <div className="card-body">
-                  {!isGvp && (
+                  {(!isGvp || isEditing) && (
                     <div className="nav nav-tabs patient-form-tabs mb-3" role="tablist" aria-label="Sezioni scheda paziente">
-                      {PATIENT_FORM_TABS.filter(([tabId]) => !["summary", "departments", "history"].includes(tabId) || isEditing).map(([tabId, label]) => <button
+                      {PATIENT_FORM_TABS.filter(([tabId]) => isGvp ? ["summary", "phones"].includes(tabId) : !["summary", "departments", "history"].includes(tabId) || isEditing).map(([tabId, label]) => <button
                         className={`nav-link ${tabId === "departments" ? "patient-departments-tab" : ""} ${activeTab === tabId ? "active" : ""}`}
                         type="button"
                         role="tab"
@@ -1692,7 +1712,11 @@ export const Patients = ({
                     </div>
                   )}
 
-                  {isGvpReadOnly ? (
+                  {isGvpReadOnly && activeTab === "phones" ? (
+                    <PatientPhoneNumbers patientName={[firstName, lastName].filter(Boolean).join(" ") || "Paziente"}
+                      patientPhone={details.patientPhone || ""} elderName={details.elderName || ""} elderPhone={details.elderPhone || ""}
+                      contacts={details.phoneContacts} userRole={currentUser.role} readOnly />
+                  ) : isGvpReadOnly ? (
                     <div className="patient-form-grid">
                       <div className={`alert border mb-3 ${patientStatus === "Trasferito" ? "alert-warning border-warning" : "alert-light"}`} role="status">
                         {patientStatus === "Trasferito" ? (
@@ -2498,6 +2522,17 @@ export const Patients = ({
                         ))}
                       </div>
                     </div>
+                  ) : activeTab === "phones" ? (
+                    <div className="w-100">
+                      <PatientPhoneNumbers key="phone-confirmation-v2" patientName={[firstName, lastName].filter(Boolean).join(" ") || "Paziente"} patientPhone={details.patientPhone || ""} contacts={details.phoneContacts}
+                        elderName={details.elderName || ""} elderPhone={details.elderPhone || ""}
+                        assignedDoctor={doctor?.presidentId === presidentId ? doctor : null} userRole={currentUser.role}
+                        onPatientPhoneChange={(value, deletionConfirmed) => savePhoneNumbers({ patientPhone: value }, deletionConfirmed)}
+                        onElderChange={(changes, deletionConfirmed) => savePhoneNumbers(changes, deletionConfirmed)}
+                        onContactsChange={(value, deletionConfirmed) => savePhoneNumbers({ phoneContacts: value }, deletionConfirmed)}
+                        readOnly={!canEditPatients || isPatientReadOnly} />
+                      {!isEditing && <p className="form-text mt-3">I numeri saranno salvati con il primo inserimento del paziente.</p>}
+                    </div>
                   ) : activeTab === "history" ? (
                     <div className="patient-form-grid patient-history-content">
                       {changeHistory.length === 0 ? (
@@ -2887,7 +2922,7 @@ export const Patients = ({
                   )}
                 </div>
 
-                <div className="card-footer d-flex align-items-center gap-2">
+                {activeTab !== "phones" && <div className="card-footer d-flex align-items-center gap-2">
                   {canEditPatients && isEditing && (!isPatientReadOnly || isAdminOperator) && (
                     <button
                       className="btn btn-outline-danger me-auto"
@@ -2909,7 +2944,7 @@ export const Patients = ({
                   {isPatientReadOnly ? (
                     <button className="btn btn-secondary ms-auto" type="button" onClick={resetForm}>Chiudi</button>
                   ) : null}
-                </div>
+                </div>}
               </form>
             </section>
           </div>

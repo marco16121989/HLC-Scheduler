@@ -1275,6 +1275,49 @@ svg.admin-nav-icon {
   width: min(100%, 34rem);
 }
 
+.patient-phone-list > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .65rem;
+  padding: .85rem 0;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+.patient-phone-info { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; min-width: 0; overflow-wrap: anywhere; }
+.patient-phone-contact-name { display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; min-width: 0; }
+.patient-phone-reference { display: inline-block; max-width: 100%; white-space: normal; text-align: left; }
+.patient-phone-list .patient-phone-name { font-size: inherit; overflow-wrap: anywhere; }
+.patient-phone-number { text-decoration: none; overflow-wrap: anywhere; }
+.patient-phone-number:hover { text-decoration: underline; }
+.patient-phone-actions { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: .35rem; }
+.patient-phone-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  flex: 0 0 auto;
+  text-align: center;
+}
+.patient-phone-actions .patient-phone-view-action { display: none; }
+@media (max-width: 575.98px) {
+  .patient-phone-separator { display: none; }
+  .patient-phone-info > .patient-phone-number { display: none; }
+  .patient-phone-actions .patient-phone-edit-action,
+  .patient-phone-actions .patient-phone-delete-action { display: none; }
+  .patient-phone-actions .patient-phone-view-action { display: inline-flex; }
+  .patient-phone-actions .btn { width: 2.75rem; height: 2.75rem; min-height: 2.75rem; }
+}
+.patient-phone-editor-backdrop { z-index: 1070; }
+.patient-phone-editor-shell { z-index: 1075; }
+.patient-phone-editor-shell .form-control { min-height: 2.75rem; font-size: 1rem; }
+.patient-phone-editor-shell .card-footer .btn { min-height: 2.75rem; }
+.patient-phone-delete-dialog { position: fixed; inset: 0; margin: auto; width: min(calc(100vw - 1.5rem), 28rem); max-height: calc(100dvh - 2rem); padding: 0; border: 1px solid var(--bs-border-color); border-radius: 1rem; background: var(--bs-body-bg); color: var(--bs-body-color); box-shadow: 0 1rem 4rem rgb(0 0 0 / 25%); }
+.patient-phone-delete-dialog::backdrop { background: rgb(0 0 0 / 55%); }
+.patient-phone-delete-dialog .card-footer .btn { min-height: 2.75rem; }
+
 .contact-search-results {
   display: grid;
   gap: 1rem;

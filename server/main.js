@@ -32,6 +32,7 @@ import { isProtectedPresidentAccount } from "/imports/constants/userProtection";
 import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
 import { normalizeGvpPatientSharedFields } from "/imports/constants/gvpPatientSharing";
 import { getGvpUsersSelector } from "../imports/api/userDirectory.js";
+import { preparePatientPhoneContacts, removesPatientPhoneNumber } from "../imports/api/patientPhoneContacts.js";
 import { legacyGvpOrganizationSelector } from "../imports/api/patientAssignmentUsers.js";
 import { buildUserProfileUpdate, hasUserProfileChanges } from "../imports/api/userProfileUpdates.js";
 import { gvpPatientProjection, pickGvpPatientFields } from "../imports/api/gvpPatientVisibility.js";
@@ -1361,6 +1362,53 @@ Meteor.methods({
     await DoctorsCollection.updateAsync(doctorId, {
       $pull: { doctorNotes: { id: noteId, authorId: actor._id } },
     });
+  },
+
+  async "hlc.updatePatientPhoneNumbers"(patientId, changes, deletionConfirmed = false) {
+    requireUser(this);
+    check(patientId, String);
+    check(deletionConfirmed, Boolean);
+    check(changes, {
+      patientPhone: Match.Optional(String),
+      elderName: Match.Optional(String),
+      elderPhone: Match.Optional(String),
+      phoneContacts: Match.Optional([{ id: String, name: String, phone: String }]),
+    });
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    requirePageEdit(actor, "patients");
+    if (!["Presidente", "CAS"].includes(actor?.profile?.role)) {
+      throw new Meteor.Error("not-authorized", "Non puoi modificare i numeri del paziente.");
+    }
+    const presidentId = await getActorPresidentId(actor);
+    const selector = { _id: patientId, presidentId, status: { $nin: CLOSED_PATIENT_STATUSES } };
+    const patient = await PatientsCollection.findOneAsync(selector);
+    if (!patient || (isFollowUpPatient(patient) && !canViewPatientFollowUp(actor, patient))) {
+      throw new Meteor.Error("not-authorized", "Paziente non disponibile o non modificabile.");
+    }
+    const updates = {};
+    if (changes.patientPhone !== undefined) updates.patientPhone = changes.patientPhone.trim();
+    if (changes.elderName !== undefined) updates.elderName = changes.elderName.trim();
+    if (changes.elderPhone !== undefined) updates.elderPhone = changes.elderPhone.trim();
+    if (changes.phoneContacts !== undefined) {
+      const prepared = preparePatientPhoneContacts(changes.phoneContacts);
+      if (!prepared.valid) throw new Meteor.Error("invalid-contact", "Completa nome e numero di telefono.");
+      updates.phoneContacts = prepared.contacts;
+    }
+    if (!Object.keys(updates).length) return updates;
+    if (removesPatientPhoneNumber(patient.details, updates) && !deletionConfirmed) {
+      throw new Meteor.Error("phone-deletion-confirmation-required", "La cancellazione richiede conferma. Ricarica la pagina e riprova.");
+    }
+    const history = buildPatientChangeHistory({
+      existing: { details: patient.details || {} },
+      updated: { details: { ...(patient.details || {}), ...updates } },
+      actor,
+    });
+    const updated = await PatientsCollection.updateAsync(selector, {
+      $set: { ...Object.fromEntries(Object.entries(updates).map(([key, value]) => [`details.${key}`, value])), updatedAt: new Date() },
+      ...(history.length ? { $push: { changeHistory: { $each: history } } } : {}),
+    });
+    if (!updated) throw new Meteor.Error("not-authorized", "Il paziente non è più modificabile.");
+    return updates;
   },
 
   async "hlc.getPatientDetails"(patientId) {
