@@ -4288,6 +4288,8 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .patient-report-chart-card { min-width: 0; overflow: hidden; }
 .patient-pie-layout { display: grid; grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); align-items: center; gap: 1.25rem; }
 .activity-year-filter { display: grid; gap: .35rem; min-width: 11rem; }
+.activity-report-header { flex-wrap: wrap; }
+.activity-report-filters { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; }
 .activity-year-filter label { font-size: .8rem; font-weight: 600; color: var(--bs-secondary-color); }
 .activity-reports .patient-report-kpis article { min-width: 0; }
 .activity-report-note { font-size: .8rem; color: var(--bs-secondary-color); line-height: 1.5; }
@@ -4325,6 +4327,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .patient-combined-chart .activity-chart-data { margin-top: .65rem; }
 @media (max-width: 575.98px) {
   .patient-combined-chart { padding: .9rem .6rem; border-radius: 1rem; }
+  .activity-report-filters { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; }
   .patient-combined-heading { padding-inline: .25rem; gap: .5rem; }
   .patient-combined-heading h2 { font-size: 1.15rem; }
   .patient-combined-chart .activity-chart-legend { gap: .35rem; font-size: .72rem; }

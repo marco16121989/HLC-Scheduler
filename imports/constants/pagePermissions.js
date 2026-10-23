@@ -14,7 +14,7 @@ export const getPagePermission = (user, pageId) => {
   if (pageId === "follow-up") return { view: ["Presidente", "CAS"].includes(user?.role), edit: false };
   if (user?.role === "Admin") return { view: true, edit: true };
   if (pageId === "reports") {
-    const eligible = ["Presidente", "CAS"].includes(user?.role);
+    const eligible = ["Presidente", "CAS", "GVP"].includes(user?.role);
     const configured = user?.pagePermissions?.reports;
     return { view: eligible && (configured ? Boolean(configured.view) : true), edit: false };
   }

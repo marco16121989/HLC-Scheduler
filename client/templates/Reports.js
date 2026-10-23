@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { activityReportYears, buildActivityReport } from "/imports/api/activityReports.js";
+import { formatCasUserLabel } from "./CasRoleBadge.js";
 
 const MONTHS = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
 const number = value => new Intl.NumberFormat("it-IT").format(value);
@@ -71,16 +72,27 @@ const PatientTrendChart = ({ periods, year }) => {
   </section>;
 };
 
-export const Reports = ({ patients = [], presidentId }) => {
+export const Reports = ({ patients = [], users = [], currentUser = {}, presidentId }) => {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(String(currentYear));
+  const [casFilter, setCasFilter] = useState("all");
+  const isGvp = currentUser.role === "GVP";
+  const selectedCasId = isGvp ? "all" : casFilter;
+  const selectedGvpId = isGvp && casFilter !== "all" ? currentUser.id : null;
+  const casUsers = users.filter(user =>
+    (user.role === "Presidente" && user.id === presidentId) ||
+    (user.role === "CAS" && (user.presidentId || user.associationId) === presidentId),
+  ).sort((first, second) => (first.username || "").localeCompare(second.username || "", "it-IT"));
   const years = activityReportYears({ patients, presidentId, currentYear });
-  const report = useMemo(() => buildActivityReport({ patients, presidentId, year }), [patients, presidentId, year]);
-  const previous = useMemo(() => buildActivityReport({ patients, presidentId, year: year === "all" ? "all" : Number(year) - 1 }), [patients, presidentId, year]);
+  const report = useMemo(() => buildActivityReport({ patients, presidentId, year, casId: selectedCasId, gvpId: selectedGvpId }), [patients, presidentId, year, selectedCasId, selectedGvpId]);
+  const previous = useMemo(() => buildActivityReport({ patients, presidentId, year: year === "all" ? "all" : Number(year) - 1, casId: selectedCasId, gvpId: selectedGvpId }), [patients, presidentId, year, selectedCasId, selectedGvpId]);
   const kpis = [["Totale pazienti", "total"], ["Pazienti dimessi", "discharged"], ["Pazienti deceduti", "deceased"], ["Pazienti trasferiti", "transferred"]];
 
   return <>
-    <div className="app-content-header"><div className="container-fluid patient-report-header"><div><h1 className="mb-1">Report</h1><p className="text-secondary mb-0">Pazienti del CAS: numeri, stati e andamento nel tempo.</p></div><div className="activity-year-filter"><label htmlFor="activity-report-year">Anno di accesso</label><select className="form-select" id="activity-report-year" value={year} onChange={event => setYear(event.target.value)}><option value="all">Tutti gli anni</option>{years.map(value => <option key={value}>{value}</option>)}</select></div></div></div>
+    <div className="app-content-header"><div className="container-fluid patient-report-header activity-report-header"><div><h1 className="mb-1">Report</h1><p className="text-secondary mb-0">Pazienti del CAS: numeri, stati e andamento nel tempo.</p></div><div className="activity-report-filters">
+      <div className="activity-year-filter"><label htmlFor="activity-report-cas">Casi assegnati</label><select className="form-select" id="activity-report-cas" value={casFilter} onChange={event => setCasFilter(event.target.value)}>{currentUser.id && <option value={currentUser.id}>I miei casi</option>}<option value="all">Tutti i casi</option>{!isGvp && <optgroup label="Per CAS">{casUsers.filter(user => user.id !== currentUser.id).map(user => <option key={user.id} value={user.id}>{formatCasUserLabel(user)}</option>)}</optgroup>}</select></div>
+      <div className="activity-year-filter"><label htmlFor="activity-report-year">Anno di accesso</label><select className="form-select" id="activity-report-year" value={year} onChange={event => setYear(event.target.value)}><option value="all">Tutti gli anni</option>{years.map(value => <option key={value}>{value}</option>)}</select></div>
+    </div></div></div>
     <div className="app-content"><div className="container-fluid activity-reports">
       <div className="patient-report-kpis">{kpis.map(([label, key]) => <article key={key}><span>{label}</span><strong>{number(report.totals[key])}</strong>{year !== "all" && <small className="text-secondary">Accessi {Number(year) - 1}: {number(previous.totals[key])}</small>}</article>)}</div>
       <PatientTrendChart periods={report.periods} year={year} />

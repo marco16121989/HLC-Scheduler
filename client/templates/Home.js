@@ -73,7 +73,7 @@ const DATA_RESOURCES_BY_VIEW = {
   hospitality: ["hospitality"],
   "patient-reports": ["users", "hospitals", "patients"],
   "presentation-reports": ["presentations"],
-  reports: ["patients"],
+  reports: ["patients", "users"],
   "annual-report": ["users", "presentations", "doctors", "hospitals"],
   presentations: ["presentations"],
   cas: ["users", "hospitals"],
@@ -586,6 +586,11 @@ export const Home = ({
               </li>}
               {user.role === "GVP" && (
                 <>
+                {canViewPage("reports") && <li className="nav-item menu-order-reports">
+                  <button className={`nav-link w-100 ${activeView === "reports" ? "active" : ""}`} type="button" onClick={() => openView("reports")}>
+                    <MenuIcon name="reports" /><p>Report</p>
+                  </button>
+                </li>}
                 <li className="sidebar-section-label menu-order-health">Gestione sanitaria</li>
                 <li className="nav-item menu-order-health">
                   <button
@@ -723,7 +728,7 @@ export const Home = ({
         ) : activeView === "hospitality" && presidentId && canViewPage("hospitality") ? (
           <Hospitality offers={hospitalityOffers} setOffers={setHospitalityOffers} presidentId={presidentId} readOnly={!canEditPage("hospitality")} />
         ) : activeView === "reports" && presidentId && canViewPage("reports") ? (
-          <Reports patients={patients} presidentId={presidentId} />
+          <Reports patients={patients} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "patient-reports" && presidentId && canViewPage("patient-reports") ? (
           <PatientReports patients={patients} hospitals={hospitals} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "presentation-reports" && presidentId && canViewPage("presentation-reports") ? (

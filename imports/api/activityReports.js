@@ -12,8 +12,10 @@ export const activityReportYears = ({ patients = [], presidentId, currentYear })
   [...new Set([String(currentYear), ...patients.filter(item => presidentId && item.presidentId === presidentId)
     .map(item => dateParts(item.admissionDate)?.year).filter(Boolean)])].sort((a, b) => b.localeCompare(a));
 
-export const buildActivityReport = ({ patients = [], presidentId, year = "all" }) => {
-  const organizationPatients = patients.filter(item => presidentId && item.presidentId === presidentId);
+export const buildActivityReport = ({ patients = [], presidentId, year = "all", casId = "all", gvpId = null }) => {
+  const organizationPatients = patients.filter(item => presidentId && item.presidentId === presidentId &&
+    (casId === "all" || item.casId === casId || (Array.isArray(item.casIds) && item.casIds.includes(casId))) &&
+    (!gvpId || item.gvpId === gvpId || (Array.isArray(item.gvpIds) && item.gvpIds.includes(gvpId))));
   const selectedPatients = organizationPatients.filter(item => year === "all" || dateParts(item.admissionDate)?.year === String(year));
   const labels = year === "all"
     ? [...new Set(selectedPatients.map(item => dateParts(item.admissionDate)?.year).filter(Boolean))].sort()

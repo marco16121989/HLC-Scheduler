@@ -3,6 +3,23 @@ import { activityReportYears, buildActivityReport } from "../imports/api/activit
 import { getPagePermission, MANAGEABLE_PAGES } from "../imports/constants/pagePermissions.js";
 
 describe("patient activity reports", function () {
+  it("combines CAS assignment and year filters for totals and chart periods", function () {
+    const cases = [
+      { presidentId: "p", admissionDate: "2026-01-01", status: "Dimesso", casIds: ["p", "cas"] },
+      { presidentId: "p", admissionDate: "2026-02-01", status: "Deceduto", casId: "cas" },
+      { presidentId: "p", admissionDate: "2025-01-01", status: "Trasferito", casIds: ["cas"] },
+      { presidentId: "p", admissionDate: "2026-01-01", status: "Ricoverato", casIds: ["other"] },
+      { presidentId: "foreign", admissionDate: "2026-01-01", status: "Deceduto", casIds: ["cas"] },
+    ];
+    const report = casId => buildActivityReport({ patients: cases, presidentId: "p", year: "2026", casId });
+    assert.deepStrictEqual(report("cas").totals, { total: 2, discharged: 1, deceased: 1, transferred: 0 });
+    assert.strictEqual(report("cas").periods[0].total, 1);
+    assert.strictEqual(report("cas").periods[1].deceased, 1);
+    assert.strictEqual(report("p").totals.total, 1);
+    assert.strictEqual(report("all").totals.total, 3);
+    assert.strictEqual(report("missing").totals.total, 0);
+    assert.strictEqual(buildActivityReport({ patients: cases, presidentId: "p", year: "2025", casId: "cas" }).totals.transferred, 1);
+  });
   const patients = [
     { presidentId: "p", admissionDate: "2026-01-12", status: "Dimesso" },
     { presidentId: "p", admissionDate: "2025-12-20", status: "Deceduto" },
@@ -45,12 +62,28 @@ describe("patient activity reports", function () {
     assert.deepStrictEqual(build({ patients: [] }).periods, []);
   });
 
-  it("makes reports configurable and read-only for presidents and CAS", function () {
+  it("filters personal GVP cases using both current and legacy assignments", function () {
+    const cases = [
+      { presidentId: "p", admissionDate: "2026-01-01", status: "Dimesso", gvpIds: ["gvp", "other"], casIds: ["cas"] },
+      { presidentId: "p", admissionDate: "2026-02-01", status: "Deceduto", gvpId: "gvp" },
+      { presidentId: "p", admissionDate: "2026-02-01", gvpIds: ["other"] },
+      { presidentId: "p", admissionDate: "2025-01-01", gvpId: "gvp" },
+      { presidentId: "foreign", admissionDate: "2026-01-01", gvpId: "gvp" },
+    ];
+    const options = { patients: cases, presidentId: "p", year: "2026" };
+    assert.strictEqual(buildActivityReport(options).totals.total, 3);
+    const personal = buildActivityReport({ ...options, gvpId: "gvp" });
+    assert.deepStrictEqual(personal.totals, { total: 2, discharged: 1, deceased: 1, transferred: 0 });
+    assert.strictEqual(personal.periods[0].discharged, 1);
+    assert.strictEqual(personal.periods[1].deceased, 1);
+  });
+
+  it("makes reports configurable and read-only for presidents, CAS and GVP", function () {
     assert.ok(MANAGEABLE_PAGES.some(([id]) => id === "reports"));
-    for (const role of ["Presidente", "CAS"]) {
+    for (const role of ["Presidente", "CAS", "GVP"]) {
       assert.deepStrictEqual(getPagePermission({ role }, "reports"), { view: true, edit: false });
       assert.deepStrictEqual(getPagePermission({ role, pagePermissions: { reports: { view: false, edit: true } } }, "reports"), { view: false, edit: false });
     }
-    assert.deepStrictEqual(getPagePermission({ role: "GVP", pagePermissions: { reports: { view: true } } }, "reports"), { view: false, edit: false });
+    assert.deepStrictEqual(getPagePermission({ role: "GVP", pagePermissions: { reports: { view: true } } }, "reports"), { view: true, edit: false });
   });
 });
