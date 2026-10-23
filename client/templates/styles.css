@@ -1286,6 +1286,15 @@ svg.admin-nav-icon {
 .patient-phone-info { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; min-width: 0; overflow-wrap: anywhere; }
 .patient-phone-contact-name { display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; min-width: 0; }
 .patient-phone-reference { display: inline-block; max-width: 100%; white-space: normal; text-align: left; }
+.patient-assignees-popover { z-index: 1090; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--bs-border-color); border-radius: .85rem; background: var(--bs-body-bg); color: var(--bs-body-color); box-shadow: 0 .6rem 2rem rgb(0 0 0 / 16%); }
+.patient-assignees-popover-header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; background: var(--bs-body-bg); border-bottom: 1px solid var(--bs-border-color); font-size: .85rem; }
+.patient-assignees-popover-header strong > span { margin-left: .35rem; color: var(--bs-secondary-color); font-weight: 400; }
+.patient-assignees-popover-header .btn-close { flex-shrink: 0; padding: .5rem; font-size: .65rem; }
+.patient-assignees-popover li { display: flex; align-items: center; gap: .6rem; padding: .6rem 1rem; }
+.patient-assignees-popover li + li { border-top: 1px solid var(--bs-border-color-translucent); }
+.patient-assignee-avatar { display: grid; place-items: center; flex-shrink: 0; width: 1.9rem; height: 1.9rem; border-radius: 50%; font-size: .75rem; font-weight: 700; background: var(--bs-info-bg-subtle); color: var(--bs-info-text-emphasis); }
+.patient-assignees-popover.is-cas .patient-assignee-avatar { background: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
+.patient-assignee-label { min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
 .patient-phone-list .patient-phone-name { font-size: inherit; overflow-wrap: anywhere; }
 .patient-phone-number { text-decoration: none; overflow-wrap: anywhere; }
 .patient-phone-number:hover { text-decoration: underline; }

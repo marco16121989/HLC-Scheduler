@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { PatientPhoneNumbers } from "./PatientPhoneNumbers.js";
+import { PatientAssignees } from "./PatientAssignees.js";
 import { preparePatientPhoneContacts, removesPatientPhoneNumber } from "/imports/api/patientPhoneContacts.js";
 import { getPatientAssignmentGvpUsers, getPatientAssignmentGvpLabel as getGvpDisplayName } from "/imports/api/patientAssignmentUsers.js";
 import { confirmAction } from "./ConfirmDialog.js";
@@ -414,7 +415,7 @@ export const Patients = ({
   );
   const [gvpIds, setGvpIds] = useState([]);
   const [casFilter, setCasFilter] = useState(
-    currentUser.role === "CAS" ? currentUser.id : "all",
+    ["CAS", "Presidente"].includes(currentUser.role) ? currentUser.id : "all",
   );
   const [gvpPatientScope, setGvpPatientScope] = useState("mine");
   const [statusFilter, setStatusFilter] = useState(followUpOnly ? "Dimesso" : "Ricoverato");
@@ -494,7 +495,7 @@ export const Patients = ({
         const isMine = patientGvpIds.includes(currentUser.id) || getPatientCasIds(patient).includes(currentUser.id);
         return gvpPatientScope === "all" ? true : isMine;
       })
-    : currentUser.role === "CAS" && casFilter !== "all"
+    : ["CAS", "Presidente"].includes(currentUser.role) && casFilter !== "all"
       ? organizationPatients.filter((patient) => getPatientCasIds(patient).includes(casFilter))
       : organizationPatients;
   const visiblePatients = statusFilter === "all"
@@ -1525,10 +1526,10 @@ export const Patients = ({
                   <option value="all">Tutti i pazienti</option>
                 </select>
               )}
-              {!followUpOnly && !isGvp && currentUser.role === "CAS" && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra pazienti per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
-                <option value={currentUser.id}>I miei pazienti</option>
-                <option value="all">Tutti i pazienti</option>
-                {visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{formatCasUserLabel(casUser)}</option>)}
+              {!followUpOnly && ["CAS", "Presidente"].includes(currentUser.role) && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra casi per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
+                <option value={currentUser.id}>I miei casi</option>
+                <option value="all">Tutti i casi</option>
+                <optgroup label="Per CAS">{visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{formatCasUserLabel(casUser)}</option>)}</optgroup>
               </select>}
               {canViewGvpSharing && <button className="btn btn-outline-primary" type="button" onClick={openSharingModal}>Scegli info da condividere con GVP</button>}
               {canEditPatients && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
@@ -3109,14 +3110,8 @@ export const Patients = ({
                             {followUpOnly && <td data-label="Data attivazione follow up">
                               {formatFollowUpActivationDate(getFollowUpActivationDate(patient))}
                             </td>}
-                            <td data-label="CAS">
-                              {casUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{casUsers.map((casUser) => <span className="badge text-bg-success" key={casUser.id}><CasRoleBadge user={casUser} />{casUser.username}</span>)}</div> : (
-                                <span className="badge text-bg-warning">
-                                  Non assegnato
-                                </span>
-                              )}
-                            </td>
-                            <td data-label="GVP">{gvpUsers.length > 0 ? <div className="d-flex flex-wrap gap-1">{gvpUsers.map((gvpUser) => <span className="badge text-bg-info" key={gvpUser.id}>{getGvpDisplayName(gvpUser)}</span>)}</div> : <span className="text-secondary">-</span>}</td>
+                            <td data-label="CAS"><PatientAssignees users={casUsers} type="CAS" /></td>
+                            <td data-label="GVP"><PatientAssignees users={gvpUsers} type="GVP" /></td>
                             <td className="text-center patient-actions-column" data-label="Azioni">
                               <div className="patient-row-actions">
                                 {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <><button className="btn btn-primary btn-sm patient-note-button" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note GVP, ${getUnreadNoteCount(patient)} nuove` : "Note GVP"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button><button className="btn btn-warning btn-sm patient-note-button" type="button" aria-label={getUnreadCasNoteCount(patient) > 0 ? `Note CAS, ${getUnreadCasNoteCount(patient)} nuove` : "Note CAS"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openCasNotes(patient); }}><NoteButtonContent label="Note CAS" unreadCount={getUnreadCasNoteCount(patient)} /></button></>}
