@@ -36,6 +36,7 @@ import { preparePatientPhoneContacts, removesPatientPhoneNumber } from "../impor
 import { legacyGvpOrganizationSelector } from "../imports/api/patientAssignmentUsers.js";
 import { buildUserProfileUpdate, hasUserProfileChanges } from "../imports/api/userProfileUpdates.js";
 import { gvpPatientProjection, pickGvpPatientFields } from "../imports/api/gvpPatientVisibility.js";
+import { PATIENT_REPORT_FIELDS } from "../imports/api/activityReports.js";
 
 const usefulFileExtensions = new Set([
   "pdf", "jpg", "jpeg", "png", "gif", "webp", "doc", "docx", "odt", "rtf", "txt",
@@ -695,6 +696,16 @@ Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
             ],
           }
         : { _id: actor._id };
+
+  if (wants("report-patients") && presidentId && getPagePermission({ ...actor.profile, role }, "reports").view) {
+    // Keep report records separate from patient sheets and publish statistical fields only.
+    const observer = await PatientsCollection.find({ presidentId }, { fields: PATIENT_REPORT_FIELDS }).observeChangesAsync({
+      added: (id, fields) => this.added("patientReportData", id, fields),
+      changed: (id, fields) => this.changed("patientReportData", id, fields),
+      removed: (id) => this.removed("patientReportData", id),
+    });
+    this.onStop(() => observer.stop());
+  }
 
   if (role === "GVP") {
     const cursors = [];

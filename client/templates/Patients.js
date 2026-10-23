@@ -417,7 +417,6 @@ export const Patients = ({
   const [casFilter, setCasFilter] = useState(
     ["CAS", "Presidente"].includes(currentUser.role) ? currentUser.id : "all",
   );
-  const [gvpPatientScope, setGvpPatientScope] = useState("mine");
   const [statusFilter, setStatusFilter] = useState(followUpOnly ? "Dimesso" : "Ricoverato");
   const [notes, setNotes] = useState("");
   const [details, setDetails] = useState({ isMinorOrNewborn: "No" });
@@ -492,8 +491,7 @@ export const Patients = ({
   const roleFilteredPatients = isGvp
     ? organizationPatients.filter((patient) => {
         const patientGvpIds = getPatientGvpIds(patient);
-        const isMine = patientGvpIds.includes(currentUser.id) || getPatientCasIds(patient).includes(currentUser.id);
-        return gvpPatientScope === "all" ? true : isMine;
+        return patientGvpIds.includes(currentUser.id) || getPatientCasIds(patient).includes(currentUser.id);
       })
     : ["CAS", "Presidente"].includes(currentUser.role) && casFilter !== "all"
       ? organizationPatients.filter((patient) => getPatientCasIds(patient).includes(casFilter))
@@ -509,7 +507,7 @@ export const Patients = ({
   const patientPagination = usePagination(
     sortedVisiblePatients,
     25,
-    `${statusFilter}:${casFilter}:${gvpPatientScope}`,
+    `${statusFilter}:${casFilter}`,
   );
   const currentNotePatient = notePatient;
   const visibleDoctors = doctors.filter(
@@ -1520,12 +1518,6 @@ export const Patients = ({
                   <option key={status} value={status}>{status}</option>
                 ))}
               </select>}
-              {isGvp && (
-                <select className="form-select w-auto flex-shrink-0" aria-label="Filtra pazienti del GVP" value={gvpPatientScope} onChange={(event) => setGvpPatientScope(event.target.value)}>
-                  <option value="mine">I miei pazienti</option>
-                  <option value="all">Tutti i pazienti</option>
-                </select>
-              )}
               {!followUpOnly && ["CAS", "Presidente"].includes(currentUser.role) && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra casi per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
                 <option value={currentUser.id}>I miei casi</option>
                 <option value="all">Tutti i casi</option>

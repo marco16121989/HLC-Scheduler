@@ -73,7 +73,7 @@ const DATA_RESOURCES_BY_VIEW = {
   hospitality: ["hospitality"],
   "patient-reports": ["users", "hospitals", "patients"],
   "presentation-reports": ["presentations"],
-  reports: ["patients", "users"],
+  reports: ["report-patients", "users"],
   "annual-report": ["users", "presentations", "doctors", "hospitals"],
   presentations: ["presentations"],
   cas: ["users", "hospitals"],
@@ -728,7 +728,7 @@ export const Home = ({
         ) : activeView === "hospitality" && presidentId && canViewPage("hospitality") ? (
           <Hospitality offers={hospitalityOffers} setOffers={setHospitalityOffers} presidentId={presidentId} readOnly={!canEditPage("hospitality")} />
         ) : activeView === "reports" && presidentId && canViewPage("reports") ? (
-          <Reports patients={patients} users={users} currentUser={user} presidentId={presidentId} />
+          <Reports users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "patient-reports" && presidentId && canViewPage("patient-reports") ? (
           <PatientReports patients={patients} hospitals={hospitals} users={users} currentUser={user} presidentId={presidentId} />
         ) : activeView === "presentation-reports" && presidentId && canViewPage("presentation-reports") ? (

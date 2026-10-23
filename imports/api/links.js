@@ -6,6 +6,7 @@ export const HospitalsCollection = new Mongo.Collection("hospitals");
 export const DepartmentsCollection = new Mongo.Collection("departments");
 export const DoctorsCollection = new Mongo.Collection("doctors");
 export const PatientsCollection = new Mongo.Collection("patients");
+export const PatientReportDataCollection = new Mongo.Collection("patientReportData");
 export const HospitalityOffersCollection = new Mongo.Collection("hospitalityOffers");
 export const PresentationsCollection = new Mongo.Collection("presentations");
 export const AnnualReportsCollection = new Mongo.Collection("annualReports");

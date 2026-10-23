@@ -1,8 +1,23 @@
 import assert from "assert";
-import { activityReportYears, buildActivityReport } from "../imports/api/activityReports.js";
+import { PATIENT_REPORT_FIELDS, activityReportYears, buildActivityReport } from "../imports/api/activityReports.js";
 import { getPagePermission, MANAGEABLE_PAGES } from "../imports/constants/pagePermissions.js";
 
 describe("patient activity reports", function () {
+  it("counts all organization cases from statistical fields, including unassigned and follow-up cases", function () {
+    const cases = [
+      { presidentId: "p", admissionDate: "2026-01-01", status: "Dimesso", gvpIds: ["gvp"], firstName: "Private" },
+      { presidentId: "p", admissionDate: "2026-02-01", status: "Dimesso", gvpIds: ["other"], followUpEnabled: true },
+      { presidentId: "p", admissionDate: "2026-03-01", status: "Ricoverato" },
+      { presidentId: "foreign", admissionDate: "2026-01-01", status: "Deceduto" },
+    ];
+    const patients = cases.map(patient => Object.fromEntries(Object.entries(patient).filter(([field]) => PATIENT_REPORT_FIELDS[field])));
+    const options = { patients, presidentId: "p", year: "2026" };
+    assert.strictEqual(buildActivityReport(options).totals.total, 3);
+    assert.strictEqual(buildActivityReport(options).totals.discharged, 2);
+    assert.strictEqual(buildActivityReport({ ...options, gvpId: "gvp" }).totals.total, 1);
+    assert.deepStrictEqual(Object.keys(PATIENT_REPORT_FIELDS).sort(), ["admissionDate", "casId", "casIds", "gvpId", "gvpIds", "presidentId", "status"]);
+  });
+
   it("combines CAS assignment and year filters for totals and chart periods", function () {
     const cases = [
       { presidentId: "p", admissionDate: "2026-01-01", status: "Dimesso", casIds: ["p", "cas"] },

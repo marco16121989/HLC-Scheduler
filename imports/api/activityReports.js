@@ -1,3 +1,13 @@
+export const PATIENT_REPORT_FIELDS = {
+  presidentId: 1,
+  admissionDate: 1,
+  status: 1,
+  casId: 1,
+  casIds: 1,
+  gvpId: 1,
+  gvpIds: 1,
+};
+
 const dateParts = value => {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const date = new Date(`${value}T00:00:00Z`);

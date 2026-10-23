@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTracker } from "meteor/react-meteor-data";
+import { PatientReportDataCollection } from "/imports/api/links";
 import { activityReportYears, buildActivityReport } from "/imports/api/activityReports.js";
 import { formatCasUserLabel } from "./CasRoleBadge.js";
 
@@ -72,7 +74,8 @@ const PatientTrendChart = ({ periods, year }) => {
   </section>;
 };
 
-export const Reports = ({ patients = [], users = [], currentUser = {}, presidentId }) => {
+export const Reports = ({ users = [], currentUser = {}, presidentId }) => {
+  const patients = useTracker(() => PatientReportDataCollection.find({ presidentId }).fetch(), [presidentId]);
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(String(currentYear));
   const [casFilter, setCasFilter] = useState("all");
