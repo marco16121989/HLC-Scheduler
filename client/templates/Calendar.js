@@ -215,7 +215,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
       ["Tipo di accesso", selectedPatient.admissionType === "scheduled" ? "Ricovero programmato" : selectedPatient.admissionType === "consultation" ? "Consulto" : "Emergenza"],
       ["Data di accesso", selectedPatient.admissionDate],
       ["Visita con l’anestesista", patientDetails.anesthesiologistDate],
-      ["Orario visita", patientDetails.anesthesiologistTime],
+      ["Orario visita Anestesista", patientDetails.anesthesiologistTime],
       ["Anestesista", patientDetails.anesthesiologistName],
       ["Patologia", selectedPatient.pathology],
       ["Medico responsabile", selectedDoctor ? `${selectedDoctor.lastName} ${selectedDoctor.firstName}` : "Non assegnato"],

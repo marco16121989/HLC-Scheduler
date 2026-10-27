@@ -398,9 +398,9 @@ const standardPatientProjection = (hiddenFields = []) => {
   const projection = Object.fromEntries([
     "presidentId", "casId", "casIds", "gvpId", "gvpIds", "firstName", "lastName",
     "admissionDate", "dischargeDate", "admissionType", "status", "followUpEnabled", "followUpActivatedAt", "transferNotes", "pathology",
-    "doctorId", "details.sex", "details.maidenName", "details.departmentId", "details.hospitalRoom",
+    "doctorId", "details.sex", "details.maidenName", "details.departmentId", "details.hospitalFloor", "details.hospitalRoom",
     "details.hospitalBed", "details.anesthesiologistDate", "details.anesthesiologistTime",
-    "details.anesthesiologistName",
+    "details.anesthesiologistName", "details.visitingHoursFrom", "details.visitingHoursTo",
   ].map((field) => [field, 1]));
   hiddenFields.forEach((field) => delete projection[field]);
   projection.status = 1;
