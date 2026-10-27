@@ -2564,7 +2564,8 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   }
 
   .patient-header-actions .form-select,
-  .patient-header-actions .btn {
+  .patient-header-actions .btn,
+  .patient-sharing-action .btn {
     width: 100% !important;
     min-height: 2.75rem;
   }

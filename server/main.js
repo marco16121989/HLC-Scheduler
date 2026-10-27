@@ -316,7 +316,7 @@ const requireFollowUpPatientAccess = (actor, patient) => {
     throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
   }
 };
-const getClosedPatientHiddenFields = async () => ["firstName", "lastName"];
+const getClosedPatientHiddenFields = async () => ["firstName", "lastName", "details.maidenName"];
 
 const setNestedValue = (target, path, value) => {
   const parts = path.split(".");
@@ -793,24 +793,19 @@ Meteor.publish("hlc-admin-support", async function publishHlcAdminSupport() {
   return SupportRequestsCollection.find({}, { sort: { createdAt: -1 } });
 });
 
-// La dashboard Admin riceve esclusivamente i log degli accessi effettivi
-// degli ultimi dodici mesi, con i soli CAS necessari per l'elenco recente.
+// La dashboard Admin riceve gli accessi effettivi degli ultimi dodici mesi
+// e i soli dati identificativi dei CAS, inclusi quelli senza accessi.
 Meteor.publish("hlc-access-logs", async function publishHlcAccessLogs() {
   if (!this.userId) return this.ready();
   const actor = await Meteor.users.findOneAsync(this.userId, { fields: { profile: 1 } });
   if (actor?.profile?.role !== "Admin") return this.ready();
-  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-  const selector = { createdAt: { $gte: threeDaysAgo }, action: { $exists: false } };
   const romeMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit" }).formatToParts(new Date());
   const year = Number(romeMonth.find((part) => part.type === "year").value);
   const month = Number(romeMonth.find((part) => part.type === "month").value);
   const chartStart = new Date(Date.UTC(year, month - 12, 1) - 2 * 60 * 60 * 1000);
-  const presidentIds = [...new Set((await AccessLogsCollection.find(selector, { fields: { presidentId: 1 } }).fetchAsync())
-    .map((log) => log.presidentId)
-    .filter(Boolean))];
   return [
     AccessLogsCollection.find({ createdAt: { $gte: chartStart }, action: { $exists: false } }, { sort: { createdAt: -1 } }),
-    Meteor.users.find({ _id: { $in: presidentIds } }, { fields: publicUserFields }),
+    Meteor.users.find({ "profile.role": "Presidente" }, { fields: { username: 1, "profile.role": 1, "profile.casMembership": 1 } }),
   ];
 });
 

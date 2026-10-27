@@ -17,7 +17,7 @@ import { PaginationControls, usePagination } from "./Pagination.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 const MASKED_VALUE = "********";
-const CLOSED_PATIENT_HIDDEN_FIELDS = ["firstName", "lastName"];
+const CLOSED_PATIENT_HIDDEN_FIELDS = ["firstName", "lastName", "details.maidenName"];
 const CLOSED_PATIENT_STATUSES = ["Dimesso", "Deceduto", "Trasferito"];
 const TRANSFERRED_PATIENT_PRIVACY_NOTE = "Come da istruzioni dello schiavo il nome e cognome del paziente sono stati eliminati.";
 const maskClosedPatientForDisplay = (patient) => {
@@ -47,7 +47,7 @@ const formatPatientListName = (patient) => {
   return `${patient.firstName} ${patient.lastName}`;
 };
 
-const NoteButtonContent = ({ unreadCount = 0, label = "Note GVP" }) => <span className="patient-note-content">
+const NoteButtonContent = ({ unreadCount = 0, label = "GVP" }) => <span className="patient-note-content">
   <svg className="patient-note-icon patient-note-mobile-icon" viewBox="0 0 52 34" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
     <path d="M6 3h40a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H37l-7 5v-5H6a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Z" />
     <text x="26" y="18.2" fill="currentColor" stroke="none" textAnchor="middle" fontSize="10.5" fontWeight="800">{label.replace("Note ", "")}</text>
@@ -57,7 +57,7 @@ const NoteButtonContent = ({ unreadCount = 0, label = "Note GVP" }) => <span cla
     <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" strokeWidth="2.5" />
   </svg>
   <span className="patient-note-desktop-label">{label}</span>
-  {unreadCount > 0 && <span className="patient-note-unread" aria-label={`${unreadCount} nuove ${label}`}>{unreadCount}</span>}
+  {unreadCount > 0 && <span className="patient-note-unread" aria-label={`${unreadCount} nuove note ${label}`}>{unreadCount}</span>}
 </span>;
 
 const PatientMobileLocation = ({ patient, departmentName, hospitalName }) => <span className="patient-mobile-location">
@@ -1543,10 +1543,12 @@ export const Patients = ({
                 <option value="all">Tutti i casi</option>
                 <optgroup label="Per CAS">{visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{formatCasUserLabel(casUser)}</option>)}</optgroup>
               </select>}
-              {canViewGvpSharing && <button className="btn btn-outline-primary" type="button" onClick={openSharingModal}>Scegli info da condividere con GVP</button>}
               {canEditPatients && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
             </div>
           </div>
+          {canViewGvpSharing && <div className="d-flex justify-content-start mt-2 patient-sharing-action">
+            <button className="btn btn-outline-primary" type="button" onClick={openSharingModal}>Scegli info da condividere con GVP</button>
+          </div>}
         </div>
       </div>
 
@@ -3055,7 +3057,7 @@ export const Patients = ({
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0 patient-list-table">
                   <thead>
-                    {isGvp ? <tr><th>Paziente</th><th className="text-center patient-actions-column">Azioni</th></tr> : <tr>
+                    {isGvp ? <tr><th>Paziente</th><th className="text-center patient-actions-column">Note</th></tr> : <tr>
                       <th>Paziente</th>
                       <th>Accesso</th>
                       <th>Stato</th>
@@ -3063,7 +3065,7 @@ export const Patients = ({
                       {followUpOnly && <th>Data attivazione follow up</th>}
                       <th>CAS</th>
                       <th>GVP</th>
-                      <th className="text-center patient-actions-column">Azioni</th>
+                      <th className="text-center patient-actions-column">Note</th>
                     </tr>}
                   </thead>
                   <tbody>
@@ -3092,7 +3094,7 @@ export const Patients = ({
                                 }}
                               >
                                 <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}<PatientMobileLocation patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
-                                <td className="text-center patient-actions-column" data-label="Azioni"><div className="patient-row-actions"><button className="btn btn-primary btn-sm patient-note-button" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button></div></td>
+                                <td className="text-center patient-actions-column" data-label="Note"><div className="patient-row-actions"><button className="btn btn-primary btn-sm patient-note-button" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button></div></td>
                               </tr>
                             );
                           }
@@ -3171,9 +3173,9 @@ export const Patients = ({
                             </td>}
                             <td data-label="CAS"><PatientAssignees users={casUsers} type="CAS" /></td>
                             <td data-label="GVP"><PatientAssignees users={gvpUsers} type="GVP" /></td>
-                            <td className="text-center patient-actions-column" data-label="Azioni">
+                            <td className="text-center patient-actions-column" data-label="Note">
                               <div className="patient-row-actions">
-                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <><button className="btn btn-primary btn-sm patient-note-button" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note GVP, ${getUnreadNoteCount(patient)} nuove` : "Note GVP"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button><button className="btn btn-warning btn-sm patient-note-button" type="button" aria-label={getUnreadCasNoteCount(patient) > 0 ? `Note CAS, ${getUnreadCasNoteCount(patient)} nuove` : "Note CAS"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openCasNotes(patient); }}><NoteButtonContent label="Note CAS" unreadCount={getUnreadCasNoteCount(patient)} /></button></>}
+                                {(currentUser.role === "CAS" || currentUser.role === "Presidente") && <><button className="btn btn-primary btn-sm patient-note-button" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note GVP, ${getUnreadNoteCount(patient)} nuove` : "Note GVP"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button><button className="btn btn-warning btn-sm patient-note-button" type="button" aria-label={getUnreadCasNoteCount(patient) > 0 ? `Note CAS, ${getUnreadCasNoteCount(patient)} nuove` : "Note CAS"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openCasNotes(patient); }}><NoteButtonContent label="CAS" unreadCount={getUnreadCasNoteCount(patient)} /></button></>}
                               </div>
                             </td>
                           </tr>

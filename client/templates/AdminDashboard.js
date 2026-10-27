@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { buildPeriodAccesses } from "/imports/utils/monthlyAccesses";
+import { buildCasActivity } from "/imports/utils/casActivity";
 
 const formatAccessDate = (value) => {
   const date = new Date(value);
@@ -9,12 +10,13 @@ const formatAccessDate = (value) => {
   }).format(date);
 };
 
-// La dashboard amministrativa espone volutamente soltanto gli accessi reali:
-// nessun dato sanitario o elenco completo degli account viene caricato qui.
+// L'attività dei CAS deriva soltanto dagli accessi reali dei loro utenti.
 export const AdminDashboard = ({ accessLogs = [], users = [] }) => {
   const [period, setPeriod] = useState("year");
+  const [activityDays, setActivityDays] = useState(30);
   const casByPresidentId = new Map(users.map((user) => [user.id, user.casMembership]));
   const now = new Date();
+  const casActivity = buildCasActivity(users, accessLogs, activityDays, now);
   const recentAccesses = accessLogs.filter((log) => log.userId && !log.action && new Date(log.createdAt).getTime() >= now.getTime() - 3 * 24 * 60 * 60 * 1000);
   const monthlyAccesses = buildPeriodAccesses(accessLogs, period, now);
   const periodLabel = period === "year" ? "Anno corrente" : period === "month" ? "Mese corrente" : "Settimana corrente (lunedì–domenica)";
@@ -39,6 +41,33 @@ export const AdminDashboard = ({ accessLogs = [], users = [] }) => {
         <p>Andamento degli accessi al gestionale e ultimi accessi degli ultimi 3 giorni.</p>
       </div>
     </header>
+    <section className="admin-dashboard-card mb-3">
+      <div className="admin-card-heading">
+        <div><h2>Attività dei CAS</h2><p>Un CAS è attivo se almeno un suo utente (Presidente, CAS o GVP) ha effettuato un accesso negli ultimi {activityDays} giorni.</p></div>
+        <select className="form-select admin-chart-period-filter" aria-label="Periodo attività CAS" value={activityDays} onChange={(event) => setActivityDays(Number(event.target.value))}>
+          <option value={7}>Ultimi 7 giorni</option>
+          <option value={30}>Ultimi 30 giorni</option>
+          <option value={90}>Ultimi 90 giorni</option>
+        </select>
+      </div>
+      <p className="text-secondary small mt-2">CAS ordinati per numero di accessi negli ultimi {activityDays} giorni, dal più attivo al meno attivo. Il conteggio somma gli accessi di tutti gli utenti del CAS. Ultimo accesso disponibile nei log degli ultimi dodici mesi.</p>
+      <div className="row g-3 mt-1">
+        {[true, false].map((active) => {
+          const cases = casActivity.filter((cas) => cas.active === active);
+          return <div className="col-12 col-lg-6" key={String(active)}>
+            <h3 className="h6">CAS {active ? "attivi" : "inattivi"} <span className={`badge ${active ? "text-bg-success" : "text-bg-secondary"}`}>{cases.length}</span></h3>
+            {cases.length ? <div className="table-responsive"><table className="table align-middle mb-0">
+              <thead><tr><th>CAS</th><th className="text-end">Accessi</th><th>Ultimo accesso</th></tr></thead>
+              <tbody>{cases.map((cas) => <tr key={cas.id}>
+                <td><strong>{cas.name}</strong><small className="d-block text-secondary">{cas.president}</small></td>
+                <td className="text-end fw-bold">{cas.accessCount}</td>
+                <td>{cas.lastAccess ? formatAccessDate(cas.lastAccess) : "Nessun accesso nel periodo disponibile"}</td>
+              </tr>)}</tbody>
+            </table></div> : <p className="admin-empty">Nessun CAS {active ? "attivo" : "inattivo"} nel periodo.</p>}
+          </div>;
+        })}
+      </div>
+    </section>
     <section className="admin-dashboard-card admin-access-chart">
       <div className="admin-card-heading">
         <div><h2>Accessi per {period === "year" ? "mese" : "giorno"}</h2><p>{periodLabel}, in corso. Totale: {totalAccesses} accessi registrati.</p></div>
