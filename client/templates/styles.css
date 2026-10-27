@@ -4776,3 +4776,93 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .admin-line-value { fill: var(--bs-emphasis-color); font-size: 11px; font-weight: 600; }
 
 .admin-president-mobile-membership { margin-top: .2rem; font-size: .75rem; font-weight: 400; white-space: normal; overflow-wrap: anywhere; }
+.absence-mobile-period { display: none; }
+@media (max-width: 767.98px) {
+  .absence-list-table.mobile-card-table tbody tr {
+    padding: .55rem .8rem;
+    gap: .15rem;
+    grid-template-columns: minmax(0, 1fr);
+    border-radius: .2rem;
+    border-left: 5px solid var(--bs-primary);
+    background: var(--bs-body-bg);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 10%);
+  }
+
+  .absence-list-table.mobile-card-table tbody td {
+    padding: .1rem 0;
+    border: 0;
+    box-shadow: none;
+    font-size: .72rem;
+  }
+
+  .absence-list-table.mobile-card-table tbody td[data-label="Utente"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    background: transparent;
+    font-size: .85rem;
+    line-height: 1.35;
+    margin-bottom: .2rem;
+  }
+
+  .absence-list-table td[data-label="Utente"] .fw-medium {
+    font-weight: 700 !important;
+  }
+
+  .absence-list-table td[data-label="Utente"] .badge {
+    background: var(--bs-primary-bg-subtle) !important;
+    color: var(--bs-primary-text-emphasis) !important;
+    border: 1px solid var(--bs-primary-border-subtle);
+    border-radius: .35rem;
+    font-size: .62rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .absence-list-table.mobile-card-table tbody td[data-label="Utente"]::before,
+  .absence-list-table.mobile-card-table tbody td[data-label="Azioni"]::before,
+  .absence-list-table.mobile-card-table tbody td[data-label="Dal"]::before,
+  .absence-list-table.mobile-card-table tbody td[data-label="Al"],
+  .absence-list-table .absence-desktop-date {
+    display: none;
+  }
+
+  .absence-list-table .absence-mobile-period {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    color: var(--bs-secondary-color);
+    font-size: .7rem;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .absence-mobile-period svg { flex-shrink: 0; }
+  .absence-date-arrow { margin-inline: .2rem; opacity: .65; }
+
+  .absence-list-table.mobile-card-table tbody td[data-label="Nota"] {
+    padding-top: .1rem;
+    border: 0;
+    color: var(--bs-secondary-color);
+    line-height: 1.45;
+  }
+
+  .absence-list-table.mobile-card-table tbody td[data-label="Nota"]::before {
+    display: none;
+  }
+
+  .absence-list-table.mobile-card-table tbody td[data-label="Nota"],
+  .absence-list-table.mobile-card-table tbody td[data-label="Azioni"] {
+    grid-column: 1 / -1;
+  }
+
+  .absence-list-table.mobile-card-table tbody td[data-label="Azioni"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .absence-list-table.mobile-card-table tbody td[data-empty="true"],
+  .absence-list-table.mobile-card-table tbody td[data-label="Azioni"]:empty {
+    display: none;
+  }
+}

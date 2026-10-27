@@ -15,6 +15,8 @@ const dateKey = (date) => {
   return `${year}-${month}-${day}`;
 };
 const parseDate = (value) => value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null;
+const formatPatientCalendarName = (patient) =>
+  `${patient.lastName?.trim() || "********"} ${patient.firstName?.trim() || "********"}`;
 
 export const Calendar = ({ presentations, patients, doctors, users = [], invitedEvents = [], absences = [], currentUser, presidentId }) => {
   const [displayedMonth, setDisplayedMonth] = useState(() => {
@@ -47,7 +49,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
           ...stayDates,
           type: "patient",
           patient,
-          title: `${patient.lastName} ${patient.firstName}`,
+          title: formatPatientCalendarName(patient),
           detail: [
             patient.admissionType === "scheduled" ? "Ricovero programmato" : patient.admissionType === "consultation" ? "Consulto" : "Emergenza",
             !isGvp ? patient.pathology : "",
@@ -59,7 +61,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
           date: patient.details.anesthesiologistDate.slice(0, 10),
           type: "patient",
           patient,
-          title: `Visita con l’anestesista — ${patient.lastName} ${patient.firstName}`,
+          title: `Visita con l’anestesista — ${formatPatientCalendarName(patient)}`,
           detail: [
             patient.details.anesthesiologistTime ? `Ore ${patient.details.anesthesiologistTime}` : "",
             patient.details.anesthesiologistName ? `Anestesista: ${patient.details.anesthesiologistName}` : "",
@@ -240,7 +242,7 @@ export const Calendar = ({ presentations, patients, doctors, users = [], invited
           <section className="card entity-modal-card patient-modal-card">
             <div className="card-header d-flex align-items-center gap-3">
               <h2 className="card-title mb-0" id="calendar-patient-title">
-                Paziente — {selectedPatient.lastName} {selectedPatient.firstName}
+                Paziente — {formatPatientCalendarName(selectedPatient)}
               </h2>
               <button className="btn-close ms-auto" type="button" aria-label="Chiudi" onClick={() => setSelectedPatient(null)} />
             </div>
