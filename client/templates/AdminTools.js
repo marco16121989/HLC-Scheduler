@@ -3,6 +3,7 @@ import { Meteor } from "meteor/meteor";
 import { Accounts } from "meteor/accounts-base";
 import { AdminLoginMessages } from "./AdminLoginMessages.js";
 import { AdminEmailSettings } from "./AdminEmailSettings.js";
+import { groupPresidentsByRegion } from "/imports/utils/presidentRegions";
 
 export const AdminTools = ({ users = [], loginMessages = [], loading = false }) => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -12,6 +13,7 @@ export const AdminTools = ({ users = [], loginMessages = [], loading = false }) 
   const [search, setSearch] = useState("");
   const [starting, setStarting] = useState(false);
   const presidents = useMemo(() => users.filter((item) => item.role === "Presidente").sort((a, b) => (a.firstName || a.username || "").localeCompare(b.firstName || b.username || "", "it-IT")), [users]);
+  const presidentsByRegion = useMemo(() => groupPresidentsByRegion(presidents.filter((item) => !item.disabled)), [presidents]);
   const userById = useMemo(() => new Map(users.map((item) => [item.id, item])), [users]);
 
   const organizationUsers = users.filter((item) => {
@@ -107,7 +109,10 @@ export const AdminTools = ({ users = [], loginMessages = [], loading = false }) 
               {searchResults.length === 0 && <p className="text-secondary mb-0">Nessun utente trovato.</p>}
             </div>}
             <div className="admin-assistance-divider"><span>oppure scegli il CAS</span></div>
-            <div className="d-grid gap-2">{presidents.filter((item) => !item.disabled).map((president) => <button className="btn btn-outline-primary text-start p-3" type="button" key={president.id} onClick={() => { setPresidentId(president.id); setRole("Presidente"); setUserId(president.id); }}><strong className="d-block">{president.casMembership || "CAS non specificato"}</strong><small className="text-secondary">Presidente: {president.username}</small></button>)}</div>
+            <div className="d-grid gap-2">{presidentsByRegion.map(({ region, users: regionPresidents }) => <details className="border rounded p-3" key={region}>
+              <summary className="fw-semibold">{region} <span className="badge text-bg-secondary ms-2">{regionPresidents.length}</span></summary>
+              <div className="d-grid gap-2 mt-3">{regionPresidents.map((president) => <button className="btn btn-outline-primary text-start p-3" type="button" key={president.id} onClick={() => { setPresidentId(president.id); setRole("Presidente"); setUserId(president.id); }}><strong className="d-block">{president.casMembership || "CAS non specificato"}</strong><small className="text-secondary">Presidente: {president.username}</small></button>)}</div>
+            </details>)}</div>
           </> : <>
             <div className="nav nav-tabs mb-3" role="tablist" aria-label="Ruolo utente da assistere">{["Presidente", "CAS", "GVP"].map((itemRole) => <button className={`nav-link ${role === itemRole ? "active" : ""}`} type="button" role="tab" key={itemRole} aria-selected={role === itemRole} onClick={() => { setRole(itemRole); setUserId(organizationUsers.find((item) => item.role === itemRole)?.id || ""); }}>{itemRole}</button>)}</div>
             <label className="form-label" htmlFor="assistance-user">Utente</label>
