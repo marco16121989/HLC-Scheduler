@@ -2802,11 +2802,11 @@ button[aria-label^="Informazioni sui permessi"] span::after {
     display: none;
   }
 
-  .patient-list-table tbody td[data-label]:not([data-label="Paziente"]):not([data-label="Azioni"]) {
+  .patient-list-table tbody td[data-label]:not([data-label="Paziente"]):not([data-label="Note"]) {
     display: none !important;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"] {
+  .patient-list-table tbody td[data-label="Note"] {
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: 4.75rem minmax(0, 1fr);
@@ -2815,12 +2815,12 @@ button[aria-label^="Informazioni sui permessi"] span::after {
     padding: 0.35rem 0.45rem;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"] > .patient-row-actions {
+  .patient-list-table tbody td[data-label="Note"] > .patient-row-actions {
     width: 100%;
     justify-self: stretch;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"] .btn {
+  .patient-list-table tbody td[data-label="Note"] .btn {
     height: 2.75rem;
     padding: 0.3rem 0.5rem;
     font-size: 0.78rem;
@@ -3286,7 +3286,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
     flex: 1 0 100%;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"] {
+  .patient-list-table tbody td[data-label="Note"] {
     position: static;
     display: flex;
     align-items: center;
@@ -3298,11 +3298,11 @@ button[aria-label^="Informazioni sui permessi"] span::after {
     background: transparent;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"]::before {
+  .patient-list-table tbody td[data-label="Note"]::before {
     display: none;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"] > .patient-row-actions {
+  .patient-list-table tbody td[data-label="Note"] > .patient-row-actions {
     flex: 0 0 auto;
     width: auto;
     height: auto;
@@ -3310,7 +3310,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
     justify-content: flex-end;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"] .btn {
+  .patient-list-table tbody td[data-label="Note"] .btn {
     position: absolute;
     top: 50%;
     right: 0.5rem;
@@ -3350,13 +3350,13 @@ button[aria-label^="Informazioni sui permessi"] span::after {
     display: block;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"] .patient-note-button {
+  .patient-list-table tbody td[data-label="Note"] .patient-note-button {
     width: 3.6rem;
     min-width: 3.6rem;
     padding-inline: .35rem;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"] .patient-note-button.btn-warning {
+  .patient-list-table tbody td[data-label="Note"] .patient-note-button.btn-warning {
     border-color: var(--bs-warning);
     background: var(--bs-warning);
     color: #241a00;
@@ -3377,8 +3377,8 @@ button[aria-label^="Informazioni sui permessi"] span::after {
     gap: 0.3rem;
   }
 
-  .patient-list-table tbody td[data-label="Azioni"] .btn:hover,
-  .patient-list-table tbody td[data-label="Azioni"] .btn:focus-visible {
+  .patient-list-table tbody td[data-label="Note"] .btn:hover,
+  .patient-list-table tbody td[data-label="Note"] .btn:focus-visible {
     border-color: var(--bs-primary);
     background: color-mix(in srgb, var(--bs-primary) 88%, black);
     color: var(--bs-white);
