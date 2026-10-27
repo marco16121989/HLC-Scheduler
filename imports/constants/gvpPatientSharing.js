@@ -14,6 +14,8 @@ export const GVP_PATIENT_SUMMARY_FIELDS = [
   ["details.hospitalBed", "Numero letto"],
   ["details.visitingHoursFrom", "Orario visita dalle"],
   ["details.visitingHoursTo", "Orario visita alle"],
+  ["details.visitingHoursSecondFrom", "Seconda fascia visita dalle"],
+  ["details.visitingHoursSecondTo", "Seconda fascia visita alle"],
   ["details.anesthesiologistDate", "Visita con l’anestesista"],
   ["details.anesthesiologistTime", "Orario visita Anestesista"],
   ["details.anesthesiologistName", "Anestesista"],

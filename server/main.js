@@ -401,6 +401,7 @@ const standardPatientProjection = (hiddenFields = []) => {
     "doctorId", "details.sex", "details.maidenName", "details.departmentId", "details.hospitalFloor", "details.hospitalRoom",
     "details.hospitalBed", "details.anesthesiologistDate", "details.anesthesiologistTime",
     "details.anesthesiologistName", "details.visitingHoursFrom", "details.visitingHoursTo",
+    "details.visitingHoursSecondFrom", "details.visitingHoursSecondTo",
   ].map((field) => [field, 1]));
   hiddenFields.forEach((field) => delete projection[field]);
   projection.status = 1;

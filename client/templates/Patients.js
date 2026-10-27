@@ -136,6 +136,8 @@ export const DETAIL_SECTIONS = [
       ["hospitalBed", "Numero letto"],
       ["visitingHoursFrom", "Orario visita dalle", "time"],
       ["visitingHoursTo", "Orario visita alle", "time"],
+      ["visitingHoursSecondFrom", "Seconda fascia visita dalle", "time"],
+      ["visitingHoursSecondTo", "Seconda fascia visita alle", "time"],
       ["hospitalPhone", "Telefono dell’ospedale", "tel"],
       ["congregation", "Congregazione"],
       ["localElders", "Anziani locali contattati"],
@@ -923,8 +925,8 @@ export const Patients = ({
   };
 
   const savePatient = () => {
-    if ((details.visitingHoursFrom || details.visitingHoursTo)
-      && (!details.visitingHoursFrom || !details.visitingHoursTo || details.visitingHoursFrom >= details.visitingHoursTo)) {
+    if ([[details.visitingHoursFrom, details.visitingHoursTo], [details.visitingHoursSecondFrom, details.visitingHoursSecondTo]]
+      .some(([from, to]) => (from || to) && (!from || !to || from >= to))) {
       setError("Completa l’orario visita: indica un orario iniziale e un orario finale successivo.");
       setActiveTab("main");
       return false;
@@ -1499,7 +1501,13 @@ export const Patients = ({
     { label: "Piano", value: details.hospitalFloor },
     { label: "Numero camera", value: details.hospitalRoom },
     { label: "Numero letto", value: details.hospitalBed },
-    { label: "Orario visita", value: [details.visitingHoursFrom && `Dalle ${details.visitingHoursFrom}`, details.visitingHoursTo && `alle ${details.visitingHoursTo}`].filter(Boolean).join(" ") },
+    {
+      label: "Orario visita",
+      visitingSlots: [
+        ["Prima fascia", details.visitingHoursFrom, details.visitingHoursTo],
+        ["Seconda fascia", details.visitingHoursSecondFrom, details.visitingHoursSecondTo],
+      ],
+    },
     { label: "Visita con l’anestesista", value: details.anesthesiologistDate },
     { label: "Orario visita Anestesista", value: details.anesthesiologistTime },
     { label: "Anestesista", value: details.anesthesiologistName },
@@ -2063,7 +2071,7 @@ export const Patients = ({
                             setDetails((current) => ({ ...current, [name]: value }));
                             setError("");
                           }}
-                          columnClassName="col-12 col-sm-4 col-lg-2"
+                          columnClassName="col-12 col-sm-4"
                         />
                         <PatientDetailField
                           field={["hospitalRoom", "Numero camera"]}
@@ -2072,7 +2080,7 @@ export const Patients = ({
                             setDetails((current) => ({ ...current, [name]: value }));
                             setError("");
                           }}
-                          columnClassName="col-12 col-sm-4 col-lg-2"
+                          columnClassName="col-12 col-sm-4"
                         />
                         <PatientDetailField
                           field={["hospitalBed", "Numero letto"]}
@@ -2081,34 +2089,36 @@ export const Patients = ({
                             setDetails((current) => ({ ...current, [name]: value }));
                             setError("");
                           }}
-                          columnClassName="col-12 col-sm-4 col-lg-2"
+                          columnClassName="col-12 col-sm-4"
                         />
-                        <div className="col-12 col-lg-6" role="group" aria-labelledby="patient-visiting-hours-label">
-                          <div className="form-label" id="patient-visiting-hours-label">Orario visita</div>
-                          <div className="row g-2">
-                            <PatientDetailField
-                              field={["visitingHoursFrom", "Dalle", "time"]}
-                              hideLabel
-                              value={details.visitingHoursFrom}
-                              onChange={(name, value) => {
-                                setDetails((current) => ({ ...current, [name]: value }));
-                                setError("");
-                              }}
-                              columnClassName="col-6"
-                            />
-                            <PatientDetailField
-                              field={["visitingHoursTo", "Alle", "time"]}
-                              hideLabel
-                              value={details.visitingHoursTo}
-                              onChange={(name, value) => {
-                                setDetails((current) => ({ ...current, [name]: value }));
-                                setError("");
-                              }}
-                              columnClassName="col-6"
-                            />
-                          </div>
-                        </div>
                       </div>
+                      <fieldset className="patient-visiting-hours-box w-100">
+                        <legend>Orari di visita</legend>
+                        <div className="patient-visiting-hours-grid">
+                          {[
+                            ["Prima fascia", "visitingHoursFrom", "visitingHoursTo", false],
+                            ["Seconda fascia", "visitingHoursSecondFrom", "visitingHoursSecondTo", true],
+                          ].map(([label, from, to, optional]) => (
+                            <fieldset key={from} className="patient-visiting-hours-slot">
+                              <legend>{label}{optional && <span className="patient-visiting-hours-optional">Facoltativa</span>}</legend>
+                              <div className="row g-2">
+                                {[[from, "Dalle"], [to, "Alle"]].map(([name, fieldLabel]) => (
+                                  <PatientDetailField
+                                    key={name}
+                                    field={[name, fieldLabel, "time"]}
+                                    value={details[name]}
+                                    onChange={(fieldName, value) => {
+                                      setDetails((current) => ({ ...current, [fieldName]: value }));
+                                      setError("");
+                                    }}
+                                    columnClassName="col-6"
+                                  />
+                                ))}
+                              </div>
+                            </fieldset>
+                          ))}
+                        </div>
+                      </fieldset>
                       <div className="d-none">
                         <div className="form-label">Medico responsabile</div>
                         <button className="btn btn-outline-primary w-100" type="button" onClick={openDoctorSelectionModal} disabled={visibleDoctors.length === 0}>
@@ -2642,9 +2652,20 @@ export const Patients = ({
                       </div>
                       <div className="patient-summary-grid">
                         {mainSummaryEntries.map((entry) => (
-                          <div className="patient-summary-item" key={`${entry.label}-${entry.value}`}>
+                          <div className={`patient-summary-item${entry.visitingSlots ? " patient-summary-visiting-hours" : ""}`} key={entry.label}>
                             <div className="patient-summary-label">{entry.label}</div>
-                            <div className="patient-summary-value">{entry.label === "GVP assegnati" ? <PatientAssignees users={selectedGvpUsers} type="GVP" singleLine /> : renderSummaryValue(entry.value, entry.label) || "-"}</div>
+                            {entry.visitingSlots ? (
+                              <div className="patient-summary-visiting-slots">
+                                {entry.visitingSlots.map(([label, from, to]) => (
+                                  <div key={label}>
+                                    <div className="patient-summary-slot-label">{label}</div>
+                                    <div className="patient-summary-value">{[from && `Dalle ${from}`, to && `alle ${to}`].filter(Boolean).join(" ") || "Non compilata"}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="patient-summary-value">{entry.label === "GVP assegnati" ? <PatientAssignees users={selectedGvpUsers} type="GVP" singleLine /> : renderSummaryValue(entry.value, entry.label) || "-"}</div>
+                            )}
                           </div>
                         ))}
                       </div>
