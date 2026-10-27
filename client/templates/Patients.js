@@ -1735,7 +1735,7 @@ export const Patients = ({
                         {gvpSummaryEntries.map((entry) => (
                           <div className="patient-summary-item" key={`${entry.label}-${entry.value}`}>
                             <div className="patient-summary-label">{entry.label}</div>
-                            <div className="patient-summary-value">{renderSummaryValue(entry.value, entry.label) || "-"}</div>
+                            <div className="patient-summary-value">{entry.label === "GVP assegnati" ? <PatientAssignees users={selectedGvpUsers} type="GVP" singleLine /> : renderSummaryValue(entry.value, entry.label) || "-"}</div>
                           </div>
                         ))}
                       </div>
@@ -2644,7 +2644,7 @@ export const Patients = ({
                         {mainSummaryEntries.map((entry) => (
                           <div className="patient-summary-item" key={`${entry.label}-${entry.value}`}>
                             <div className="patient-summary-label">{entry.label}</div>
-                            <div className="patient-summary-value">{renderSummaryValue(entry.value, entry.label) || "-"}</div>
+                            <div className="patient-summary-value">{entry.label === "GVP assegnati" ? <PatientAssignees users={selectedGvpUsers} type="GVP" singleLine /> : renderSummaryValue(entry.value, entry.label) || "-"}</div>
                           </div>
                         ))}
                       </div>

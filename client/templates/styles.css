@@ -1814,6 +1814,39 @@ svg.admin-nav-icon {
   white-space: pre-wrap;
 }
 
+.patient-assignees-single-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.patient-assignees-single-line > .patient-assignee-visible-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.patient-assignees-single-line .patient-assignee-visible-name > .badge {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.patient-assignees-single-line > button {
+  flex-shrink: 0;
+}
+
+.patient-assignees-measurements {
+  position: fixed;
+  visibility: hidden;
+  pointer-events: none;
+  width: max-content;
+  white-space: nowrap;
+}
+
 .patient-summary-value a {
   color: var(--bs-primary);
   font-weight: 600;
