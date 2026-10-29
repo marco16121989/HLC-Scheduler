@@ -63,8 +63,8 @@ const NoteButtonContent = ({ unreadCount = 0, label = "GVP" }) => <span classNam
 const PatientMobileLocation = ({ patient, departmentName, hospitalName }) => <span className="patient-mobile-location">
   <span><strong>Ospedale:</strong> {hospitalName || patient.details?.hospitalName || "-"}</span>
   <span><strong>Reparto:</strong> {patient.details?.departmentId === MASKED_VALUE ? MASKED_VALUE : departmentName || patient.details?.hospitalDepartment || "-"}</span>
-  <span><strong>Piano:</strong> {patient.details?.hospitalFloor || "-"}</span>
   <span><strong>Lotto:</strong> {patient.details?.hospitalLot || "-"}</span>
+  <span><strong>Piano:</strong> {patient.details?.hospitalFloor || "-"}</span>
   <span><strong>Camera:</strong> {patient.details?.hospitalRoom || "-"}</span>
   <span><strong>Letto:</strong> {patient.details?.hospitalBed || "-"}</span>
 </span>;
@@ -132,8 +132,8 @@ export const DETAIL_SECTIONS = [
       ["motherBaptized", "Madre battezzata?", "yesno"],
       ["familySituation", "Situazione familiare", "textarea"],
       ["hospitalName", "Nome dell’ospedale"],
-      ["hospitalFloor", "Piano"],
       ["hospitalLot", "Lotto"],
+      ["hospitalFloor", "Piano"],
       ["hospitalRoom", "Numero camera"],
       ["hospitalBed", "Numero letto"],
       ["visitingHoursFrom", "Orario visita dalle", "time"],
@@ -1500,8 +1500,8 @@ export const Patients = ({
     ...(patientStatus === "Trasferito" ? [{ label: "Destinazione del trasferimento", value: transferNotes }] : []),
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
     { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join("\n") : "Nessun medico consigliato" },
-    { label: "Piano", value: details.hospitalFloor },
     { label: "Lotto", value: details.hospitalLot },
+    { label: "Piano", value: details.hospitalFloor },
     { label: "Numero camera", value: details.hospitalRoom },
     { label: "Numero letto", value: details.hospitalBed },
     {
@@ -2070,8 +2070,8 @@ export const Patients = ({
                       </div>
                       <div className="row g-3 w-100">
                         <PatientDetailField
-                          field={["hospitalFloor", "Piano"]}
-                          value={details.hospitalFloor}
+                          field={["hospitalLot", "Lotto"]}
+                          value={details.hospitalLot}
                           onChange={(name, value) => {
                             setDetails((current) => ({ ...current, [name]: value }));
                             setError("");
@@ -2079,8 +2079,8 @@ export const Patients = ({
                           columnClassName="col-12 col-sm-6 col-lg-3"
                         />
                         <PatientDetailField
-                          field={["hospitalLot", "Lotto"]}
-                          value={details.hospitalLot}
+                          field={["hospitalFloor", "Piano"]}
+                          value={details.hospitalFloor}
                           onChange={(name, value) => {
                             setDetails((current) => ({ ...current, [name]: value }));
                             setError("");
