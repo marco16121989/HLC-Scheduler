@@ -10,6 +10,7 @@ export const GVP_PATIENT_SUMMARY_FIELDS = [
   ["doctorId", "Medico responsabile"],
   ["recommendedDoctorIds", "Medici consigliati"],
   ["details.hospitalFloor", "Piano"],
+  ["details.hospitalLot", "Lotto"],
   ["details.hospitalRoom", "Numero camera"],
   ["details.hospitalBed", "Numero letto"],
   ["details.visitingHoursFrom", "Orario visita dalle"],

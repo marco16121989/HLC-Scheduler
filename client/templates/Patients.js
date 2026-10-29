@@ -64,6 +64,7 @@ const PatientMobileLocation = ({ patient, departmentName, hospitalName }) => <sp
   <span><strong>Ospedale:</strong> {hospitalName || patient.details?.hospitalName || "-"}</span>
   <span><strong>Reparto:</strong> {patient.details?.departmentId === MASKED_VALUE ? MASKED_VALUE : departmentName || patient.details?.hospitalDepartment || "-"}</span>
   <span><strong>Piano:</strong> {patient.details?.hospitalFloor || "-"}</span>
+  <span><strong>Lotto:</strong> {patient.details?.hospitalLot || "-"}</span>
   <span><strong>Camera:</strong> {patient.details?.hospitalRoom || "-"}</span>
   <span><strong>Letto:</strong> {patient.details?.hospitalBed || "-"}</span>
 </span>;
@@ -132,6 +133,7 @@ export const DETAIL_SECTIONS = [
       ["familySituation", "Situazione familiare", "textarea"],
       ["hospitalName", "Nome dell’ospedale"],
       ["hospitalFloor", "Piano"],
+      ["hospitalLot", "Lotto"],
       ["hospitalRoom", "Numero camera"],
       ["hospitalBed", "Numero letto"],
       ["visitingHoursFrom", "Orario visita dalle", "time"],
@@ -1499,6 +1501,7 @@ export const Patients = ({
     { label: "Medico responsabile", value: doctor ? `${doctor.lastName} ${doctor.firstName}` : "Non assegnato" },
     { label: "Medici consigliati", value: recommendedDoctors.length > 0 ? recommendedDoctors.map((item) => `${item.lastName} ${item.firstName}`).join("\n") : "Nessun medico consigliato" },
     { label: "Piano", value: details.hospitalFloor },
+    { label: "Lotto", value: details.hospitalLot },
     { label: "Numero camera", value: details.hospitalRoom },
     { label: "Numero letto", value: details.hospitalBed },
     {
@@ -2073,7 +2076,16 @@ export const Patients = ({
                             setDetails((current) => ({ ...current, [name]: value }));
                             setError("");
                           }}
-                          columnClassName="col-12 col-sm-4"
+                          columnClassName="col-12 col-sm-6 col-lg-3"
+                        />
+                        <PatientDetailField
+                          field={["hospitalLot", "Lotto"]}
+                          value={details.hospitalLot}
+                          onChange={(name, value) => {
+                            setDetails((current) => ({ ...current, [name]: value }));
+                            setError("");
+                          }}
+                          columnClassName="col-12 col-sm-6 col-lg-3"
                         />
                         <PatientDetailField
                           field={["hospitalRoom", "Numero camera"]}
@@ -2082,7 +2094,7 @@ export const Patients = ({
                             setDetails((current) => ({ ...current, [name]: value }));
                             setError("");
                           }}
-                          columnClassName="col-12 col-sm-4"
+                          columnClassName="col-12 col-sm-6 col-lg-3"
                         />
                         <PatientDetailField
                           field={["hospitalBed", "Numero letto"]}
@@ -2091,7 +2103,7 @@ export const Patients = ({
                             setDetails((current) => ({ ...current, [name]: value }));
                             setError("");
                           }}
-                          columnClassName="col-12 col-sm-4"
+                          columnClassName="col-12 col-sm-6 col-lg-3"
                         />
                       </div>
                       <fieldset className="patient-visiting-hours-box w-100">
