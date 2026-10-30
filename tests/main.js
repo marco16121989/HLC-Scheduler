@@ -1,4 +1,5 @@
 import assert from "assert";
+import "./userManual.test.js";
 import "./gvpPatientPhones.test.js";
 import "./patientPhoneContacts.test.js";
 import "./patientAssignmentUsers.test.js";

@@ -4866,3 +4866,21 @@ button[aria-label^="Informazioni sui permessi"] span::after {
     display: none;
   }
 }
+
+/* Manuale d'uso per ruolo */
+.user-manual { --manual-gap: 1rem; }
+.user-manual-role { display: inline-block; padding: .3em .65em; border: 1px solid var(--bs-border-color); border-radius: .65rem; font-size: .55em; vertical-align: middle; }
+.user-manual .card-body { line-height: 1.75; }
+.user-manual .user-manual-intro .card-body { padding: 1.5rem; }
+.user-manual li { margin-bottom: .6rem; }
+.user-manual-index { position: sticky; top: 1rem; max-height: calc(100dvh - 2rem); overflow-y: auto; }
+.user-manual-index ol { padding-left: 1.3rem; }
+.user-manual-index .btn-link { padding: .15rem 0; font-size: inherit; line-height: 1.45; text-decoration: none; }
+.user-manual-index .btn-link:hover { text-decoration: underline; }
+.user-manual-chapter { margin-bottom: 1.5rem; }
+.user-manual-chapter .card-title { float: none; font-size: 1.3rem; line-height: 1.5; scroll-margin-top: 5rem; }
+.user-manual-chapter .card-body { padding: 1.4rem; }
+.user-manual-chapter h3 { font-size: 1.05rem; font-weight: 700; margin: 1.4rem 0 .7rem; }
+.user-manual-block + .user-manual-block { margin-top: 1.2rem; }
+.user-manual-chapter h2:focus { outline: 2px solid var(--bs-primary); outline-offset: .3rem; border-radius: .2rem; }
+@media (max-width: 991px) { .user-manual-index { position: static; max-height: none; } }

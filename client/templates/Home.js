@@ -27,9 +27,11 @@ import { Permissions } from "./Permissions.js";
 import { Hospitality } from "./Hospitality.js";
 import { AnnualReport } from "./AnnualReport.js";
 import { Reports } from "./Reports.js";
+import { UserManual } from "./UserManual.js";
 import { getPagePermission } from "/imports/constants/pagePermissions";
 
 const ICON_PATHS = {
+  manual: ["M3 4h7a3 3 0 0 1 3 3v15a4 4 0 0 0-4-3H3z", "M13 7a3 3 0 0 1 3-3h6v15h-5a4 4 0 0 0-4 3"],
   dashboard: ["M3 13h8V3H3z", "M13 21h8V11h-8z", "M13 3h8v6h-8z", "M3 15h8v6H3z"],
   calendar: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18"],
   events: ["M3 5h18v16H3z", "M16 3v4M8 3v4M3 10h18", "M8 15h8M12 11v8"],
@@ -413,6 +415,12 @@ export const Home = ({
                 </a>
               </li>}
               <li className="sidebar-section-label menu-order-support">Assistenza</li>
+              {canViewPage("manual") && <li className="nav-item menu-order-support-item">
+                <button className={`nav-link w-100 ${activeView === "manual" ? "active" : ""}`} type="button" onClick={() => openView("manual")}>
+                  <MenuIcon name="manual" />
+                  <p>Manuale d'uso</p>
+                </button>
+              </li>}
               {user.role !== "GVP" && canViewPage("support") && <li className="nav-item menu-order-support-item">
                 <button className={`nav-link w-100 ${activeView === "support" ? "active" : ""}`} type="button" onClick={() => openView("support")}>
                   <MenuIcon name="support" />
@@ -654,6 +662,8 @@ export const Home = ({
           <Absences absences={absences} users={users} currentUser={user} />
         ) : activeView === "settings" ? (
           <Settings currentUser={user} theme={theme} onToggleTheme={onToggleTheme} fontSize={fontSize} onFontSizeChange={onFontSizeChange} highContrast={highContrast} onToggleHighContrast={onToggleHighContrast} boldText={boldText} onToggleBoldText={onToggleBoldText} pushNotifications={pushNotifications} />
+        ) : activeView === "manual" && canViewPage("manual") ? (
+          <UserManual currentUser={user} onOpenView={openView} />
         ) : activeView === "info" ? (
           <Info />
         ) : activeView === "notifications" ? (
