@@ -129,8 +129,9 @@ export const Home = ({
   onToggleBoldText,
   onLogout,
 }) => {
+  const resolveView = (view) => user.role === "Admin" && view === "permissions" ? "home" : view || "home";
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeView, setActiveView] = useState(() => globalThis.history?.state?.hlcView || "home");
+  const [activeView, setActiveView] = useState(() => resolveView(globalThis.history?.state?.hlcView));
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsMenuRef = useRef(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -147,7 +148,7 @@ export const Home = ({
       : user.role === "CAS" || user.role === "GVP"
         ? user.presidentId || user.associationId
         : "";
-  const canViewPage = (pageId) => getPagePermission(user, pageId).view;
+  const canViewPage = (pageId) => !(user.role === "Admin" && pageId === "permissions") && getPagePermission(user, pageId).view;
   const canEditPage = (pageId) => getPagePermission(user, pageId).edit;
   const pageResources = user.role === "Admin" ? [] : DATA_RESOURCES_BY_VIEW[activeView] || [];
   const pageSubscription = useTracker(() => {
@@ -159,7 +160,7 @@ export const Home = ({
   }, [user.role, activeView]);
   const adminSubscriptions = useTracker(() => {
     const isAdmin = user.role === "Admin";
-    const directory = isAdmin && ["users", "admin-tools", "permissions"].includes(activeView)
+    const directory = isAdmin && ["users", "admin-tools"].includes(activeView)
       ? Meteor.subscribe("hlc-admin-directory")
       : null;
     const accessLogs = isAdmin && activeView === "home"
@@ -180,7 +181,7 @@ export const Home = ({
   }, [user.role, activeView]);
   const pageLoading = (pageResources.length > 0 && !pageSubscription.ready) ||
     (user.role === "Admin" && activeView === "home" && !adminSubscriptions.accessLogsReady) ||
-    (user.role === "Admin" && ["users", "permissions"].includes(activeView) && !adminSubscriptions.directoryReady) ||
+    (user.role === "Admin" && activeView === "users" && !adminSubscriptions.directoryReady) ||
     (user.role === "Admin" && activeView === "admin-tools" && (!adminSubscriptions.directoryReady || !adminSubscriptions.toolsReady)) ||
     (user.role === "Admin" && activeView === "support" && !adminSubscriptions.supportReady);
   const closeSidebar = () => {
@@ -202,7 +203,7 @@ export const Home = ({
     }
     const handleHistoryNavigation = (event) => {
       if (event.state?.hlcView) {
-        setActiveView(event.state.hlcView);
+        setActiveView(resolveView(event.state.hlcView));
         closeSidebar();
         return;
       }
@@ -462,7 +463,7 @@ export const Home = ({
               </li>
               </>
               )}
-              {(user.role === "Presidente" || canViewPage("cas") || canViewPage("gvp")) && <li className="sidebar-section-label menu-order-team">Squadra</li>}
+              {user.role !== "Admin" && (user.role === "Presidente" || canViewPage("cas") || canViewPage("gvp")) && <li className="sidebar-section-label menu-order-team">Squadra</li>}
               {(user.role === "Presidente" || user.role === "CAS") && canViewPage("cas") && (
                 <li className="nav-item menu-order-team">
                   <button
@@ -702,8 +703,8 @@ export const Home = ({
             hospitals={hospitals}
             manager={user}
           />
-        ) : activeView === "permissions" && (presidentId || user.role === "Admin") && canViewPage("permissions") ? (
-          <Permissions users={users} presidentId={presidentId} canEdit={canEditPage("permissions")} isAdmin={user.role === "Admin"} canManagePresident={["CAS", "Presidente"].includes(user.role)} />
+        ) : activeView === "permissions" && presidentId && canViewPage("permissions") ? (
+          <Permissions users={users} presidentId={presidentId} canEdit={canEditPage("permissions")} canManagePresident={["CAS", "Presidente"].includes(user.role)} />
         ) : activeView === "hospitals" && presidentId && canViewPage("hospitals") ? (
           <Hospitals
             hospitals={hospitals}

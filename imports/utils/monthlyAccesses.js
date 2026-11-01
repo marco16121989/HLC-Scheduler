@@ -16,6 +16,18 @@ const romeDay = (date) => {
   return new Date(Date.UTC(value("year"), value("month") - 1, value("day"), 12));
 };
 
+export const filterPeriodAccesses = (logs, period = "day", now = new Date()) => {
+  const start = romeDay(now);
+  if (period === "week") start.setUTCDate(start.getUTCDate() - (start.getUTCDay() + 6) % 7);
+  else if (period === "month") start.setUTCDate(1);
+  else if (period === "year") start.setUTCMonth(0, 1);
+  return logs.filter((log) => {
+    if (!log.userId || log.action || !log.createdAt) return false;
+    const date = new Date(log.createdAt);
+    return Number.isFinite(date.getTime()) && date <= now && romeDay(date) >= start;
+  }).sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
+};
+
 export const buildPeriodAccesses = (logs, period, now = new Date()) => {
   const today = romeDay(now);
   const year = today.getUTCFullYear();

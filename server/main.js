@@ -38,6 +38,8 @@ import { buildUserProfileUpdate, hasUserProfileChanges } from "../imports/api/us
 import { gvpPatientProjection, pickGvpPatientFields } from "../imports/api/gvpPatientVisibility.js";
 import { CLOSED_PATIENT_HIDDEN_FIELDS, shouldMaskPatientIdentity } from "../imports/api/patientPrivacy.js";
 import { recoverInternalTransferPatients } from "../imports/api/patientTransferRecovery.js";
+import { buildAdminCasCounts, groupUserCountsByCas } from "../imports/utils/adminCasCounts.js";
+import { buildDatabaseStorageSummary } from "../imports/utils/databaseStorage.js";
 import { PATIENT_REPORT_FIELDS } from "../imports/api/activityReports.js";
 
 const usefulFileExtensions = new Set([
@@ -854,7 +856,61 @@ Meteor.publish("hlc-annual-reports", async function publishHlcAnnualReports(pres
   return AnnualReportsCollection.find({ presidentId }, { sort: { year: -1 } });
 });
 
+const getAdminCountsByCas = async (kind) => {
+  if (kind === "users") {
+    const accounts = await Meteor.users.find({}, { fields: {
+      "profile.role": 1, "profile.casMembership": 1, "profile.presidentId": 1,
+      "profile.associationId": 1, "profile.casId": 1, "profile.casIds": 1,
+    } }).fetchAsync();
+    return buildAdminCasCounts(accounts.filter((account) => account.profile?.role === "Presidente"), groupUserCountsByCas(accounts));
+  }
+  const collection = kind === "patients" ? PatientsCollection : DoctorsCollection;
+  const [groups, presidents] = await Promise.all([
+    collection.rawCollection().aggregate([
+      { $group: { _id: "$presidentId", count: { $sum: 1 } } },
+    ]).toArray(),
+    Meteor.users.find({ "profile.role": "Presidente" }, { fields: { "profile.casMembership": 1 } }).fetchAsync(),
+  ]);
+  return buildAdminCasCounts(presidents, groups);
+};
+
 Meteor.methods({
+  async "hlc.getAdminDatabaseStorage"() {
+    await requireAdmin(this);
+    try {
+      const database = await PatientsCollection.rawDatabase();
+      const stats = await database.command({ dbStats: 1, scale: 1, maxTimeMS: 5000 });
+      return buildDatabaseStorageSummary(stats, process.env.HLC_DATABASE_CAPACITY_GB || 10);
+    } catch (error) {
+      if (error.code === 13 || error.codeName === "Unauthorized") {
+        throw new Meteor.Error("database-stats-forbidden", "L’utente MongoDB del gestionale non ha il permesso di leggere le statistiche dello spazio (dbStats).");
+      }
+      throw new Meteor.Error("database-stats-unavailable", "Statistiche dello spazio non disponibili. Verifica la connessione e i permessi del database.");
+    }
+  },
+
+  async "hlc.getAdminCountsByCas"(kind) {
+    await requireAdmin(this);
+    check(kind, Match.OneOf("patients", "users", "doctors"));
+    return getAdminCountsByCas(kind);
+  },
+
+  async "hlc.getAdminDoctorCountsByCas"() {
+    await requireAdmin(this);
+    return getAdminCountsByCas("doctors");
+  },
+
+  async "hlc.getAdminDashboardTotals"() {
+    await requireAdmin(this);
+    const [patients, users, doctors, cas] = await Promise.all([
+      PatientsCollection.find({}).countAsync(),
+      Meteor.users.find({}).countAsync(),
+      DoctorsCollection.find({}).countAsync(),
+      Meteor.users.find({ "profile.role": "Presidente" }).countAsync(),
+    ]);
+    return { patients, users, doctors, cas };
+  },
+
   async "hlc.getEmailSettings"() {
     await requireAdmin(this);
     return publicEmailSettings(await EmailSettingsCollection.findOneAsync("smtp"));

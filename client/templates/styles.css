@@ -4659,12 +4659,15 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .admin-president-filter { display: grid; min-width: 245px; gap: .3rem; color: var(--bs-secondary-color); font-size: .75rem; font-weight: 700; }
 .admin-president-filter .form-select { background-color: var(--bs-body-bg); color: var(--bs-body-color); }
 .admin-filter-summary { margin: -.65rem 0 1rem; color: var(--bs-secondary-color); font-size: .8rem; }
-.admin-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1rem; margin-bottom: 1rem; }
+.admin-stat-grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 1rem; margin-bottom: 1rem; }
 .admin-stat-card { position: relative; overflow: hidden; min-height: 135px; padding: 1.15rem 1.25rem; border: 1px solid var(--bs-border-color); border-radius: 14px; background: var(--bs-body-bg); box-shadow: 0 7px 24px rgba(24,39,75,.06); }
 .admin-stat-card::before { position: absolute; inset: 0 auto 0 0; width: 5px; content: ""; background: var(--stat-color); }
 .admin-stat-card span, .admin-stat-card small { display: block; color: var(--bs-secondary-color); }
 .admin-stat-card span { font-size: .84rem; font-weight: 700; }
 .admin-stat-card strong { display: block; margin: .35rem 0 .05rem; color: var(--bs-emphasis-color); font-size: 2.1rem; line-height: 1; }
+button.admin-stat-card { text-align: left; cursor: pointer; }
+button.admin-stat-card:hover { border-color: var(--stat-color); }
+button.admin-stat-card:focus-visible { outline: 3px solid var(--stat-color); outline-offset: 3px; }
 .admin-stat-card small { font-size: .76rem; }
 .admin-stat-blue { --stat-color: #0d6efd; } .admin-stat-violet { --stat-color: #6f42c1; } .admin-stat-green { --stat-color: #198754; } .admin-stat-orange { --stat-color: #fd7e14; }
 .admin-dashboard-card { min-width: 0; padding: 1.2rem 1.3rem; border: 1px solid var(--bs-border-color); border-radius: 14px; background: var(--bs-body-bg); box-shadow: 0 7px 24px rgba(24,39,75,.05); }
@@ -4707,6 +4710,37 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .admin-access-chart { margin-bottom: 1rem; }
 .admin-card-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 .admin-card-heading h2 { margin-bottom: .15rem; }
+.admin-collapse-summary {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  min-height: 2.75rem;
+  list-style: none;
+  cursor: pointer;
+  color: var(--bs-emphasis-color);
+  font-weight: 700;
+}
+.admin-collapse-summary::-webkit-details-marker { display: none; }
+.admin-collapse-summary:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 4px; border-radius: .25rem; }
+.admin-summary-count { font-size: 1.5rem; color: var(--bs-primary); }
+.admin-collapse-arrow { margin-left: auto; font-size: 1.65rem; line-height: 1; }
+details[open] > .admin-collapse-summary .admin-collapse-arrow { transform: rotate(90deg); }
+.admin-collapse-body { margin-top: 1rem; }
+.admin-cas-groups { display: grid; gap: .5rem; margin-top: 1rem; }
+.admin-cas-group { padding: .5rem .75rem; border: 1px solid var(--bs-border-color); border-radius: .5rem; }
+.admin-cas-table { width: 100%; table-layout: fixed; }
+.admin-column-sort { display: inline-flex; align-items: center; gap: .4rem; width: 100%; padding: .2rem 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: pointer; }
+.text-end > .admin-column-sort { justify-content: flex-end; }
+.admin-column-sort svg { flex-shrink: 0; }
+.admin-column-sort:hover { color: var(--bs-primary); }
+.admin-column-sort:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 3px; border-radius: .2rem; }
+.admin-cas-table .admin-cas-name-column { width: 45%; }
+.admin-cas-table .admin-cas-count-column { width: 17%; }
+.admin-cas-table .admin-cas-date-column { width: 38%; }
+.admin-cas-table th, .admin-cas-table td { overflow-wrap: anywhere; }
+.admin-cas-tables-scroll { max-width: 100%; overflow-x: auto; }
+.admin-cas-groups-modal { min-width: 34rem; }
+.admin-cas-groups-modal .table-responsive { overflow: visible; }
 .admin-card-heading p { font-size: .8rem; }
 .admin-chart-period-filter { width: min(210px, 100%); flex: 0 0 auto; }
 .admin-bars { display: flex; align-items: flex-end; gap: clamp(2px,.45vw,8px); height: 235px; padding-top: 2rem; border-bottom: 1px solid var(--bs-border-color); }
