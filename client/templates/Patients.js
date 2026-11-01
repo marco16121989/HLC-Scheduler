@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
+import { CLOSED_PATIENT_HIDDEN_FIELDS, shouldMaskPatientIdentity } from "../../imports/api/patientPrivacy.js";
 import { Meteor } from "meteor/meteor";
 import { PatientPhoneNumbers } from "./PatientPhoneNumbers.js";
 import { PatientAssignees } from "./PatientAssignees.js";
@@ -17,11 +18,10 @@ import { PaginationControls, usePagination } from "./Pagination.js";
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 const MASKED_VALUE = "********";
-const CLOSED_PATIENT_HIDDEN_FIELDS = ["firstName", "lastName", "details.maidenName"];
 const CLOSED_PATIENT_STATUSES = ["Dimesso", "Deceduto", "Trasferito"];
 const TRANSFERRED_PATIENT_PRIVACY_NOTE = "Come da istruzioni dello schiavo il nome e cognome del paziente sono stati eliminati.";
 const maskClosedPatientForDisplay = (patient) => {
-  if (!CLOSED_PATIENT_STATUSES.includes(patient?.status) || isFollowUpPatient(patient)) return patient;
+  if (!shouldMaskPatientIdentity(patient)) return patient;
   const masked = { ...patient, details: { ...(patient.details || {}) } };
   CLOSED_PATIENT_HIDDEN_FIELDS.forEach((path) => {
     const parts = path.split(".");
@@ -60,9 +60,39 @@ const NoteButtonContent = ({ unreadCount = 0, label = "GVP" }) => <span classNam
   {unreadCount > 0 && <span className="patient-note-unread" aria-label={`${unreadCount} nuove note ${label}`}>{unreadCount}</span>}
 </span>;
 
-const PatientMobileLocation = ({ patient, departmentName, hospitalName, className = "patient-mobile-location" }) => <span className={className}>
+const getPatientTransfers = (patient, departmentName, hospitalName) => {
+  const history = Array.isArray(patient.departmentHistory) ? patient.departmentHistory : [];
+  const transfers = history.map((movement, index) => {
+    const previous = history[index - 1];
+    return {
+      ...movement,
+      fromHospitalName: movement.fromHospitalName || previous?.toHospitalName || "Non disponibile",
+      fromDepartmentName: movement.fromDepartmentName || previous?.toDepartmentName || "Non disponibile",
+    };
+  }).filter((movement) => !movement.initialAssignment);
+  if (transfers.length === 0 && patient.status === "Trasferito" && patient.transferNotes) {
+    transfers.push({
+      fromHospitalName: hospitalName || patient.details?.hospitalName || "Non disponibile",
+      fromDepartmentName: departmentName || patient.details?.hospitalDepartment || "Non disponibile",
+      toHospitalName: patient.transferNotes,
+    });
+  }
+  return transfers;
+};
+
+const PatientMobileLocation = ({ patient, departmentName, hospitalName, onOpenTransfers, className = "patient-mobile-location" }) => {
+  const transfers = getPatientTransfers(patient, departmentName, hospitalName);
+  return <span className={className}>
   <span><strong>Ospedale:</strong> {hospitalName || patient.details?.hospitalName || "-"}</span>
-  <span><strong>Reparto:</strong> {patient.details?.departmentId === MASKED_VALUE ? MASKED_VALUE : departmentName || patient.details?.hospitalDepartment || "-"}</span>
+  <span><strong>Reparto:</strong> {patient.details?.departmentId === MASKED_VALUE ? MASKED_VALUE : departmentName || patient.details?.hospitalDepartment || "-"}
+    {transfers.length > 0 && <span className="patient-list-transfer">
+      <button className="badge rounded-pill text-bg-primary border-0" type="button" aria-label={`Visualizza ${transfers.length} trasferimenti`} title="Visualizza trasferimenti"
+        onKeyDown={(event) => event.stopPropagation()}
+        onClick={(event) => { event.stopPropagation(); onOpenTransfers(transfers); }}>
+        Trasferimenti: {transfers.length}
+      </button>
+    </span>}
+  </span>
   <span><strong>Lotto:</strong> {patient.details?.hospitalLot || "-"}</span>
   <span><strong>Piano:</strong> {patient.details?.hospitalFloor || "-"}</span>
   <span><strong>Camera:</strong> {patient.details?.hospitalRoom || "-"}</span>
@@ -72,6 +102,7 @@ const PatientMobileLocation = ({ patient, departmentName, hospitalName, classNam
     [patient.details?.visitingHoursSecondFrom, patient.details?.visitingHoursSecondTo],
   ].map(([from, to]) => [from, to].filter(Boolean).join(" - ")).filter(Boolean).join(" e ") || "-"}</span>
 </span>;
+};
 
 const PATIENT_STATUSES = [
   "In attesa di ricovero",
@@ -414,6 +445,7 @@ export const Patients = ({
   const [stoppingFollowUp, setStoppingFollowUp] = useState(false);
   const [followUpStopError, setFollowUpStopError] = useState("");
   const [transferNotes, setTransferNotes] = useState("");
+  const [listedTransfers, setListedTransfers] = useState(null);
   const [admissionDate, setAdmissionDate] = useState(getToday);
   const [dischargeDate, setDischargeDate] = useState("");
   const [pathology, setPathology] = useState("");
@@ -430,9 +462,12 @@ export const Patients = ({
     ["CAS", "Presidente"].includes(currentUser.role) ? currentUser.id : "all",
   );
   const [statusFilter, setStatusFilter] = useState(followUpOnly ? "Dimesso" : "Ricoverato");
+  const currentYear = new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Europe/Rome" }).format(new Date());
+  const [yearFilter, setYearFilter] = useState(currentYear);
   const [notes, setNotes] = useState("");
   const [details, setDetails] = useState({ isMinorOrNewborn: "No" });
   const [departmentHistory, setDepartmentHistory] = useState([]);
+  const isPatientIdentityMasked = shouldMaskPatientIdentity({ status: patientStatus, followUpEnabled, departmentHistory });
   const [changeHistory, setChangeHistory] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const isGvpReadOnly = isGvp && !canEditPatients;
@@ -508,9 +543,16 @@ export const Patients = ({
     : ["CAS", "Presidente"].includes(currentUser.role) && casFilter !== "all"
       ? organizationPatients.filter((patient) => getPatientCasIds(patient).includes(casFilter))
       : organizationPatients;
-  const visiblePatients = statusFilter === "all"
+  const availableYears = [...new Set([currentYear, ...organizationPatients
+    .map((patient) => typeof patient.admissionDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(patient.admissionDate)
+      ? patient.admissionDate.slice(0, 4) : null).filter(Boolean)])].sort((first, second) => second.localeCompare(first));
+  const yearFilteredPatients = followUpOnly || yearFilter === "all"
     ? roleFilteredPatients
-    : roleFilteredPatients.filter(
+    : roleFilteredPatients.filter((patient) => typeof patient.admissionDate === "string"
+      && patient.admissionDate.slice(0, 4) === yearFilter);
+  const visiblePatients = statusFilter === "all"
+    ? yearFilteredPatients
+    : yearFilteredPatients.filter(
         (patient) => (patient.status || "") === statusFilter,
       );
   const sortedVisiblePatients = [...visiblePatients].sort((first, second) =>
@@ -519,7 +561,7 @@ export const Patients = ({
   const patientPagination = usePagination(
     sortedVisiblePatients,
     25,
-    `${statusFilter}:${casFilter}`,
+    `${statusFilter}:${casFilter}:${yearFilter}`,
   );
   const currentNotePatient = notePatient;
   const visibleDoctors = doctors.filter(
@@ -831,6 +873,9 @@ export const Patients = ({
         changedByName: currentUser.username || `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() || currentUser.role,
         changedByRole: currentUser.role,
         toDepartmentId: "",
+        fromDepartmentId: selectedDepartment?.id || details.departmentId || "",
+        fromDepartmentName: selectedDepartment?.name || details.hospitalDepartment || "",
+        fromHospitalName: selectedDepartment?.hospitalName || details.hospitalName || "",
         toDepartmentName: "Trasferimento esterno",
         toHospitalName: destination,
         external: true,
@@ -851,8 +896,8 @@ export const Patients = ({
     }
 
     if (isEditing && selectedDepartment && departmentChangeMode === "transfer") {
-      setPatientStatus("Trasferito");
-      setTransferNotes(`${department.hospitalName} / ${department.name}`);
+      setPatientStatus("Ricoverato");
+      setTransferNotes("");
       setDepartmentHistory((current) => [
         ...current,
         {
@@ -862,6 +907,9 @@ export const Patients = ({
           changedByName: currentUser.username || `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() || currentUser.role,
           changedByRole: currentUser.role,
           toDepartmentId: department.id,
+          fromDepartmentId: selectedDepartment.id,
+          fromDepartmentName: selectedDepartment.name,
+          fromHospitalName: selectedDepartment.hospitalName,
           toDepartmentName: department.name,
           toHospitalName: department.hospitalName,
         },
@@ -1471,7 +1519,7 @@ export const Patients = ({
   ];
 
   const getSharingSummaryValue = (field) => {
-    if (CLOSED_PATIENT_STATUSES.includes(patientStatus) && !isFollowUpPatient({ status: patientStatus, followUpEnabled }) && CLOSED_PATIENT_HIDDEN_FIELDS.includes(field)) return MASKED_VALUE;
+    if (isPatientIdentityMasked && CLOSED_PATIENT_HIDDEN_FIELDS.includes(field)) return MASKED_VALUE;
     if (field === "firstName") return firstName;
     if (field === "lastName") return lastName;
     if (field === "admissionType") return admissionTypeLabel(admissionType);
@@ -1533,6 +1581,11 @@ export const Patients = ({
           <div className="d-flex align-items-center justify-content-between gap-3">
             <div><h1 className="mb-1">{followUpOnly ? "Follow up" : "Pazienti"}</h1><p className="text-secondary mb-0">{followUpOnly ? "Consulta tutti i dati e lo storico dei pazienti dimessi con follow up attivo." : "Gestisci le informazioni, le assegnazioni e lo storico dei pazienti."}</p></div>
             <div className="d-flex align-items-center gap-2 flex-nowrap patient-header-actions">
+              {!followUpOnly && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra pazienti per anno di accesso"
+                value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
+                <option value="all">Tutti gli anni</option>
+                {availableYears.map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>}
               {!followUpOnly && <select
                 className="form-select w-auto flex-shrink-0"
                 aria-label="Filtra pazienti per stato"
@@ -1541,7 +1594,7 @@ export const Patients = ({
               >
                 <option value="all">Tutti gli stati</option>
                 <option value="">Senza stato</option>
-                {PATIENT_STATUSES.map((status) => (
+                {PATIENT_RECORD_STATUSES.map((status) => (
                   <option key={status} value={status}>{status}</option>
                 ))}
               </select>}
@@ -1744,7 +1797,7 @@ export const Patients = ({
                         {patientStatus === "Trasferito" ? (
                           <>
                             <div>Paziente trasferito: la scheda è bloccata e non può più essere modificata.</div>
-                            <div className="mt-2 fw-semibold">{TRANSFERRED_PATIENT_PRIVACY_NOTE}</div>
+                            {isPatientIdentityMasked && <div className="mt-2 fw-semibold">{TRANSFERRED_PATIENT_PRIVACY_NOTE}</div>}
                           </>
                         ) : "Riepilogo delle informazioni disponibili per il GVP."}
                       </div>
@@ -1762,7 +1815,7 @@ export const Patients = ({
                       {isClosedPatientReadOnly && (
                         <div className="alert alert-warning border-warning mb-3" role="status">
                           <div>Paziente {patientStatus.toLowerCase()}: puoi consultare tutte le informazioni, ma la scheda non può più essere modificata.</div>
-                          {patientStatus === "Trasferito" && <div className="mt-2 fw-semibold">{TRANSFERRED_PATIENT_PRIVACY_NOTE}</div>}
+                          {patientStatus === "Trasferito" && isPatientIdentityMasked && <div className="mt-2 fw-semibold">{TRANSFERRED_PATIENT_PRIVACY_NOTE}</div>}
                           {canEditPatients && patientStatus === "Trasferito" && (
                             <button className="btn btn-outline-primary btn-sm mt-3" type="button" onClick={() => {
                               setTransferTarget({ type: "form" });
@@ -3065,9 +3118,51 @@ export const Patients = ({
             </div>
           </>}
 
+          {listedTransfers && <>
+            <button className="entity-modal-backdrop" type="button" aria-label="Chiudi trasferimenti" onClick={() => setListedTransfers(null)} />
+            <div className="entity-modal-shell" role="dialog" aria-modal="true" aria-labelledby="patient-transfer-history-title"
+              onKeyDown={(event) => { if (event.key === "Escape") setListedTransfers(null); }}>
+              <section className="card entity-modal-card">
+                <div className="card-header d-flex align-items-center">
+                  <h2 className="card-title mb-0" id="patient-transfer-history-title">Trasferimenti ({listedTransfers.length})</h2>
+                  <button className="btn-close ms-auto" type="button" aria-label="Chiudi" autoFocus onClick={() => setListedTransfers(null)} />
+                </div>
+                <div className="card-body">
+                  {listedTransfers.map((movement, index) => {
+                    const date = movement.date ? new Date(`${movement.date}T00:00:00`) : null;
+                    const formattedDate = date && !Number.isNaN(date.getTime())
+                      ? new Intl.DateTimeFormat("it-IT").format(date) : "Non disponibile";
+                    return <article className={`border rounded p-3${index > 0 ? " mt-3" : ""}`} key={movement.id || index}>
+                      <h3 className="h6 mb-3">Trasferimento {index + 1}</h3>
+                      <div className="row g-3">
+                        <div className="col-12 col-md-6">
+                          <strong className="d-block mb-1">Da:</strong>
+                          <div><span className="text-secondary">Ospedale:</span> {movement.fromHospitalName}</div>
+                          <div><span className="text-secondary">Reparto:</span> {movement.fromDepartmentName}</div>
+                        </div>
+                        <div className="col-12 col-md-6">
+                          <strong className="d-block mb-1">A:</strong>
+                          <div><span className="text-secondary">Ospedale:</span> {movement.toHospitalName || "Non disponibile"}</div>
+                          <div><span className="text-secondary">Reparto:</span> {movement.toDepartmentName || "Non disponibile"}</div>
+                        </div>
+                      </div>
+                      <div className="border-top mt-3 pt-2 small">
+                        <div><strong>Data:</strong> {formattedDate}</div>
+                        <div><strong>Trasferito da:</strong> {movement.changedByName || "Non disponibile"}{movement.changedByRole ? ` (${movement.changedByRole})` : ""}</div>
+                      </div>
+                    </article>;
+                  })}
+                </div>
+                <div className="card-footer d-flex justify-content-end">
+                  <button className="btn btn-secondary" type="button" onClick={() => setListedTransfers(null)}>Chiudi</button>
+                </div>
+              </section>
+            </div>
+          </>}
+
           <section className="card">
             <div className="card-header patient-list-header">
-              <h2 className="card-title">Elenco pazienti</h2>
+              <h2 className="card-title">{visiblePatients.length} {visiblePatients.length === 1 ? "paziente" : "pazienti"}</h2>
             </div>
             <div className="card-body p-0">
               <div className="table-responsive">
@@ -3110,11 +3205,11 @@ export const Patients = ({
                                   }
                                 }}
                               >
-                                <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}<PatientMobileLocation patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
+                                <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}<PatientMobileLocation patient={patient} onOpenTransfers={setListedTransfers} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
                                 <td className="text-center patient-actions-column" data-label="Note"><div className="patient-row-actions"><button className="btn btn-primary btn-sm patient-note-button" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button></div></td>
                               </tr>
                               <tr className="d-none d-md-table-row patient-desktop-details-row">
-                                <td colSpan={2}><PatientMobileLocation className="patient-desktop-location" patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
+                                <td colSpan={2}><PatientMobileLocation className="patient-desktop-location" patient={patient} onOpenTransfers={setListedTransfers} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
                               </tr>
                               <tr className="d-none d-md-table-row patient-desktop-spacer" aria-hidden="true"><td colSpan={2} /></tr>
                               </Fragment>
@@ -3145,7 +3240,7 @@ export const Patients = ({
                                 <span>{formatPatientListName(patient)}</span>
                                 {isFollowUpPatient(patient) && <span className="badge text-bg-primary d-md-none patient-follow-up-badge">Follow up attivo</span>}
                               </div>
-                              <PatientMobileLocation patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} />
+                              <PatientMobileLocation patient={patient} onOpenTransfers={setListedTransfers} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} />
                             </td>
                             <td data-label="Accesso">
                               <span
@@ -3203,7 +3298,7 @@ export const Patients = ({
                             </td>
                           </tr>
                           <tr className="d-none d-md-table-row patient-desktop-details-row">
-                            <td colSpan={followUpOnly ? 8 : 7}><PatientMobileLocation className="patient-desktop-location" patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
+                            <td colSpan={followUpOnly ? 8 : 7}><PatientMobileLocation className="patient-desktop-location" patient={patient} onOpenTransfers={setListedTransfers} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
                           </tr>
                           <tr className="d-none d-md-table-row patient-desktop-spacer" aria-hidden="true"><td colSpan={followUpOnly ? 8 : 7} /></tr>
                           </Fragment>

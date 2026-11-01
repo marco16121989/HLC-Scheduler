@@ -2435,6 +2435,14 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   font-weight: 650;
 }
 
+.patient-list-transfer {
+  display: block;
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
 .patient-desktop-details-row > td {
   padding: 0.2rem 1rem 0.25rem;
 }

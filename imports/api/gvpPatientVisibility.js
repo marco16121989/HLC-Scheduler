@@ -1,7 +1,7 @@
 // Le date di accesso e dimissione servono al calendario anche quando i campi facoltativi
 // condivisi con il GVP sono stati personalizzati dal Presidente.
 const REQUIRED_FIELDS = [
-  "presidentId", "casId", "casIds", "gvpId", "gvpIds", "gvpNotes", "transferNotes", "admissionDate", "dischargeDate",
+  "presidentId", "casId", "casIds", "gvpId", "gvpIds", "gvpNotes", "transferNotes", "status", "departmentHistory", "admissionDate", "dischargeDate",
   "details.patientPhone", "details.elderName", "details.elderPhone", "details.phoneContacts",
 ];
 

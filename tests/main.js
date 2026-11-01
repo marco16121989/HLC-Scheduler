@@ -7,6 +7,8 @@ import "./activityReports.test.js";
 import "./presentationPermissions.test.js";
 import "./annualReport.test.js";
 import "./patientStatusConfirmation.test.js";
+import "./patientPrivacy.test.js";
+import "./patientTransferRecovery.test.js";
 import "./casActivity.test.js";
 import "./patientFollowUp.test.js";
 import "./eventFilters.test.js";

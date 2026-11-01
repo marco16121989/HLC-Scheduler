@@ -36,6 +36,8 @@ import { preparePatientPhoneContacts, removesPatientPhoneNumber } from "../impor
 import { legacyGvpOrganizationSelector } from "../imports/api/patientAssignmentUsers.js";
 import { buildUserProfileUpdate, hasUserProfileChanges } from "../imports/api/userProfileUpdates.js";
 import { gvpPatientProjection, pickGvpPatientFields } from "../imports/api/gvpPatientVisibility.js";
+import { CLOSED_PATIENT_HIDDEN_FIELDS, shouldMaskPatientIdentity } from "../imports/api/patientPrivacy.js";
+import { recoverInternalTransferPatients } from "../imports/api/patientTransferRecovery.js";
 import { PATIENT_REPORT_FIELDS } from "../imports/api/activityReports.js";
 
 const usefulFileExtensions = new Set([
@@ -316,7 +318,7 @@ const requireFollowUpPatientAccess = (actor, patient) => {
     throw new Meteor.Error("not-authorized", "Paziente non disponibile per il tuo profilo.");
   }
 };
-const getClosedPatientHiddenFields = async () => ["firstName", "lastName", "details.maidenName"];
+const getClosedPatientHiddenFields = async () => CLOSED_PATIENT_HIDDEN_FIELDS;
 
 const setNestedValue = (target, path, value) => {
   const parts = path.split(".");
@@ -328,7 +330,7 @@ const setNestedValue = (target, path, value) => {
 };
 
 const maskClosedPatientFields = (patient, hiddenFields) => {
-  if (!patient || !CLOSED_PATIENT_STATUSES.includes(patient.status) || isFollowUpPatient(patient)) return patient;
+  if (!shouldMaskPatientIdentity(patient)) return patient;
   const masked = { ...patient, details: { ...(patient.details || {}) } };
   hiddenFields.forEach((path) => setNestedValue(masked, path, "********"));
   if (Array.isArray(patient.changeHistory)) {
@@ -397,7 +399,7 @@ const buildPatientChangeHistory = ({ existing, updated, actor }) => {
 const standardPatientProjection = (hiddenFields = []) => {
   const projection = Object.fromEntries([
     "presidentId", "casId", "casIds", "gvpId", "gvpIds", "firstName", "lastName",
-    "admissionDate", "dischargeDate", "admissionType", "status", "followUpEnabled", "followUpActivatedAt", "transferNotes", "pathology",
+    "admissionDate", "dischargeDate", "admissionType", "status", "followUpEnabled", "followUpActivatedAt", "transferNotes", "departmentHistory", "pathology",
     "doctorId", "details.sex", "details.maidenName", "details.departmentId", "details.hospitalFloor", "details.hospitalLot", "details.hospitalRoom",
     "details.hospitalBed", "details.anesthesiologistDate", "details.anesthesiologistTime",
     "details.anesthesiologistName", "details.visitingHoursFrom", "details.visitingHoursTo",
@@ -422,7 +424,7 @@ const publishPatientCursors = async (subscription, cursors) => {
     }
     // Il cursore dei pazienti conclusi è l'ultimo e ha la precedenza, così i campi
     // censurati non possono riapparire durante un cambio di stato simultaneo.
-    const nextFields = { ...availableSources.at(-1).get(id) };
+    const nextFields = maskClosedPatientFields({ ...availableSources.at(-1).get(id) }, CLOSED_PATIENT_HIDDEN_FIELDS);
     const previousFields = publishedRecords.get(id);
     if (!previousFields) {
       publishedRecords.set(id, nextFields);
@@ -712,8 +714,7 @@ Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
     const cursors = [];
     if (wants("patients")) {
       const sharedPatientFields = await getGvpPatientSharedFields(presidentId);
-      const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
-      const closedGvpFields = sharedPatientFields.filter((field) => !closedPatientHiddenFields.includes(field));
+      const closedGvpFields = sharedPatientFields;
       await publishPatientCursors(this, [
         PatientsCollection.find({ presidentId, ...NON_FOLLOW_UP_PATIENT_SELECTOR, status: { $nin: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] }, { fields: gvpPatientProjection(sharedPatientFields) }),
         PatientsCollection.find({ presidentId, ...NON_FOLLOW_UP_PATIENT_SELECTOR, status: { $in: CLOSED_PATIENT_STATUSES }, $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] }, { fields: gvpPatientProjection(closedGvpFields) }),
@@ -737,10 +738,9 @@ Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
 
   const cursors = [];
   if (wants("patients") || wants("follow-up")) {
-    const closedPatientHiddenFields = await getClosedPatientHiddenFields(presidentId);
     const patientCursors = wants("patients") ? [
       PatientsCollection.find({ ...dataSelector, ...NON_FOLLOW_UP_PATIENT_SELECTOR, status: { $nin: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection() }),
-      PatientsCollection.find({ ...dataSelector, ...NON_FOLLOW_UP_PATIENT_SELECTOR, status: { $in: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection(closedPatientHiddenFields) }),
+      PatientsCollection.find({ ...dataSelector, ...NON_FOLLOW_UP_PATIENT_SELECTOR, status: { $in: CLOSED_PATIENT_STATUSES } }, { fields: standardPatientProjection() }),
     ] : [];
     patientCursors.push(PatientsCollection.find(getFollowUpPatientSelector(actor)));
     await publishPatientCursors(this, patientCursors);
@@ -2544,6 +2544,7 @@ const ensurePerformanceIndexes = async () => {
 };
 
 const runServerMaintenance = async () => {
+  await recoverInternalTransferPatients(PatientsCollection);
   await ensurePerformanceIndexes();
   await initializeWebPush();
   const adminUsername = formatUserName(
