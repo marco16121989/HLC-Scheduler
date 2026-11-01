@@ -1,4 +1,6 @@
 /* Shared styles for the client templates. */
+/* Tablet in verticale: vista mobile fino a 1199.98px; in orizzontale restano
+   attivi i normali breakpoint desktop. */
 
 :root {
   /* Colors */
@@ -419,7 +421,7 @@ a {
   padding-right: var(--spacing-md);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (orientation: landscape), (min-width: 1200px) {
   .container {
     padding-left: var(--spacing-lg);
     padding-right: var(--spacing-lg);
@@ -470,7 +472,7 @@ a {
   letter-spacing: -0.025em;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (orientation: landscape), (min-width: 1200px) {
   .page-title {
     font-size: 1.5rem;
   }
@@ -493,7 +495,7 @@ a {
   padding-bottom: var(--spacing-xl);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (orientation: landscape), (min-width: 1200px) {
   .main {
     padding-top: var(--spacing-2xl);
     padding-bottom: var(--spacing-2xl);
@@ -514,7 +516,7 @@ a {
   margin-bottom: 2.5rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (orientation: landscape), (min-width: 1200px) {
   .counter-card {
     padding: var(--spacing-xl);
     margin-bottom: var(--spacing-2xl);
@@ -725,8 +727,74 @@ a {
   border: 0;
 }
 
-@media (max-width: 991.98px) {
+@media (min-width: 992px) and (orientation: landscape), (min-width: 1200px) {
+  /* La pagina riserva sempre lo spazio della barra ridotta: il menu aperto
+     si sovrappone al contenuto senza cambiare la larghezza della pagina. */
+  .app-wrapper.sidebar-expand-lg {
+    --sidebar-rail-width: 4.6rem;
+    grid-template-columns: var(--sidebar-rail-width) minmax(0, 1fr);
+  }
+
   .app-wrapper.sidebar-expand-lg .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1038;
+    display: flex;
+    flex-direction: column;
+    width: var(--lte-sidebar-width);
+    min-width: var(--lte-sidebar-width);
+    max-width: var(--lte-sidebar-width);
+    height: 100dvh;
+    margin-left: 0;
+    overflow: hidden;
+  }
+
+  .app-wrapper.sidebar-expand-lg.sidebar-collapse .app-sidebar {
+    width: var(--sidebar-rail-width);
+    min-width: var(--sidebar-rail-width);
+    max-width: var(--sidebar-rail-width);
+  }
+
+  .app-wrapper.sidebar-expand-lg .app-sidebar .sidebar-brand {
+    flex: 0 0 auto;
+  }
+
+  .app-wrapper.sidebar-expand-lg .app-sidebar .sidebar-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+}
+
+.app-wrapper.sidebar-expand-lg .sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1037;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: rgb(0 0 0 / 20%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  animation: none;
+  transition: opacity var(--sidebar-motion-duration) var(--sidebar-motion-easing),
+    visibility 0s linear var(--sidebar-motion-duration);
+}
+
+.app-wrapper.sidebar-expand-lg.sidebar-open .sidebar-overlay {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+@media (max-width: 991.98px), (max-width: 1199.98px) and (orientation: portrait) {
+  .app-wrapper.sidebar-expand-lg .app-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
     left: 0;
     margin-left: 0;
     transform: translateX(-100%);
@@ -735,29 +803,6 @@ a {
 
   .app-wrapper.sidebar-expand-lg.sidebar-open .app-sidebar {
     transform: translateX(0);
-  }
-
-  .app-wrapper.sidebar-expand-lg .sidebar-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1037;
-    display: block;
-    width: 100%;
-    height: 100%;
-    background-color: rgb(0 0 0 / 20%);
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    animation: none;
-    transition: opacity var(--sidebar-motion-duration) var(--sidebar-motion-easing),
-      visibility 0s linear var(--sidebar-motion-duration);
-  }
-
-  .app-wrapper.sidebar-expand-lg.sidebar-open .sidebar-overlay {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transition-delay: 0s;
   }
 
   .app-sidebar {
@@ -945,23 +990,23 @@ a {
   border-radius: 0.375rem;
 }
 
-.sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) .sidebar-brand .brand-link {
+.sidebar-mini.sidebar-collapse .app-sidebar .sidebar-brand .brand-link {
   width: 100%;
   justify-content: center;
   gap: 0;
 }
 
-.sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) .sidebar-brand .brand-text {
+.sidebar-mini.sidebar-collapse .app-sidebar .sidebar-brand .brand-text {
   margin-left: 0;
 }
 
-.sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) .sidebar-section-label {
+.sidebar-mini.sidebar-collapse .app-sidebar .sidebar-section-label {
   color: transparent;
   text-shadow: none;
   user-select: none;
 }
 
-@media (max-width: 991.98px) {
+@media (max-width: 991.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .sidebar-mini.sidebar-collapse .app-sidebar,
   .sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) {
     min-width: var(--lte-sidebar-width);
@@ -1178,7 +1223,7 @@ svg.admin-nav-icon {
   border-radius: var(--bs-border-radius);
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .hospital-department-coverage-heading {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1555,7 +1600,7 @@ svg.admin-nav-icon {
 .login-message-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; color: var(--bs-secondary-color); font-size: .8rem; font-weight: 650; }
 .login-message-card small { color: var(--bs-secondary-color); font-size: .95rem; }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .admin-login-message-dates { grid-template-columns: 1fr; }
   .admin-email-grid { grid-template-columns: 1fr; }
   .admin-login-message-list article { flex-direction: column; }
@@ -1827,7 +1872,7 @@ svg.admin-nav-icon {
   font-weight: 600;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .patient-summary-item.patient-summary-visiting-hours {
     flex: 1 1 100%;
     min-width: 0;
@@ -2077,7 +2122,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   text-align: right;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .annual-report-page-header {
     flex-direction: column;
     align-items: stretch !important;
@@ -2443,11 +2488,32 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   overflow-wrap: anywhere;
 }
 
+@media (min-width: 768px) and (max-width: 1199.98px) and (orientation: portrait) {
+  /* Allinea le utility Bootstrap alla stessa vista delle liste e dei modal. */
+  .d-none.d-md-table-row {
+    display: none !important;
+  }
+
+  .d-md-none {
+    display: block !important;
+  }
+
+  .patient-follow-up-badge.d-md-none {
+    display: inline-block !important;
+  }
+
+  .row > [class*="col-md-"],
+  .row > [class*="col-lg-"] {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
+
 .patient-desktop-details-row > td {
   padding: 0.2rem 1rem 0.25rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (orientation: landscape), (min-width: 1200px) {
   .patient-list-table {
     border-collapse: separate;
     border-spacing: 0;
@@ -2614,7 +2680,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   font-weight: 600;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .patient-summary-grid {
     grid-template-columns: 1fr;
   }
@@ -2918,13 +2984,13 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   }
 }
 
-@media (min-width: 360px) and (max-width: 767.98px) {
+@media (min-width: 360px) and (max-width: 767.98px), (min-width: 768px) and (max-width: 1199.98px) and (orientation: portrait) {
   .patient-list-table tbody tr {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .card:has(input[placeholder*="nominativo"]) .table-responsive {
     display: none;
   }
@@ -3224,7 +3290,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .admin-president-detail-shell {
     padding: 0.75rem;
   }
@@ -3240,7 +3306,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   }
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .patient-page-header {
     border-bottom: 1px solid var(--bs-border-color-translucent);
     background: var(--bs-tertiary-bg);
@@ -4037,7 +4103,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   box-shadow: 0 0 0 0.12rem var(--bs-primary-bg-subtle);
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .event-page-controls {
     flex-direction: column;
     width: 100%;
@@ -4061,7 +4127,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   font-size: 0.85rem;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .calendar-day { min-height: 4.5rem; }
   .calendar-event { width: 0.55rem; height: 0.55rem; padding: 0; border-radius: 50%; color: transparent; }
   .calendar-more { display: none; }
@@ -4174,7 +4240,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   color: var(--color-primary);
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .mobile-list-header {
     display: none;
   }
@@ -4266,7 +4332,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   }
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .cas-list-table tbody,
   .gvp-list-table tbody {
     padding-right: 0.15rem;
@@ -4333,7 +4399,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   justify-content: space-between;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   /* Elenco GVP: stessa resa compatta e contrastata della lista pazienti. */
   .card:has(.gvp-list-table) > .card-header,
   .card:has(.cas-list-table) > .card-header,
@@ -4541,7 +4607,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .patient-pie-dot { width: 0.65rem; height: 0.65rem; border-radius: 50%; }
 .patient-pie-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-@media (max-width: 991.98px) {
+@media (max-width: 991.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .patient-report-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .patient-report-grid { grid-template-columns: 1fr; }
 }
@@ -4620,7 +4686,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 .admin-assistance-search-results { display: grid; gap: .4rem; margin-top: .65rem; padding: .5rem; border: 1px solid var(--bs-border-color); border-radius: .65rem; background: var(--bs-tertiary-bg); }
 .admin-assistance-search-result { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: .6rem .7rem; border: 0; border-radius: .5rem; background: var(--bs-body-bg); color: var(--bs-body-color); text-align: left; }
 .admin-assistance-search-result:hover,.admin-assistance-search-result:focus-visible { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
-@media (min-width: 768px) { .hospitality-mobile-list { display: none; } }
+@media (min-width: 768px) and (orientation: landscape), (min-width: 1200px) { .hospitality-mobile-list { display: none; } }
 .hospitality-details-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
 .hospitality-details-grid > div { min-width: 0; }
 .hospitality-details-grid span,.hospitality-details-grid strong { display: block; }
@@ -4733,7 +4799,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 [data-bs-theme="dark"] .startup-progress span { background: #a1a1a6; }
 [data-bs-theme="dark"] .startup-loader.is-exiting .startup-progress span { background: #f5f5f7; }
 
-@media (max-width: 991.98px) {
+@media (max-width: 991.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .admin-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .admin-dashboard-two-columns { grid-template-columns: 1fr; }
 }
@@ -4789,7 +4855,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   background: var(--bs-secondary-bg, #e9ecef);
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .admin-presidents-table tbody tr.admin-president-region {
     display: block;
     grid-column: 1 / -1;
@@ -4855,7 +4921,7 @@ button[aria-label^="Informazioni sui permessi"] span::after {
 
 .admin-president-mobile-membership { margin-top: .2rem; font-size: .75rem; font-weight: 400; white-space: normal; overflow-wrap: anywhere; }
 .absence-mobile-period { display: none; }
-@media (max-width: 767.98px) {
+@media (max-width: 767.98px), (max-width: 1199.98px) and (orientation: portrait) {
   .absence-list-table.mobile-card-table tbody tr {
     padding: .55rem .8rem;
     gap: .15rem;

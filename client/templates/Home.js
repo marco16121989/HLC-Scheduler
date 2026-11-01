@@ -93,6 +93,8 @@ const PageLoader = () => <div className="page-data-loader" role="status" aria-li
   <span>Caricamento dati…</span>
 </div>;
 
+const DESKTOP_SIDEBAR_QUERY = "(min-width: 992px) and (orientation: landscape), (min-width: 1200px)";
+
 export const Home = ({
   user,
   users,
@@ -127,9 +129,7 @@ export const Home = ({
   onToggleBoldText,
   onLogout,
 }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(
-    () => globalThis.innerWidth >= 992,
-  );
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState(() => globalThis.history?.state?.hlcView || "home");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsMenuRef = useRef(null);
@@ -183,8 +183,8 @@ export const Home = ({
     (user.role === "Admin" && ["users", "permissions"].includes(activeView) && !adminSubscriptions.directoryReady) ||
     (user.role === "Admin" && activeView === "admin-tools" && (!adminSubscriptions.directoryReady || !adminSubscriptions.toolsReady)) ||
     (user.role === "Admin" && activeView === "support" && !adminSubscriptions.supportReady);
-  const closeMobileSidebar = () => {
-    if (globalThis.innerWidth < 992) setSidebarOpen(false);
+  const closeSidebar = () => {
+    setSidebarOpen(false);
   };
   const openView = (view) => {
     if (!["home", "settings", "info", "notifications"].includes(view) && !canViewPage(view)) return;
@@ -192,7 +192,7 @@ export const Home = ({
       globalThis.history?.pushState({ ...(globalThis.history.state || {}), hlcApp: true, hlcView: view }, "");
     }
     setActiveView(view);
-    closeMobileSidebar();
+    closeSidebar();
   };
 
   useEffect(() => {
@@ -203,11 +203,11 @@ export const Home = ({
     const handleHistoryNavigation = (event) => {
       if (event.state?.hlcView) {
         setActiveView(event.state.hlcView);
-        closeMobileSidebar();
+        closeSidebar();
         return;
       }
       setActiveView("home");
-      closeMobileSidebar();
+      closeSidebar();
       globalThis.history?.pushState({ hlcApp: true, hlcView: "home" }, "");
     };
     globalThis.addEventListener("popstate", handleHistoryNavigation);
@@ -240,9 +240,9 @@ export const Home = ({
   }, [notificationsOpen, userMenuOpen]);
 
   useEffect(() => {
-    const desktopViewport = globalThis.matchMedia?.("(min-width: 992px)");
+    const desktopViewport = globalThis.matchMedia?.(DESKTOP_SIDEBAR_QUERY);
     if (!desktopViewport) return undefined;
-    const syncSidebarWithViewport = (event) => setSidebarOpen(event.matches);
+    const syncSidebarWithViewport = () => setSidebarOpen(false);
     if (typeof desktopViewport.addEventListener === "function") {
       desktopViewport.addEventListener("change", syncSidebarWithViewport);
       return () => desktopViewport.removeEventListener("change", syncSidebarWithViewport);
@@ -251,9 +251,16 @@ export const Home = ({
     return () => desktopViewport.removeListener(syncSidebarWithViewport);
   }, []);
 
+  useEffect(() => {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    try { globalThis.localStorage?.removeItem("hlc-desktop-view"); } catch {}
+    document.documentElement.removeAttribute("data-desktop-view");
+    viewport?.setAttribute("content", "width=device-width, initial-scale=1.0");
+  }, []);
+
   return (
     <div
-      className={`app-wrapper sidebar-expand-lg sidebar-mini ${
+      className={`app-wrapper sidebar-expand-lg sidebar-mini sidebar-without-hover ${
         sidebarOpen ? "sidebar-open" : "sidebar-collapse"
       }`}
     >
@@ -330,7 +337,8 @@ export const Home = ({
         </div>
       </nav>
 
-      <aside className="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+      <aside className="app-sidebar bg-body-secondary shadow" data-bs-theme="dark"
+        onClick={(event) => { if (event.target.closest("a, button")) closeSidebar(); }}>
         <div className="sidebar-brand">
           <a href="#" className="brand-link" aria-label="HLC Scheduler home">
             <img
@@ -408,7 +416,7 @@ export const Home = ({
                   href={SHAREPOINT_URL}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={closeMobileSidebar}
+                  onClick={closeSidebar}
                 >
                   <MenuIcon name="sharepoint" />
                   <p>Share Point</p>
@@ -646,6 +654,8 @@ export const Home = ({
         className="sidebar-overlay"
         type="button"
         aria-label="Chiudi il menu"
+        aria-hidden={!sidebarOpen}
+        tabIndex={sidebarOpen ? 0 : -1}
         onClick={() => setSidebarOpen(false)}
       />
 
