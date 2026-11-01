@@ -2406,6 +2406,75 @@ button[aria-label^="Informazioni sui permessi"] span::after {
   display: none;
 }
 
+.patient-desktop-location {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) repeat(4, minmax(0, 0.7fr)) minmax(0, 2fr);
+  gap: 0.35rem 1rem;
+  width: 100%;
+  color: var(--bs-secondary-color);
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+.patient-desktop-location > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  gap: 0 0.3rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.patient-desktop-location > span + span {
+  padding-left: 1rem;
+  border-left: 1px solid var(--bs-border-color-translucent);
+}
+
+.patient-desktop-location strong {
+  color: var(--bs-body-color);
+  font-weight: 650;
+}
+
+.patient-desktop-details-row > td {
+  padding: 0.2rem 1rem 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .patient-list-table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .patient-list-table .patient-clickable-row:hover > td,
+  .patient-list-table .patient-clickable-row:hover + .patient-desktop-details-row > td,
+  .patient-list-table .patient-clickable-row:has(+ .patient-desktop-details-row:hover) > td,
+  .patient-list-table .patient-desktop-details-row:hover > td {
+    --bs-table-bg-state: var(--bs-table-hover-bg);
+    --bs-table-color-state: var(--bs-table-hover-color);
+  }
+
+  .patient-list-table .patient-desktop-spacer > td {
+    height: 0.4rem;
+    padding: 0;
+    border: 0;
+    background: var(--bs-tertiary-bg);
+    box-shadow: none;
+  }
+
+  .patient-list-table .patient-clickable-row > td:first-child,
+  .patient-list-table .patient-desktop-details-row > td {
+    border-left: 4px solid var(--bs-primary);
+  }
+
+  .patient-list-table .patient-clickable-row > td {
+    border-bottom: 0;
+  }
+
+  .patient-list-table .patient-desktop-details-row:not(:last-child) > td {
+    border-bottom: 3px solid var(--bs-border-color);
+  }
+}
+
 .patient-notes-chat {
   display: grid;
   gap: 0.85rem;
@@ -3282,7 +3351,8 @@ button[aria-label^="Informazioni sui permessi"] span::after {
     font-weight: 650;
   }
 
-  .patient-mobile-location > span:nth-child(-n+2) {
+  .patient-mobile-location > span:nth-child(-n+2),
+  .patient-mobile-location > .patient-mobile-visiting-hours {
     flex: 1 0 100%;
   }
 

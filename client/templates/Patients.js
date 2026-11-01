@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Meteor } from "meteor/meteor";
 import { PatientPhoneNumbers } from "./PatientPhoneNumbers.js";
 import { PatientAssignees } from "./PatientAssignees.js";
@@ -60,13 +60,17 @@ const NoteButtonContent = ({ unreadCount = 0, label = "GVP" }) => <span classNam
   {unreadCount > 0 && <span className="patient-note-unread" aria-label={`${unreadCount} nuove note ${label}`}>{unreadCount}</span>}
 </span>;
 
-const PatientMobileLocation = ({ patient, departmentName, hospitalName }) => <span className="patient-mobile-location">
+const PatientMobileLocation = ({ patient, departmentName, hospitalName, className = "patient-mobile-location" }) => <span className={className}>
   <span><strong>Ospedale:</strong> {hospitalName || patient.details?.hospitalName || "-"}</span>
   <span><strong>Reparto:</strong> {patient.details?.departmentId === MASKED_VALUE ? MASKED_VALUE : departmentName || patient.details?.hospitalDepartment || "-"}</span>
   <span><strong>Lotto:</strong> {patient.details?.hospitalLot || "-"}</span>
   <span><strong>Piano:</strong> {patient.details?.hospitalFloor || "-"}</span>
   <span><strong>Camera:</strong> {patient.details?.hospitalRoom || "-"}</span>
   <span><strong>Letto:</strong> {patient.details?.hospitalBed || "-"}</span>
+  <span className="patient-mobile-visiting-hours"><strong>Orario visita:</strong> {[
+    [patient.details?.visitingHoursFrom, patient.details?.visitingHoursTo],
+    [patient.details?.visitingHoursSecondFrom, patient.details?.visitingHoursSecondTo],
+  ].map(([from, to]) => [from, to].filter(Boolean).join(" - ")).filter(Boolean).join(" e ") || "-"}</span>
 </span>;
 
 const PATIENT_STATUSES = [
@@ -3092,6 +3096,7 @@ export const Patients = ({
                           const patientDepartment = availableDepartments.find((department) => department.id === patient.details?.departmentId);
                           if (isGvp) {
                             return (
+                              <Fragment key={patient.id}>
                               <tr
                                 className="patient-clickable-row"
                                 key={patient.id}
@@ -3108,6 +3113,11 @@ export const Patients = ({
                                 <td className="fw-medium" data-label="Paziente">{formatPatientListName(patient)}<PatientMobileLocation patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
                                 <td className="text-center patient-actions-column" data-label="Note"><div className="patient-row-actions"><button className="btn btn-primary btn-sm patient-note-button" type="button" aria-label={getUnreadNoteCount(patient) > 0 ? `Note, ${getUnreadNoteCount(patient)} nuove` : "Note"} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openNotes(patient); }}><NoteButtonContent unreadCount={getUnreadNoteCount(patient)} /></button></div></td>
                               </tr>
+                              <tr className="d-none d-md-table-row patient-desktop-details-row">
+                                <td colSpan={2}><PatientMobileLocation className="patient-desktop-location" patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
+                              </tr>
+                              <tr className="d-none d-md-table-row patient-desktop-spacer" aria-hidden="true"><td colSpan={2} /></tr>
+                              </Fragment>
                             );
                           }
                           const casUsers = users.filter((item) => getPatientCasIds(patient).includes(item.id));
@@ -3116,6 +3126,7 @@ export const Patients = ({
                           );
 
                           return (
+                          <Fragment key={patient.id}>
                           <tr
                             className="patient-clickable-row"
                             key={patient.id}
@@ -3191,6 +3202,11 @@ export const Patients = ({
                               </div>
                             </td>
                           </tr>
+                          <tr className="d-none d-md-table-row patient-desktop-details-row">
+                            <td colSpan={followUpOnly ? 8 : 7}><PatientMobileLocation className="patient-desktop-location" patient={patient} departmentName={patientDepartment?.name} hospitalName={patientDepartment?.hospitalName} /></td>
+                          </tr>
+                          <tr className="d-none d-md-table-row patient-desktop-spacer" aria-hidden="true"><td colSpan={followUpOnly ? 8 : 7} /></tr>
+                          </Fragment>
                           );
                         })
                     )}
