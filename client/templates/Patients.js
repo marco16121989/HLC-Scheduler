@@ -141,6 +141,56 @@ const getNoteRoleBadgeClass = (role) =>
       ? "text-bg-success"
       : "text-bg-warning";
 
+export const PatientNote = ({ note, currentUserId, defaultRole, onSave, onDelete }) => {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(note.text);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const owned = !!currentUserId && note.authorId === currentUserId;
+  const save = () => {
+    if (saving || !text.trim()) return;
+    setSaving(true);
+    setError("");
+    onSave(note, text, (methodError) => {
+      setSaving(false);
+      if (methodError) {
+        setError(methodError.reason || "Impossibile modificare la nota.");
+        return;
+      }
+      setEditing(false);
+    });
+  };
+  return <article className={`patient-note border rounded p-3${editing && owned ? " patient-note-editing" : ""}`}>
+    <div className="patient-note-content">{editing && owned ? <>
+      <textarea className="patient-note-input form-control mb-2" aria-label="Modifica nota" maxLength={4000} rows={6} value={text} disabled={saving} ref={(input) => {
+        if (!input) return;
+        input.style.height = "auto";
+        input.style.height = `${input.scrollHeight + input.offsetHeight - input.clientHeight}px`;
+      }} onChange={(event) => setText(event.target.value)} />
+      {error && <p className="text-danger" role="alert">{error}</p>}
+    </> : <p className="mb-1" style={{ whiteSpace: "pre-wrap" }}>{note.text}</p>}</div>
+    <div className="patient-note-meta d-flex align-items-center gap-2">
+      <span className={`badge ${getNoteRoleBadgeClass(note.authorRole)}`}>{note.authorRole || defaultRole}</span>
+      <small className="text-secondary">
+        <span className="d-block">{note.author || defaultRole}</span>
+        {(note.createdAt || note.updatedAt) && <span className="d-block">
+          {note.createdAt ? new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt)) : ""}
+          {note.updatedAt ? `${note.createdAt ? " · " : ""}modificata` : ""}
+        </span>}
+      </small>
+    </div>
+    {owned && <div className="patient-note-actions d-flex gap-2">
+      {editing ? <>
+        <button className="btn btn-primary btn-sm" type="button" disabled={saving || !text.trim()} onClick={save}>{saving ? "Salvataggio…" : "Salva"}</button>
+        <button className="btn btn-outline-secondary btn-sm" type="button" disabled={saving} onClick={() => setEditing(false)}>Annulla</button>
+      </> : <>
+      <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => { setText(note.text); setError(""); setEditing(true); }}>Modifica</button>
+      <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => onDelete(note)}>Elimina</button>
+      </>}
+    </div>}
+  </article>;
+};
+
 export const DETAIL_SECTIONS = [
   {
     title: "NOTIFICA",
@@ -1389,6 +1439,17 @@ export const Patients = ({
     });
   };
 
+  const updateGvpNote = (note, text, done) => {
+    if (!notePatient || note.authorId !== currentUser.id) return done({ reason: "Puoi modificare soltanto le tue note." });
+    const patientId = notePatient.id;
+    Meteor.call("hlc.updatePatientNote", patientId, note.id, text, (methodError, updated) => {
+      if (!methodError) setNotePatient((current) => current?.id === patientId
+        ? { ...current, gvpNotes: getGvpNotes(current).map((item) => item.id === note.id ? { ...item, ...updated } : item) }
+        : current);
+      done(methodError);
+    });
+  };
+
   const deleteGvpNote = async (note) => {
     if (!notePatient || note.authorId !== currentUser.id) return;
     if (!await confirmAction("Eliminare questa nota?")) return;
@@ -1441,6 +1502,17 @@ export const Patients = ({
         return;
       }
       closeCasNotes();
+    });
+  };
+
+  const updateCasNote = (note, text, done) => {
+    if (!casNotePatient || note.authorId !== currentUser.id) return done({ reason: "Puoi modificare soltanto le tue note CAS." });
+    const patientId = casNotePatient.id;
+    Meteor.call("hlc.updatePatientCasNote", patientId, note.id, text, (methodError, updated) => {
+      if (!methodError) setCasNotePatient((current) => current?.id === patientId
+        ? { ...current, casNotes: getCasNotes(current).map((item) => item.id === note.id ? { ...item, ...updated } : item) }
+        : current);
+      done(methodError);
     });
   };
 
@@ -1661,7 +1733,7 @@ export const Patients = ({
                 <div className="card-body">
                   {noteError && <div className="alert alert-danger py-2" role="alert">{noteError}</div>}
                   <h3 className="h6">Note GVP esistenti</h3>
-                  {getGvpNotes(currentNotePatient).length === 0 ? <p className="text-secondary">Nessuna nota inserita.</p> : <div className="d-grid gap-2 mb-4">{getGvpNotes(currentNotePatient).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{note.authorId === currentUser.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteGvpNote(note)}>Elimina</button>}</div><div className="d-flex align-items-center gap-2"><span className={`badge ${getNoteRoleBadgeClass(note.authorRole)}`}>{note.authorRole || "GVP"}</span><small className="text-secondary">{note.author || "GVP"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></div></article>)}</div>}
+                  {getGvpNotes(currentNotePatient).length === 0 ? <p className="text-secondary">Nessuna nota inserita.</p> : <div className="d-grid gap-2 mb-4">{getGvpNotes(currentNotePatient).map((note) => <PatientNote key={`${currentNotePatient.id}-${note.id}`} note={note} currentUserId={currentUser.id} defaultRole="GVP" onSave={updateGvpNote} onDelete={deleteGvpNote} />)}</div>}
                   <label className="form-label" htmlFor="gvp-patient-notes">Aggiungi una nota GVP</label>
                   <textarea className="form-control" id="gvp-patient-notes" rows="5" value={newGvpNote} onChange={(event) => setNewGvpNote(event.target.value)} maxLength="4000" autoFocus />
                 </div>
@@ -1683,7 +1755,7 @@ export const Patients = ({
                 <div className="card-body">
                   {casNoteError && <div className="alert alert-danger py-2" role="alert">{casNoteError}</div>}
                   <h3 className="h6">Note CAS esistenti</h3>
-                  {getCasNotes(casNotePatient).length === 0 ? <p className="text-secondary">Nessuna nota CAS inserita.</p> : <div className="d-grid gap-2 mb-4">{getCasNotes(casNotePatient).map((note) => <article className="border rounded p-3" key={note.id}><div className="d-flex align-items-start justify-content-between gap-3"><p className="mb-1">{note.text}</p>{note.authorId === currentUser.id && <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => deleteCasNote(note)}>Elimina</button>}</div><div className="d-flex align-items-center gap-2"><span className={`badge ${getNoteRoleBadgeClass(note.authorRole)}`}>{note.authorRole || "CAS"}</span><small className="text-secondary">{note.author || "CAS"}{note.createdAt ? ` · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(new Date(note.createdAt))}` : ""}</small></div></article>)}</div>}
+                  {getCasNotes(casNotePatient).length === 0 ? <p className="text-secondary">Nessuna nota CAS inserita.</p> : <div className="d-grid gap-2 mb-4">{getCasNotes(casNotePatient).map((note) => <PatientNote key={`${casNotePatient.id}-${note.id}`} note={note} currentUserId={currentUser.id} defaultRole="CAS" onSave={updateCasNote} onDelete={deleteCasNote} />)}</div>}
                   <label className="form-label" htmlFor="cas-patient-notes">Aggiungi una nota CAS</label>
                   <textarea className="form-control" id="cas-patient-notes" rows="5" value={newCasNote} onChange={(event) => setNewCasNote(event.target.value)} maxLength="4000" autoFocus />
                 </div>

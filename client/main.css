@@ -2,3 +2,57 @@ body {
   margin: 0;
   padding: 0;
 }
+.patient-note {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1rem;
+}
+
+.patient-note-content {
+  grid-column: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.patient-note-actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
+.patient-note-meta {
+  grid-column: 1;
+}
+
+.patient-note-editing .patient-note-content,
+.patient-note-editing .patient-note-actions {
+  grid-column: 1 / -1;
+}
+
+.patient-note-editing .patient-note-actions {
+  grid-row: auto;
+  margin-top: 1rem;
+}
+
+.patient-note-input {
+  width: 100%;
+  min-height: 10rem;
+  resize: vertical;
+}
+
+@media (max-width: 575.98px) {
+  .patient-note {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .patient-note-actions {
+    grid-column: 1;
+    grid-row: auto;
+    flex-direction: column;
+    margin-top: 1rem;
+  }
+
+  .patient-note-actions .btn {
+    width: 100%;
+  }
+}

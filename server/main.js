@@ -1778,6 +1778,41 @@ Meteor.methods({
     }
   },
 
+  async "hlc.updatePatientNote"(patientId, noteId, noteText) {
+    requireUser(this);
+    check(patientId, String);
+    check(noteId, String);
+    check(noteText, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const actorRole = actor?.profile?.role;
+    if (!["Presidente", "CAS", "GVP"].includes(actorRole)) {
+      throw new Meteor.Error("not-authorized", "Operazione non autorizzata.");
+    }
+    const presidentId = actorRole === "Presidente"
+      ? actor._id
+      : actor.profile?.presidentId ||
+        (actorRole === "CAS" ? actor.profile?.associationId : "") || "";
+    const selector = {
+      _id: patientId,
+      presidentId,
+      ...(actorRole === "GVP"
+        ? { $or: [{ gvpIds: actor._id }, { gvpId: actor._id }] }
+        : {}),
+      gvpNotes: { $elemMatch: { id: noteId, authorId: this.userId } },
+    };
+    const patient = await PatientsCollection.findOneAsync(selector);
+    requireFollowUpPatientAccess(actor, patient);
+    if (!patient) throw new Meteor.Error("not-authorized", "Puoi modificare soltanto le tue note.");
+    const text = noteText.trim().slice(0, 4000);
+    if (!text) throw new Meteor.Error("note-required", "Inserisci una nota.");
+    const updatedAt = new Date();
+    const updated = await PatientsCollection.updateAsync(selector, {
+      $set: { "gvpNotes.$[note].text": text, "gvpNotes.$[note].updatedAt": updatedAt },
+    }, { arrayFilters: [{ "note.id": noteId, "note.authorId": this.userId }] });
+    if (!updated) throw new Meteor.Error("note-not-found", "Nota non più disponibile. Ricarica le note.");
+    return { text, updatedAt };
+  },
+
   async "hlc.deletePatientNote"(patientId, noteId) {
     requireUser(this);
     check(patientId, String);
@@ -1850,6 +1885,37 @@ Meteor.methods({
         noteText: normalizedText,
       }));
     }
+  },
+
+  async "hlc.updatePatientCasNote"(patientId, noteId, noteText) {
+    requireUser(this);
+    check(patientId, String);
+    check(noteId, String);
+    check(noteText, String);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    const actorRole = actor?.profile?.role;
+    if (!["Presidente", "CAS"].includes(actorRole)) {
+      throw new Meteor.Error("not-authorized", "Le note CAS sono riservate a CAS e Presidente.");
+    }
+    const presidentId = actorRole === "Presidente"
+      ? actor._id
+      : actor.profile?.presidentId || actor.profile?.associationId || "";
+    const selector = {
+      _id: patientId,
+      presidentId,
+      casNotes: { $elemMatch: { id: noteId, authorId: this.userId } },
+    };
+    const patient = await PatientsCollection.findOneAsync(selector);
+    requireFollowUpPatientAccess(actor, patient);
+    if (!patient) throw new Meteor.Error("not-authorized", "Puoi modificare soltanto le tue note CAS.");
+    const text = noteText.trim().slice(0, 4000);
+    if (!text) throw new Meteor.Error("note-required", "Inserisci una nota CAS.");
+    const updatedAt = new Date();
+    const updated = await PatientsCollection.updateAsync(selector, {
+      $set: { "casNotes.$[note].text": text, "casNotes.$[note].updatedAt": updatedAt },
+    }, { arrayFilters: [{ "note.id": noteId, "note.authorId": this.userId }] });
+    if (!updated) throw new Meteor.Error("note-not-found", "Nota non più disponibile. Ricarica le note.");
+    return { text, updatedAt };
   },
 
   async "hlc.deletePatientCasNote"(patientId, noteId) {
