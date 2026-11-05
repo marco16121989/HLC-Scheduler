@@ -509,11 +509,11 @@ export const Patients = ({
   );
   const [gvpIds, setGvpIds] = useState([]);
   const [casFilter, setCasFilter] = useState(
-    ["CAS", "Presidente"].includes(currentUser.role) ? currentUser.id : "all",
+    !followUpOnly && ["CAS", "Presidente"].includes(currentUser.role) ? currentUser.id : "all",
   );
   const [statusFilter, setStatusFilter] = useState(followUpOnly ? "Dimesso" : "Ricoverato");
   const currentYear = new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Europe/Rome" }).format(new Date());
-  const [yearFilter, setYearFilter] = useState(currentYear);
+  const [yearFilter, setYearFilter] = useState(followUpOnly ? "all" : currentYear);
   const [notes, setNotes] = useState("");
   const [details, setDetails] = useState({ isMinorOrNewborn: "No" });
   const [departmentHistory, setDepartmentHistory] = useState([]);
@@ -1670,7 +1670,7 @@ export const Patients = ({
                   <option key={status} value={status}>{status}</option>
                 ))}
               </select>}
-              {!followUpOnly && ["CAS", "Presidente"].includes(currentUser.role) && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra casi per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
+              {["CAS", "Presidente"].includes(currentUser.role) && <select className="form-select w-auto flex-shrink-0" aria-label="Filtra casi per CAS" value={casFilter} onChange={(event) => setCasFilter(event.target.value)}>
                 <option value={currentUser.id}>I miei casi</option>
                 <option value="all">Tutti i casi</option>
                 <optgroup label="Per CAS">{visibleCasUsers.filter((casUser) => casUser.id !== currentUser.id).map((casUser) => <option key={casUser.id} value={casUser.id}>{formatCasUserLabel(casUser)}</option>)}</optgroup>

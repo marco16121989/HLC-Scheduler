@@ -711,12 +711,12 @@ a {
 /* ============ AdminLTE dashboard ============ */
 .app-wrapper {
   min-height: 100vh;
-  --sidebar-motion-duration: 600ms;
-  --sidebar-motion-easing: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --sidebar-motion-duration: 1200ms;
+  --sidebar-motion-easing: cubic-bezier(0.45, 0, 0.25, 1);
 }
 
 .app-wrapper .app-sidebar {
-  transition-property: min-width, max-width, margin-left, margin-right;
+  transition-property: width, min-width, max-width, margin-left, margin-right;
   transition-duration: var(--sidebar-motion-duration);
   transition-timing-function: var(--sidebar-motion-easing);
 }
@@ -731,6 +731,8 @@ a {
   /* La pagina riserva sempre lo spazio della barra ridotta: il menu aperto
      si sovrappone al contenuto senza cambiare la larghezza della pagina. */
   .app-wrapper.sidebar-expand-lg {
+    --sidebar-motion-duration: 500ms;
+    --sidebar-motion-easing: cubic-bezier(0.42, 0, 0.58, 1);
     --sidebar-rail-width: 4.6rem;
     grid-template-columns: var(--sidebar-rail-width) minmax(0, 1fr);
   }
@@ -747,6 +749,12 @@ a {
     height: 100dvh;
     margin-left: 0;
     overflow: hidden;
+    /* Mantieni l'animazione del menu richiesta anche quando il tema
+       azzera globalmente le durate con prefers-reduced-motion. */
+    transition:
+      width var(--sidebar-motion-duration) var(--sidebar-motion-easing),
+      min-width var(--sidebar-motion-duration) var(--sidebar-motion-easing),
+      max-width var(--sidebar-motion-duration) var(--sidebar-motion-easing) !important;
   }
 
   .app-wrapper.sidebar-expand-lg.sidebar-collapse .app-sidebar {

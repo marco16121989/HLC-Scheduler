@@ -339,6 +339,16 @@ export const Home = ({
       </nav>
 
       <aside className="app-sidebar bg-body-secondary shadow" data-bs-theme="dark"
+        onPointerEnter={(event) => {
+          if (event.pointerType === "mouse" && globalThis.matchMedia?.(DESKTOP_SIDEBAR_QUERY).matches) {
+            setSidebarOpen(true);
+          }
+        }}
+        onPointerLeave={(event) => {
+          if (event.pointerType === "mouse" && globalThis.matchMedia?.(DESKTOP_SIDEBAR_QUERY).matches) {
+            closeSidebar();
+          }
+        }}
         onClick={(event) => { if (event.target.closest("a, button")) closeSidebar(); }}>
         <div className="sidebar-brand">
           <a href="#" className="brand-link" aria-label="HLC Scheduler home">
