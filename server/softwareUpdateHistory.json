@@ -1,6 +1,19 @@
 {
-  "lastProcessedCommit": null,
+  "lastProcessedCommit": "3a1c4aa6b0a4fb23079f24f1608f8c8fcf554c87",
   "updates": [
+    {
+      "version": "1.0.1",
+      "releaseNumber": 1,
+      "sourceCommit": "3a1c4aa6b0a4fb23079f24f1608f8c8fcf554c87",
+      "date": "2026-11-06",
+      "summary": "Aggiornamenti alle funzionalità del gestionale",
+      "changes": [
+        "Aggiornata l’interfaccia del gestionale.",
+        "Aggiornata la sezione Aggiornamenti.",
+        "Aggiornata la documentazione.",
+        "Aggiornate le funzionalità del gestionale."
+      ]
+    },
     {
       "version": "1.0.0",
       "releaseNumber": 0,
