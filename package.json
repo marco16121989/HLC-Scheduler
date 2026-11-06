@@ -5,6 +5,8 @@
     "start": "meteor run",
     "test": "node scripts/safe-meteor-test.cjs",
     "test-app": "node scripts/safe-meteor-test.cjs --full-app",
+    "test:updates": "node --test tests/softwareUpdates.cjs tests/softwareUpdateApproval.cjs",
+    "updates:generate": "node scripts/generate-software-updates.cjs",
     "visualize": "meteor --production --extra-packages bundle-visualizer"
   },
   "dependencies": {

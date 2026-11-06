@@ -1061,6 +1061,39 @@ svg.admin-nav-icon {
   flex: 0 0 1.25rem;
 }
 
+.software-updates-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  overflow: visible;
+}
+
+.software-updates-icon > svg.admin-nav-icon {
+  margin: 0;
+}
+
+.software-updates-badge {
+  position: absolute;
+  top: -.55rem;
+  right: -.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 .25rem;
+  border-radius: 999px;
+  background: #dc3545;
+  color: #fff;
+  font-size: .65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .admin-welcome-card {
   border-left: 4px solid var(--color-primary);
 }

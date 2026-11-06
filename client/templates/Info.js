@@ -1,3 +1,5 @@
+import { SOFTWARE_VERSION } from "../../imports/constants/softwareVersion.js";
+
 export const Info = () => (
   <>
     <div className="app-content-header">
@@ -15,6 +17,7 @@ export const Info = () => (
                 <h2 className="card-title">HLC Scheduler</h2>
               </div>
               <div className="card-body">
+                <p className="text-secondary">Versione attuale: <strong>{SOFTWARE_VERSION}</strong></p>
                 <h3 className="h5">Scopo del gestionale</h3>
                 <p>
                   HLC Scheduler nasce per offrire uno strumento semplice e ordinato con cui

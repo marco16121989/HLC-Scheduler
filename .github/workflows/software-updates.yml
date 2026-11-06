@@ -1,0 +1,41 @@
+name: Aggiornamenti del software
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - server/softwareUpdateHistory.json
+      - imports/constants/softwareVersion.js
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: software-updates-main
+  cancel-in-progress: false
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Genera riepilogo e versione
+        run: node scripts/generate-software-updates.cjs
+      - name: Salva gli aggiornamenti per Galaxy
+        shell: bash
+        run: |
+          if git diff --quiet -- server/softwareUpdateHistory.json imports/constants/softwareVersion.js; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- server/softwareUpdateHistory.json imports/constants/softwareVersion.js
+          git commit -m "chore(updates): aggiorna lo storico del software"
+          git push origin HEAD:main

@@ -16,6 +16,8 @@ import { SupportRequests } from "./SupportRequests.js";
 import { UsefulFiles } from "./UsefulFiles.js";
 import { Notifications } from "./Notifications.js";
 import { Info } from "./Info.js";
+import { Updates } from "./Updates.js";
+import { useSoftwareUpdateBadge } from "./useSoftwareUpdateBadge.js";
 import { Settings } from "./Settings.js";
 import { Absences } from "./Absences.js";
 import { Events } from "./Events.js";
@@ -132,6 +134,7 @@ export const Home = ({
   const resolveView = (view) => user.role === "Admin" && view === "permissions" ? "home" : view || "home";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState(() => resolveView(globalThis.history?.state?.hlcView));
+  const unreadUpdateCount = useSoftwareUpdateBadge(user.id, activeView);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsMenuRef = useRef(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -188,7 +191,7 @@ export const Home = ({
     setSidebarOpen(false);
   };
   const openView = (view) => {
-    if (!["home", "settings", "info", "notifications"].includes(view) && !canViewPage(view)) return;
+    if (!["home", "settings", "info", "updates", "notifications"].includes(view) && !canViewPage(view)) return;
     if (view !== activeView) {
       globalThis.history?.pushState({ ...(globalThis.history.state || {}), hlcApp: true, hlcView: view }, "");
     }
@@ -402,6 +405,15 @@ export const Home = ({
                 <button className={`nav-link w-100 ${activeView === "settings" ? "active" : ""}`} type="button" onClick={() => openView("settings")}>
                   <MenuIcon name="settings" />
                   <p>Impostazioni</p>
+                </button>
+              </li>
+              <li className="nav-item menu-order-info">
+                <button className={`nav-link w-100 ${activeView === "updates" ? "active" : ""}`} type="button" onClick={() => openView("updates")} aria-label={unreadUpdateCount ? `Aggiornamenti, ${unreadUpdateCount} nuovi` : "Aggiornamenti"}>
+                  <span className="nav-icon software-updates-icon">
+                    <MenuIcon name="calendar" />
+                    {unreadUpdateCount > 0 && <span className="software-updates-badge" aria-hidden="true">{unreadUpdateCount}</span>}
+                  </span>
+                  <p>Aggiornamenti</p>
                 </button>
               </li>
               <li className="nav-item menu-order-info">
@@ -685,6 +697,8 @@ export const Home = ({
           <Settings currentUser={user} theme={theme} onToggleTheme={onToggleTheme} fontSize={fontSize} onFontSizeChange={onFontSizeChange} highContrast={highContrast} onToggleHighContrast={onToggleHighContrast} boldText={boldText} onToggleBoldText={onToggleBoldText} pushNotifications={pushNotifications} />
         ) : activeView === "manual" && canViewPage("manual") ? (
           <UserManual currentUser={user} onOpenView={openView} />
+        ) : activeView === "updates" ? (
+          <Updates currentUser={user} />
         ) : activeView === "info" ? (
           <Info />
         ) : activeView === "notifications" ? (

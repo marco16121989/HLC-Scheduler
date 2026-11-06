@@ -6,6 +6,7 @@ import { check, Match } from "meteor/check";
 import webpush from "web-push";
 import nodemailer from "nodemailer";
 import { buildEmailHtml } from "./emailTemplate.js";
+import { SOFTWARE_UPDATES } from "./softwareUpdates.js";
 import { canViewPatientFollowUp, getFollowUpPatientSelector, isFollowUpPatient, NON_FOLLOW_UP_PATIENT_SELECTOR, withFollowUpActivationDate } from "../imports/api/patientFollowUp.js";
 import {
   AccessLogsCollection,
@@ -19,6 +20,8 @@ import {
   HospitalsCollection,
   HospitalityOffersCollection,
   NotificationsCollection,
+  SoftwareUpdatesCollection,
+  SoftwareUpdateReadsCollection,
   PatientsCollection,
   PresentationsCollection,
   PushSettingsCollection,
@@ -811,6 +814,22 @@ Meteor.publish("hlc-access-logs", async function publishHlcAccessLogs() {
   ];
 });
 
+Meteor.publish("hlc-software-updates", async function publishHlcSoftwareUpdates() {
+  if (!this.userId) return this.ready();
+  const actor = await Meteor.users.findOneAsync(this.userId, { fields: { "profile.role": 1 } });
+  if (!actor) return this.ready();
+  const isAdmin = actor.profile?.role === "Admin";
+  return SoftwareUpdatesCollection.find({ deleted: { $ne: true }, ...(!isAdmin ? { approved: true } : {}) }, {
+    fields: { version: 1, date: 1, summary: 1, changes: 1, releaseNumber: 1, approved: 1 },
+    sort: { releaseNumber: -1, date: -1, version: -1 },
+  });
+});
+
+Meteor.publish("hlc-software-update-reads", function publishHlcSoftwareUpdateReads() {
+  if (!this.userId) return this.ready();
+  return SoftwareUpdateReadsCollection.find({ _id: this.userId }, { fields: { seenIds: 1 } });
+});
+
 Meteor.publish("hlc-notifications", function publishHlcNotifications() {
   if (!this.userId) {
     return this.ready();
@@ -875,6 +894,53 @@ const getAdminCountsByCas = async (kind) => {
 };
 
 Meteor.methods({
+  async "hlc.markSoftwareUpdatesSeen"(updateIds) {
+    requireUser(this);
+    check(updateIds, [String]);
+    const visibleUpdates = await SoftwareUpdatesCollection.find(
+      { _id: { $in: [...new Set(updateIds)] }, deleted: { $ne: true }, approved: true },
+      { fields: { _id: 1 } },
+    ).fetchAsync();
+    if (!visibleUpdates.length) return;
+    await SoftwareUpdateReadsCollection.upsertAsync(this.userId, {
+      $addToSet: { seenIds: { $each: visibleUpdates.map((update) => update._id) } },
+    });
+  },
+
+  async "hlc.approveSoftwareUpdate"(updateId) {
+    await requireAdmin(this);
+    check(updateId, String);
+    const approved = await SoftwareUpdatesCollection.updateAsync(
+      { _id: updateId, deleted: { $ne: true }, approved: { $ne: true } },
+      { $set: { approved: true, approvedAt: new Date(), approvedBy: this.userId } },
+    );
+    if (!approved && !await SoftwareUpdatesCollection.findOneAsync({ _id: updateId, deleted: { $ne: true }, approved: true })) {
+      throw new Meteor.Error("software-update-not-found", "Aggiornamento non disponibile.");
+    }
+  },
+
+  async "hlc.editSoftwareUpdate"(updateId, data) {
+    await requireAdmin(this);
+    check(updateId, String);
+    check(data, { summary: String, changes: [String] });
+    const summary = data.summary.trim();
+    const changes = data.changes.map((change) => change.trim()).filter(Boolean);
+    if (!summary || summary.length > 200 || !changes.length || changes.length > 50 || changes.some((change) => change.length > 5000)) {
+      throw new Meteor.Error("invalid-software-update", "Inserisci un titolo (massimo 200 caratteri) e da 1 a 50 punti di riepilogo (massimo 5000 caratteri ciascuno).");
+    }
+    const updated = await SoftwareUpdatesCollection.updateAsync(
+      { _id: updateId, deleted: { $ne: true } },
+      { $set: { summary, changes } },
+    );
+    if (!updated) throw new Meteor.Error("software-update-not-found", "Aggiornamento non disponibile.");
+  },
+
+  async "hlc.deleteSoftwareUpdate"(updateId) {
+    await requireAdmin(this);
+    check(updateId, String);
+    await SoftwareUpdatesCollection.updateAsync(updateId, { $set: { deleted: true } });
+  },
+
   async "hlc.getAdminDatabaseStorage"() {
     await requireAdmin(this);
     try {
@@ -2278,6 +2344,24 @@ Meteor.methods({
           });
         }
 
+        if (record.status === "Dimesso" && previousPatientStatuses.get(recordId) !== "Dimesso") {
+          const patientName = `${record.lastName || ""} ${record.firstName || ""}`.trim();
+          for (const gvpId of new Set(currentIds.filter(Boolean))) {
+            const recipient = await Meteor.users.findOneAsync(gvpId, { fields: publicUserFields });
+            if (recipient?.profile?.role !== "GVP") continue;
+            await insertNotification({
+              recipientId: gvpId,
+              type: "patient-discharged",
+              patientId: recordId,
+              patientName,
+              senderName: actor.username || role,
+              message: `Il paziente ${patientName || "selezionato"} è stato dimesso.`,
+              createdAt: new Date(),
+              readAt: null,
+            });
+          }
+        }
+
         if (record.status === "Deceduto" && previousPatientStatuses.get(recordId) !== "Deceduto") {
           const patientPresidentId = record.presidentId || presidentId;
           const recipient = patientPresidentId
@@ -2720,7 +2804,10 @@ const runServerMaintenance = async () => {
   }, 60 * 60 * 1000);
 };
 
-Meteor.startup(() => {
+Meteor.startup(async () => {
+  for (const update of SOFTWARE_UPDATES) {
+    await SoftwareUpdatesCollection.upsertAsync(update.version, { $setOnInsert: { ...update, approved: false } });
+  }
   runServerMaintenance().catch((error) => {
     console.error("Manutenzione iniziale non riuscita.", error);
   });

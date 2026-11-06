@@ -1,0 +1,15 @@
+{
+  "lastProcessedCommit": null,
+  "updates": [
+    {
+      "version": "1.0.0",
+      "releaseNumber": 0,
+      "date": "2026-11-06",
+      "summary": "Notifiche di dimissione e storico degli aggiornamenti",
+      "changes": [
+        "I GVP assegnati ricevono una notifica quando un paziente viene indicato come dimesso, per evitare visite in ospedale non più necessarie. L’avviso compare nel gestionale e viene inviato anche tramite push ed email, se abilitate.",
+        "Aggiunta la sezione Aggiornamenti, con data, numero di versione e riepilogo delle novità del software."
+      ]
+    }
+  ]
+}
