@@ -1,16 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2040" height="640" viewBox="0 0 2040 640" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" width="2040" height="736" viewBox="0 0 2040 736" fill="none">
   <title>Esempio di foglio Excel per importare medici</title>
-  <desc>Colonne: Cognome, Nome, Ospedale, Reparto, Professione, Telefono, Email, Note. Per Professione inserisci una delle tre opzioni: Medico, Chirurgo, Anestesista. Mario Rossi è presente su due righe per due reparti diversi. Un’altra riga mostra Anna Bianchi.</desc>
-  <rect width="2040" height="640" rx="20" fill="#F4F7FA"/>
+  <desc>Colonne: Cognome, Nome, Ospedale, Reparto, Professione, Telefono, Email, Note. Per Ospedale inserisci il nome presente nel gestionale. Per Reparto inserisci il nome del reparto dell’ospedale indicato. Per Professione inserisci una delle tre opzioni: Medico, Chirurgo, Anestesista. Mario Rossi è presente su due righe per due reparti diversi. Un’altra riga mostra Anna Bianchi.</desc>
+  <rect width="2040" height="736" rx="20" fill="#F4F7FA"/>
   <g font-family="Arial, Helvetica, sans-serif">
     <rect x="40" y="36" width="8" height="64" rx="4" fill="#198754"/>
     <text x="68" y="62" font-size="28" font-weight="700" fill="#173B32">Come organizzare il foglio Excel</text>
     <text x="68" y="94" font-size="20" fill="#526273">Una riga per ogni associazione tra medico, ospedale e reparto.</text>
-    <rect x="1120" y="36" width="880" height="64" rx="12" fill="#E5F3EB" stroke="#198754"/>
-    <text x="1144" y="76" font-size="26" font-weight="700" fill="#176340">Professione: Medico / Chirurgo / Anestesista</text>
-    <path d="M1220 100V120" stroke="#198754" stroke-width="3"/>
-    <path d="M1214 116L1220 124L1226 116" stroke="#198754" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="40" y="132" width="640" height="64" rx="12" fill="#E5F3EB" stroke="#198754"/>
+    <text x="64" y="172" font-size="24" font-weight="700" fill="#176340">Ospedale: nome presente nel gestionale</text>
+    <rect x="700" y="132" width="640" height="64" rx="12" fill="#E5F3EB" stroke="#198754"/>
+    <text x="724" y="172" font-size="24" font-weight="700" fill="#176340">Reparto: nome del reparto dell’ospedale</text>
+    <rect x="1360" y="132" width="640" height="64" rx="12" fill="#E5F3EB" stroke="#198754"/>
+    <text x="1384" y="172" font-size="24" font-weight="700" fill="#176340">Professione: Medico / Chirurgo / Anestesista</text>
+    <g stroke="#198754" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M600 196V208H690V220M684 214L690 222L696 214"/>
+      <path d="M980 196V220M974 214L980 222L986 214"/>
+      <path d="M1400 196V208H1220V220M1214 214L1220 222L1226 214"/>
+    </g>
 
+    <g transform="translate(0 96)">
     <rect x="40" y="132" width="1960" height="302" rx="8" fill="white" stroke="#CCD6DF"/>
     <path d="M48 132H1992Q2000 132 2000 140V176H40V140Q40 132 48 132" fill="#E8EEF2"/>
     <path d="M88 176H2000V240H88Z" fill="#198754"/>
@@ -27,6 +35,8 @@
       <text x="64" y="215">1</text><text x="64" y="279">2</text><text x="64" y="343">3</text><text x="64" y="407">4</text>
     </g>
     <rect x="1120" y="176" width="200" height="258" stroke="#198754" stroke-width="3"/>
+    <rect x="540" y="176" width="300" height="258" stroke="#198754" stroke-width="3"/>
+    <rect x="840" y="176" width="280" height="258" stroke="#198754" stroke-width="3"/>
     <g font-size="21" fill="white" font-weight="700">
       <text x="104" y="215">Cognome</text><text x="336" y="215">Nome</text>
       <text x="556" y="215">Ospedale</text><text x="856" y="215">Reparto</text><text x="1136" y="215">Professione</text><text x="1336" y="215">Telefono</text><text x="1526" y="215">Email</text>
@@ -52,5 +62,6 @@
     <text x="1044" y="502" font-size="22" font-weight="700" fill="#176340">Ospedale e reparto in colonne separate</text>
     <text x="1044" y="536" font-size="20" fill="#243746">Usa i nomi presenti nel gestionale. Il reparto deve</text>
     <text x="1044" y="566" font-size="20" fill="#243746">appartenere all’ospedale indicato nella stessa riga.</text>
+    </g>
   </g>
 </svg>

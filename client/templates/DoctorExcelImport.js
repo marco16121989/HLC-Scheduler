@@ -103,7 +103,7 @@ export const DoctorExcelImport = ({ onBack, hospitals, doctors, presidentId, can
       <div className="container-fluid">
         <figure className="mb-4">
           <a href="/images/doctor-excel-example.svg" target="_blank" rel="noopener noreferrer" aria-label="Apri l’immagine di esempio a dimensione intera">
-            <img className="img-fluid w-100" src="/images/doctor-excel-example.svg" width="2040" height="640" alt="Esempio Excel con le colonne Cognome, Nome, Ospedale, Reparto, Professione, Telefono, Email, Note. Professione: Medico, Chirurgo oppure Anestesista. Mario Rossi compare su due righe per Cardiologia e Medicina interna dell’Ospedale San Carlo; Anna Bianchi per Chirurgia dell’Ospedale Maggiore." />
+            <img className="img-fluid w-100" src="/images/doctor-excel-example.svg" width="2040" height="736" alt="Esempio Excel con le colonne Cognome, Nome, Ospedale, Reparto, Professione, Telefono, Email, Note. Ospedale: nome presente nel gestionale. Reparto: nome del reparto dell’ospedale indicato. Professione: Medico, Chirurgo oppure Anestesista. Mario Rossi compare su due righe per Cardiologia e Medicina interna dell’Ospedale San Carlo; Anna Bianchi per Chirurgia dell’Ospedale Maggiore." />
           </a>
         </figure>
         <section className="card" aria-label="Caricamento file Excel">
