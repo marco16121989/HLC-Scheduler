@@ -5,6 +5,7 @@ import { Users } from "./Users.js";
 import { Hospitals } from "./Hospitals.js";
 import { Departments } from "./Departments.js";
 import { Doctors } from "./Doctors.js";
+import { DoctorExcelImport } from "./DoctorExcelImport.js";
 import { Patients } from "./Patients.js";
 import { PatientReports } from "./PatientReports.js";
 import { PresentationReports } from "./PresentationReports.js";
@@ -72,6 +73,7 @@ const DATA_RESOURCES_BY_VIEW = {
   hospitals: ["users", "hospitals", "departments", "doctors"],
   departments: ["hospitals", "departments"],
   doctors: ["hospitals", "doctors"],
+  "doctors-import": ["hospitals", "doctors"],
   patients: ["users", "hospitals", "doctors", "patients", "absences"],
   "follow-up": ["users", "hospitals", "doctors", "follow-up", "absences"],
   hospitality: ["hospitality"],
@@ -585,7 +587,7 @@ export const Home = ({
                   </li>
                   <li className="nav-item menu-order-health">
                     <button
-                      className={`nav-link w-100 ${!canViewPage("doctors") ? "d-none" : ""} ${activeView === "doctors" ? "active" : ""}`}
+                      className={`nav-link w-100 ${!canViewPage("doctors") ? "d-none" : ""} ${["doctors", "doctors-import"].includes(activeView) ? "active" : ""}`}
                       type="button"
                       onClick={() => openView("doctors")}
                     >
@@ -643,7 +645,7 @@ export const Home = ({
                 </li>
                 <li className="nav-item menu-order-health">
                   <button
-                    className={`nav-link w-100 ${!canViewPage("doctors") ? "d-none" : ""} ${activeView === "doctors" ? "active" : ""}`}
+                    className={`nav-link w-100 ${!canViewPage("doctors") ? "d-none" : ""} ${["doctors", "doctors-import"].includes(activeView) ? "active" : ""}`}
                     type="button"
                     onClick={() => openView("doctors")}
                   >
@@ -747,6 +749,8 @@ export const Home = ({
             presidentId={presidentId}
             readOnly={!canEditPage("departments")}
           />
+        ) : activeView === "doctors-import" && presidentId && canViewPage("doctors-import") ? (
+          <DoctorExcelImport key={presidentId} hospitals={hospitals} doctors={doctors} presidentId={presidentId} canImport={canEditPage("doctors-import")} onBack={() => openView("doctors")} />
         ) : activeView === "doctors" && presidentId && canViewPage("doctors") ? (
           <Doctors
             doctors={doctors}
@@ -754,6 +758,8 @@ export const Home = ({
             hospitals={hospitals}
             presidentId={presidentId}
             currentUser={user}
+            onImportExcel={() => openView("doctors-import")}
+            canImportExcel={canViewPage("doctors-import")}
             readOnly={!canEditPage("doctors")}
           />
         ) : ["patients", "follow-up"].includes(activeView) && presidentId && canViewPage(activeView) ? (

@@ -33,6 +33,7 @@ import { formatUserName } from "/imports/utils/formatUserName";
 import { DEFAULT_DEPARTMENT_NAMES } from "/imports/constants/departments";
 import { isProtectedPresidentAccount } from "/imports/constants/userProtection";
 import { MANAGEABLE_PAGES, getPagePermission } from "/imports/constants/pagePermissions";
+import { normalizeImportValue, importProfessionalRoles } from "../imports/api/doctorExcelImport.js";
 import { normalizeGvpPatientSharedFields } from "/imports/constants/gvpPatientSharing";
 import { getGvpUsersSelector } from "../imports/api/userDirectory.js";
 import { preparePatientPhoneContacts, removesPatientPhoneNumber } from "../imports/api/patientPhoneContacts.js";
@@ -2383,6 +2384,37 @@ Meteor.methods({
         }
       }
     }
+  },
+
+  async "hlc.importDoctors"(records) {
+    requireUser(this);
+    check(records, [Object]);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    requirePageEdit(actor, "doctors-import");
+    const presidentId = await getActorPresidentId(actor);
+    if (!presidentId) throw new Meteor.Error("not-authorized", "Organizzazione non disponibile.");
+    const hospitals = await HospitalsCollection.find({ presidentId }).fetchAsync();
+    const validDepartmentIds = new Set(hospitals.flatMap((hospital) => (hospital.departments || []).map((department) => department.id)));
+    const existing = await DoctorsCollection.find({ presidentId }).fetchAsync();
+    const nameKey = (record) => JSON.stringify([normalizeImportValue(record.firstName), normalizeImportValue(record.lastName)]);
+    const names = new Set(existing.map(nameKey));
+    const emails = new Set(existing.map((record) => normalizeImportValue(record.email)).filter(Boolean));
+    const prepared = records.map((record) => {
+      check(record, { id: String, firstName: String, lastName: String, phone: String, email: String, departmentIds: [String], presidentId: String, doctorType: String, professionalRole: String, notes: String, officeInstructions: String });
+      if (record.presidentId !== presidentId) throw new Meteor.Error("not-authorized", "Dati fuori dalla tua organizzazione.");
+      if (!record.firstName.trim() || !record.lastName.trim() || !record.departmentIds.length || record.departmentIds.some((id) => !validDepartmentIds.has(id)) || !importProfessionalRoles.includes(record.professionalRole)) {
+        throw new Meteor.Error("invalid-record", "Dati del medico o reparti non validi.");
+      }
+      const name = nameKey(record);
+      const email = normalizeImportValue(record.email);
+      if (names.has(name)) throw new Meteor.Error("duplicate-doctor", "Medico già presente.");
+      if (email && emails.has(email)) throw new Meteor.Error("duplicate-email", "Email già associata a un medico.");
+      names.add(name);
+      if (email) emails.add(email);
+      return cleanRecord({ ...record, id: Random.id() });
+    });
+    for (const record of prepared) await DoctorsCollection.insertAsync(record);
+    return prepared.length;
   },
 
   async "hlc.applyRecordChanges"(kind, changes) {

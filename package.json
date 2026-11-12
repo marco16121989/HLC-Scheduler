@@ -6,6 +6,7 @@
     "test": "node scripts/safe-meteor-test.cjs",
     "test-app": "node scripts/safe-meteor-test.cjs --full-app",
     "test:updates": "node --test tests/softwareUpdates.cjs tests/softwareUpdateApproval.cjs",
+    "test:doctor-import": "node tests/doctorExcelImport.cjs",
     "updates:generate": "node scripts/generate-software-updates.cjs",
     "visualize": "meteor --production --extra-packages bundle-visualizer"
   },
@@ -18,7 +19,8 @@
     "pdf-lib": "^1.17.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@meteorjs/rspack": "^2.0.1",

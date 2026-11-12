@@ -3,6 +3,7 @@ export const MANAGEABLE_PAGES = [
   ["events", "Eventi"], ["useful-files", "File utili"],
   ["cas", "CAS"], ["gvp", "GVP"],
   ["hospitals", "Ospedali"], ["departments", "Reparti"], ["doctors", "Medici"],
+  ["doctors-import", "Importazione Medici Exel"],
   ["presentations", "Presentazioni"],
   ["reports", "Report"],
   ["hospitality", "Ospitalità"],
@@ -57,6 +58,10 @@ export const getPagePermission = (user, pageId) => {
       : { view: true, edit: false };
   }
   if (configured) return { view: Boolean(configured.view), edit: Boolean(configured.view && configured.edit) };
+  if (pageId === "doctors-import") {
+    const view = user?.role === "Presidente" || (user?.role === "CAS" && Boolean(user?.isSecretary));
+    return { view, edit: view };
+  }
   const defaults = {
     Presidente: new Set(MANAGEABLE_PAGES.map(([pageId]) => pageId)),
     CAS: new Set(["calendar", "events", "absences", "useful-files", "profile", "support", "donations", "cas", "gvp", "hospitals", "departments", "doctors", "patients", "presentations", "patient-reports", "presentation-reports"]),

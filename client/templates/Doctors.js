@@ -75,6 +75,8 @@ export const Doctors = ({
   hospitals,
   presidentId,
   currentUser,
+  onImportExcel,
+  canImportExcel = false,
   readOnly = false,
 }) => {
   const [firstName, setFirstName] = useState("");
@@ -390,6 +392,16 @@ export const Doctors = ({
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div><h1 className="mb-1">Medici</h1><p className="text-secondary mb-0">{readOnly ? "Consulta i contatti dei medici e i reparti in cui operano." : "Gestisci i contatti dei medici e le indicazioni sugli studi in cui ricevono."}</p></div>
             <div className="d-flex flex-wrap gap-2 flex-shrink-0">
+            {canImportExcel && <button className="btn btn-outline-primary" type="button" onClick={async () => {
+              const confirmed = await confirmAction("hai inserito tutti gli ospedali e i reparti?", {
+                title: "Importa da Excel",
+                confirmLabel: "Sì",
+                cancelLabel: "No",
+                tone: "primary",
+              });
+              if (!confirmed) return;
+              onImportExcel();
+            }}>Importa da Excel</button>}
             {!readOnly && <button
               className="btn btn-primary"
               type="button"

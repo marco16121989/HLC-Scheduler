@@ -45,6 +45,10 @@ const PERMISSION_DESCRIPTIONS = {
     view: "Consente di consultare l’elenco e la scheda dei medici in sola lettura. Le Note operative restano leggibili e ogni utente può aggiungere note ed eliminare le proprie.",
     edit: "Consente anche di inserire, modificare ed eliminare le anagrafiche dei medici, i contatti e le associazioni con ospedali e reparti.",
   },
+  "doctors-import": {
+    view: "Mostra il pulsante Importa da Excel nella sezione Medici e consente di aprire la pagina e controllare l’anteprima del file.",
+    edit: "Consente di salvare i medici importati da Excel, indipendentemente dal permesso di modifica della sezione Medici.",
+  },
   hospitality: {
     view: "Consente di consultare chi offre ospitalità, i contatti, il luogo e le condizioni di disponibilità.",
     edit: "Consente anche di inserire, modificare, disattivare ed eliminare le disponibilità di ospitalità.",

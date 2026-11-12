@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2040" height="640" viewBox="0 0 2040 640" fill="none">
+  <title>Esempio di foglio Excel per importare medici</title>
+  <desc>Colonne: Cognome, Nome, Ospedale, Reparto, Professione, Telefono, Email, Note. Per Professione inserisci una delle tre opzioni: Medico, Chirurgo, Anestesista. Mario Rossi è presente su due righe per due reparti diversi. Un’altra riga mostra Anna Bianchi.</desc>
+  <rect width="2040" height="640" rx="20" fill="#F4F7FA"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="40" y="36" width="8" height="64" rx="4" fill="#198754"/>
+    <text x="68" y="62" font-size="28" font-weight="700" fill="#173B32">Come organizzare il foglio Excel</text>
+    <text x="68" y="94" font-size="20" fill="#526273">Una riga per ogni associazione tra medico, ospedale e reparto.</text>
+    <rect x="1120" y="36" width="880" height="64" rx="12" fill="#E5F3EB" stroke="#198754"/>
+    <text x="1144" y="76" font-size="26" font-weight="700" fill="#176340">Professione: Medico / Chirurgo / Anestesista</text>
+    <path d="M1220 100V120" stroke="#198754" stroke-width="3"/>
+    <path d="M1214 116L1220 124L1226 116" stroke="#198754" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="40" y="132" width="1960" height="302" rx="8" fill="white" stroke="#CCD6DF"/>
+    <path d="M48 132H1992Q2000 132 2000 140V176H40V140Q40 132 48 132" fill="#E8EEF2"/>
+    <path d="M88 176H2000V240H88Z" fill="#198754"/>
+    <path d="M88 240H2000V368H88Z" fill="#EEF7FF"/>
+    <path d="M40 176H88V434H48Q40 434 40 426Z" fill="#E8EEF2"/>
+    <g stroke="#CCD6DF">
+      <path d="M88 132V434M320 132V434M540 132V434M840 132V434M1120 132V434M1320 132V434M1510 132V434M1760 132V434"/>
+      <path d="M40 176H2000M40 240H2000M40 304H2000M40 368H2000"/>
+    </g>
+    <g font-size="18" fill="#526273" text-anchor="middle">
+      <text x="204" y="160">A</text><text x="430" y="160">B</text><text x="690" y="160">C</text>
+      <text x="980" y="160">D</text><text x="1220" y="160">E</text><text x="1415" y="160">F</text><text x="1635" y="160">G</text>
+      <text x="1880" y="160">H</text>
+      <text x="64" y="215">1</text><text x="64" y="279">2</text><text x="64" y="343">3</text><text x="64" y="407">4</text>
+    </g>
+    <rect x="1120" y="176" width="200" height="258" stroke="#198754" stroke-width="3"/>
+    <g font-size="21" fill="white" font-weight="700">
+      <text x="104" y="215">Cognome</text><text x="336" y="215">Nome</text>
+      <text x="556" y="215">Ospedale</text><text x="856" y="215">Reparto</text><text x="1136" y="215">Professione</text><text x="1336" y="215">Telefono</text><text x="1526" y="215">Email</text>
+      <text x="1776" y="215">Note</text>
+    </g>
+    <g font-size="21" fill="#243746">
+      <text x="104" y="279">Rossi</text><text x="336" y="279">Mario</text>
+      <text x="556" y="279">Ospedale San Carlo</text><text x="856" y="279">Cardiologia</text><text x="1136" y="279">Medico</text><text x="1336" y="279">3331234567</text><text x="1526" y="279">mario@example.it</text>
+      <text x="1776" y="279">Chiamare al mattino</text>
+      <text x="104" y="343">Rossi</text><text x="336" y="343">Mario</text>
+      <text x="556" y="343">Ospedale San Carlo</text><text x="856" y="343">Medicina interna</text><text x="1136" y="343">Medico</text><text x="1336" y="343">3331234567</text><text x="1526" y="343">mario@example.it</text>
+      <text x="1776" y="343">Chiamare al mattino</text>
+      <text x="104" y="407">Bianchi</text><text x="336" y="407">Anna</text>
+      <text x="556" y="407">Ospedale Maggiore</text><text x="856" y="407">Chirurgia</text><text x="1136" y="407">Chirurgo</text><text x="1336" y="407">3337654321</text><text x="1526" y="407">anna@example.it</text>
+      <text x="1776" y="407">Su appuntamento</text>
+    </g>
+
+    <rect x="40" y="466" width="960" height="130" rx="12" fill="#E3F0FC"/>
+    <text x="64" y="502" font-size="22" font-weight="700" fill="#175D95">Un medico in più reparti</text>
+    <text x="64" y="536" font-size="20" fill="#243746">Mario Rossi compare su due righe: è un solo medico,</text>
+    <text x="64" y="566" font-size="20" fill="#243746">associato a Cardiologia e Medicina interna.</text>
+    <rect x="1020" y="466" width="980" height="130" rx="12" fill="#E5F3EB"/>
+    <text x="1044" y="502" font-size="22" font-weight="700" fill="#176340">Ospedale e reparto in colonne separate</text>
+    <text x="1044" y="536" font-size="20" fill="#243746">Usa i nomi presenti nel gestionale. Il reparto deve</text>
+    <text x="1044" y="566" font-size="20" fill="#243746">appartenere all’ospedale indicato nella stessa riga.</text>
+  </g>
+</svg>
