@@ -1,6 +1,32 @@
 {
-  "lastProcessedCommit": "3a1c4aa6b0a4fb23079f24f1608f8c8fcf554c87",
+  "lastProcessedCommit": "32ce82dc7f452a2f2b7076a0323a6d65275b7df1",
   "updates": [
+    {
+      "version": "1.0.3",
+      "releaseNumber": 3,
+      "sourceCommit": "32ce82dc7f452a2f2b7076a0323a6d65275b7df1",
+      "date": "2026-11-12",
+      "summary": "Aggiornamenti alle funzionalità del gestionale",
+      "changes": [
+        "Aggiornate le sezioni ospedali, reparti e medici.",
+        "Aggiornata l’interfaccia del gestionale.",
+        "Aggiornata la gestione degli utenti e dei permessi.",
+        "Aggiornate le funzionalità del gestionale."
+      ]
+    },
+    {
+      "version": "1.0.2",
+      "releaseNumber": 2,
+      "sourceCommit": "d8f2a554d53897daf631896a1f4ee458924f995f",
+      "date": "2026-11-12",
+      "summary": "Aggiornamenti alle funzionalità del gestionale",
+      "changes": [
+        "Aggiornate le sezioni ospedali, reparti e medici.",
+        "Aggiornata l’interfaccia del gestionale.",
+        "Aggiornata la gestione degli utenti e dei permessi.",
+        "Aggiornate le funzionalità del gestionale."
+      ]
+    },
     {
       "version": "1.0.1",
       "releaseNumber": 1,
