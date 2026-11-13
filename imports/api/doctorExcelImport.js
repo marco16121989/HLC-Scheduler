@@ -92,9 +92,28 @@ export const isDoctorImportCellMissing = (row, column) => {
   return true;
 };
 
+export const getDoctorImportRoleConflicts = (rows) => {
+  const groups = new Map();
+  for (const row of rows) {
+    if (!row.firstName || !row.lastName) continue;
+    const key = JSON.stringify([normalizeImportValue(row.lastName), normalizeImportValue(row.firstName)]);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  const conflicts = new Map();
+  for (const group of groups.values()) {
+    const roles = new Set(group.map((row) => normalizeImportValue(row.professionalRole)).filter(Boolean));
+    if (roles.size < 2) continue;
+    const message = `Professioni diverse per ${group[0].lastName} ${group[0].firstName} (righe Excel: ${group.map((row) => row.rowNumber).join(", ")}). Uniforma la professione per continuare.`;
+    for (const row of group) conflicts.set(row.rowNumber, message);
+  }
+  return conflicts;
+};
+
 export const getDoctorImportIssues = (row, hospitals, doctors = [], presidentId) => {
   const issues = [];
   if (!row.firstName || !row.lastName) issues.push("Nome o cognome mancante");
+  if (!normalizeImportValue(row.professionalRole) && row.sourceColumns?.some((column) => column.field === "professionalRole")) issues.push("Professione mancante");
   if (row.professionalRole && !importProfessionalRoles.includes(row.professionalRole)) issues.push("Professione non riconosciuta");
   if (row.firstName && row.lastName && doctors.some((doctor) => doctor.presidentId === presidentId && normalizeImportValue(doctor.lastName) === normalizeImportValue(row.lastName) && normalizeImportValue(doctor.firstName) === normalizeImportValue(row.firstName))) {
     issues.push("Medico già presente");

@@ -128,21 +128,75 @@ function componentFixture({ failSave = false, doctors = [], canImport = true } =
   return { render, upload, calls };
 }
 
+test("profession conflicts are alerted before import and clear after correction in the grouped preview", async () => {
+  const fixture = componentFixture();
+  await fixture.upload([
+    [...mario, "", "Medico"],
+    ["Bianchi", "Anna", "Ospedale Maggiore", "Chirurgia", "", "", "", "Chirurgo"],
+    [" ROSSI ", "mario", "Ospedale Maggiore", "Chirurgia", "03331234567", "mario@example.it", "", "Chirurgo"],
+  ], [...headers, "Professione"]);
+  let view = fixture.render();
+  const dataRows = () => fixture.render().nodes.filter((node) => node.type === "tr" && node.key !== null);
+  assert.deepEqual(dataRows().map((node) => node.key), ["2", "4", "3"]);
+  assert.equal(dataRows().filter((node) => node.props.children[1].at(-1).props.className === "doctor-import-cell-invalid").length, 2);
+  assert.ok(dataRows().every((node) => node.props.className === undefined));
+  assert.ok(dataRows().every((node) => node.props.children[1][0].props.className === "doctor-import-cell-valid"));
+  const alert = view.find((node) => node.props?.role === "alert");
+  assert.match(JSON.stringify(alert), /Professioni diverse per Rossi Mario/);
+  assert.match(JSON.stringify(alert), /righe Excel: 2, 4/);
+  let button = view.find((node) => node.type === "button" && node.props.children === "Importa medici");
+  assert.equal(button.props.disabled, false);
+  await button.props.onClick();
+  assert.equal(fixture.calls.length, 0);
+  assert.match(JSON.stringify(fixture.render().find((node) => node.type === "dialog")), /Professioni diverse per Rossi Mario/);
+  fixture.render().find((node) => node.props?.["aria-label"] === "Chiudi elenco problemi").props.onClick();
+  view.find((node) => node.props?.["aria-label"] === "Modifica professione per la riga 4").props.onClick();
+  fixture.render().find((node) => node.props?.id === "doctor-import-edit-value").props.onChange({ target: { value: "Medico" } });
+  fixture.render().find((node) => node.type === "form").props.onSubmit({ preventDefault() {} });
+  view = fixture.render();
+  assert.equal(view.find((node) => node.props?.role === "alert"), undefined);
+  button = view.find((node) => node.type === "button" && node.props.children === "Importa medici");
+  assert.equal(button.props.disabled, false);
+  await button.props.onClick();
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.calls[0][1].length, 2);
+  assert.equal(fixture.calls[0][1][0].professionalRole, "Medico");
+  assert.deepEqual(fixture.calls[0][1][0].departmentIds, ["d1", "d3"]);
+});
+
+test("matching or empty professions do not conflict and conflicting professions still block record creation", () => {
+  const rows = parse(mario, mario, mario);
+  rows[0].professionalRole = "Medico";
+  rows[1].professionalRole = "Medico";
+  assert.equal(helpers.getDoctorImportRoleConflicts(rows).size, 0);
+  rows[1].professionalRole = "Anestesista";
+  assert.equal(helpers.getDoctorImportRoleConflicts(rows).size, 3);
+  assert.throws(() => build(rows), /professioni diverse/);
+});
+
 test("UI flags unmapped rows, allows manual mapping and saves only after resolving", async () => {
   const fixture = componentFixture();
   await fixture.upload([["Rossi", "Mario", "Sconosciuto", "Altro reparto"]]);
   let view = fixture.render();
   const importButton = () => fixture.render().find((node) => node.type === "button" && node.props.children === "Importa medici");
-  assert.equal(importButton().props.disabled, true);
-  assert.ok(view.find((node) => node.props?.children === "Dato non importato"));
+  assert.equal(importButton().props.disabled, false);
+  const statusCell = view.find((node) => node.type === "tbody").props.children[0].props.children[2];
+  const problemLabels = statusCell.props.children[0].props.children;
+  assert.equal(statusCell.props.children[0].props.className, "d-flex flex-column align-items-start gap-1");
+  assert.deepEqual(problemLabels.map((node) => node.props.children), ["Ospedale non riconosciuto o ambiguo", "Reparto non riconosciuto o ambiguo"]);
+  assert.ok(problemLabels.every((node) => node.props.className.includes("text-bg-danger")));
   assert.equal(view.find((node) => node.props?.["aria-label"] === "Reparto per la riga 2").props.disabled, true);
   const hospitalSelect = view.find((node) => node.props?.["aria-label"] === "Ospedale per la riga 2");
   assert.ok(!JSON.stringify(hospitalSelect).includes("Privato"));
   hospitalSelect.props.onChange({ target: { value: "h2" } });
   view = fixture.render();
+  assert.deepEqual(view.find((node) => node.type === "tbody").props.children[0].props.children[1].slice(0, 4).map((node) => node.props.className), [
+    "doctor-import-cell-valid", "doctor-import-cell-valid", "doctor-import-cell-valid", "doctor-import-cell-invalid",
+  ]);
   const departmentSelect = view.find((node) => node.props?.["aria-label"] === "Reparto per la riga 2");
   assert.ok(!JSON.stringify(departmentSelect).includes("Cardiologia"));
   departmentSelect.props.onChange({ target: { value: "d3" } });
+  assert.ok(fixture.render().find((node) => node.type === "tbody").props.children[0].props.children[1].slice(0, 4).every((node) => node.props.className === "doctor-import-cell-valid"));
   assert.equal(importButton().props.disabled, false);
   await importButton().props.onClick();
   assert.equal(fixture.calls.length, 1);
@@ -151,13 +205,96 @@ test("UI flags unmapped rows, allows manual mapping and saves only after resolvi
   assert.ok(fixture.render().find((node) => node.props?.children === "1 medico importato."));
 });
 
+test("selected associations become text and pencil buttons, with modal confirmation and cancellation", async () => {
+  const fixture = componentFixture();
+  await fixture.upload([[...mario, "", "Dottore"]], [...headers, "Professione"]);
+  let view = fixture.render();
+  view.find((node) => node.props?.["aria-label"] === "Professione per la riga 2").props.onChange({ target: { value: "Medico" } });
+  view = fixture.render();
+  for (const label of ["Ospedale", "Reparto", "Professione"]) {
+    assert.equal(view.find((node) => node.props?.["aria-label"] === `${label} per la riga 2`), undefined);
+    assert.ok(view.find((node) => node.props?.["aria-label"] === `Modifica ${label.toLowerCase()} per la riga 2`));
+  }
+  const edit = (field) => fixture.render().find((node) => node.props?.["aria-label"] === `Modifica ${field} per la riga 2`).props.onClick();
+  const select = (value) => fixture.render().find((node) => node.props?.id === "doctor-import-edit-value").props.onChange({ target: { value } });
+  const confirm = () => fixture.render().find((node) => node.type === "form").props.onSubmit({ preventDefault() {} });
+  edit("professione");
+  assert.ok(fixture.render().find((node) => node.type === "dialog"));
+  assert.equal(fixture.render().find((node) => node.props?.id === "doctor-import-edit-value").props.value, "Medico");
+  select("Anestesista");
+  fixture.render().find((node) => node.type === "button" && node.props.children === "Annulla").props.onClick();
+  assert.equal(fixture.render().find((node) => node.type === "dialog"), undefined);
+  assert.ok(fixture.render().find((node) => node.type === "span" && node.props.children === "Medico"));
+  edit("professione");
+  select("Chirurgo");
+  confirm();
+  edit("reparto");
+  select("d2");
+  confirm();
+  assert.ok(fixture.render().find((node) => node.type === "span" && node.props.children === "Medicina interna"));
+  edit("ospedale");
+  assert.ok(!JSON.stringify(fixture.render().find((node) => node.props?.id === "doctor-import-edit-value")).includes("Privato"));
+  select("h2");
+  confirm();
+  view = fixture.render();
+  assert.ok(view.find((node) => node.type === "span" && node.props.children === "Ospedale Maggiore"));
+  const departmentSelect = view.find((node) => node.props?.["aria-label"] === "Reparto per la riga 2");
+  assert.equal(departmentSelect.props.value, "");
+  assert.ok(!JSON.stringify(departmentSelect).includes("Medicina interna"));
+  assert.equal(view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.disabled, false);
+  departmentSelect.props.onChange({ target: { value: "d3" } });
+  view = fixture.render();
+  assert.equal(view.find((node) => node.props?.["aria-label"] === "Reparto per la riga 2"), undefined);
+  await view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.onClick();
+  assert.equal(fixture.calls[0][1][0].professionalRole, "Chirurgo");
+  assert.deepEqual(fixture.calls[0][1][0].departmentIds, ["d3"]);
+});
+
+test("import opens a modal listing every unresolved row and issue, then saves after corrections", async () => {
+  const fixture = componentFixture();
+  await fixture.upload([
+    [...mario, "", "Medico"],
+    ["Bianchi", "Anna", "Sconosciuto", "Altro reparto", "", "", "", ""],
+  ], [...headers, "Professione"]);
+  const importButton = () => fixture.render().find((node) => node.type === "button" && node.props.children === "Importa medici");
+  assert.equal(importButton().props.disabled, false);
+  await importButton().props.onClick();
+  let view = fixture.render();
+  const modal = view.find((node) => node.type === "dialog");
+  assert.equal(modal.props["aria-labelledby"], "doctor-import-problems-title");
+  const items = modal.props.children[2].props.children;
+  assert.equal(items.length, 1);
+  assert.deepEqual(items[0].props.children[0].props.children, ["Riga Excel ", 3, " · Bianchi Anna"]);
+  assert.deepEqual(items[0].props.children[1].props.children.map((node) => node.props.children), [
+    "Professione mancante", "Ospedale non riconosciuto o ambiguo", "Reparto non riconosciuto o ambiguo",
+  ]);
+  assert.equal(fixture.calls.length, 0);
+  modal.props.onCancel();
+  assert.equal(fixture.render().find((node) => node.type === "dialog"), undefined);
+  view.find((node) => node.props?.["aria-label"] === "Ospedale per la riga 3").props.onChange({ target: { value: "h2" } });
+  fixture.render().find((node) => node.props?.["aria-label"] === "Reparto per la riga 3").props.onChange({ target: { value: "d3" } });
+  fixture.render().find((node) => node.props?.["aria-label"] === "Professione per la riga 3").props.onChange({ target: { value: "Chirurgo" } });
+  await importButton().props.onClick();
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.calls[0][1].length, 2);
+  assert.equal(fixture.render().find((node) => node.type === "dialog"), undefined);
+});
+
+test("record validation errors open the problems modal before any server call", async () => {
+  const fixture = componentFixture({ doctors: [{ firstName: "Anna", lastName: "Bianchi", presidentId: "p1", email: mario[5] }] });
+  await fixture.upload([mario]);
+  await fixture.render().find((node) => node.type === "button" && node.props.children === "Importa medici").props.onClick();
+  assert.equal(fixture.calls.length, 0);
+  assert.match(JSON.stringify(fixture.render().find((node) => node.type === "dialog")), /associata a un altro medico/);
+});
+
 test("changing hospital clears an incompatible department", async () => {
   const fixture = componentFixture();
   await fixture.upload([["Rossi", "Mario", "San Carlo", "Cardiologia"]]);
   fixture.render().find((node) => node.props?.["aria-label"] === "Ospedale per la riga 2").props.onChange({ target: { value: "h2" } });
   const select = fixture.render().find((node) => node.props?.["aria-label"] === "Reparto per la riga 2");
   assert.equal(select.props.value, "");
-  assert.ok(fixture.render().find((node) => node.props?.children === "Dato non importato"));
+  assert.ok(fixture.render().find((node) => node.props?.children === "Reparto non riconosciuto o ambiguo" && node.props.className.includes("text-bg-danger")));
 });
 
 test("server failure keeps the preview for retry and never shows success", async () => {
@@ -176,9 +313,12 @@ test("existing doctors remain in the preview and are flagged before import", asy
   const view = fixture.render();
   assert.equal(view.nodes.filter((node) => node.type === "tbody")[0].props.children.length, 2);
   assert.ok(view.find((node) => node.props?.children === "Medico già presente"));
-  assert.ok(view.find((node) => node.props?.children === "Dato non importato"));
+  assert.ok(view.find((node) => node.props?.children === "Medico già presente" && node.props.className.includes("text-bg-danger")));
+  assert.deepEqual(view.find((node) => node.type === "tbody").props.children[0].props.children[1].slice(0, 4).map((node) => node.props.className), [
+    "doctor-import-cell-invalid", "doctor-import-cell-invalid", "doctor-import-cell-valid", "doctor-import-cell-valid",
+  ]);
   assert.ok(view.find((node) => node.props?.children === "Pronto"));
-  assert.equal(view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.disabled, true);
+  assert.equal(view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.disabled, false);
   assert.equal(fixture.calls.length, 0);
 });
 
@@ -239,7 +379,7 @@ test("profession after department is read and saved with contacts and notes in t
   const columns = ["Cognome", "Nome", "Ospedale", "Reparto", "Professione", "Telefono", "Email", "Note"];
   await fixture.upload([[...mario.slice(0, 4), "chirurgo", ...mario.slice(4), "Su appuntamento"]], columns);
   const view = fixture.render();
-  assert.ok(view.find((node) => node.type === "td" && node.props.children === "Chirurgo"));
+  assert.ok(view.find((node) => node.type === "span" && node.props.children === "Chirurgo"));
   assert.ok(!view.find((node) => node.props?.["aria-label"] === "Professione per la riga 2"));
   await view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.onClick();
   const record = fixture.calls[0][1][0];
@@ -254,7 +394,7 @@ test("unknown profession is flagged and can be corrected manually", async () => 
   await fixture.upload([[...mario, "", "Dottore"]], [...headers, "Professione"]);
   let view = fixture.render();
   assert.ok(view.find((node) => node.props?.children === "Professione non riconosciuta"));
-  assert.equal(view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.disabled, true);
+  assert.equal(view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.disabled, false);
   view.find((node) => node.props?.["aria-label"] === "Professione per la riga 2").props.onChange({ target: { value: "Anestesista" } });
   view = fixture.render();
   assert.equal(view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.disabled, false);
@@ -266,8 +406,8 @@ test("recognized hospitals and departments appear as text without selection menu
   const fixture = componentFixture();
   await fixture.upload([mario]);
   const view = fixture.render();
-  assert.ok(view.find((node) => node.type === "td" && node.props.children === "Ospedale San Carlo"));
-  assert.ok(view.find((node) => node.type === "td" && node.props.children === "Cardiologia"));
+  assert.ok(view.find((node) => node.type === "span" && node.props.children === "Ospedale San Carlo"));
+  assert.ok(view.find((node) => node.type === "span" && node.props.children === "Cardiologia"));
   assert.ok(!view.find((node) => node.props?.["aria-label"] === "Ospedale per la riga 2"));
   assert.ok(!view.find((node) => node.props?.["aria-label"] === "Reparto per la riga 2"));
 });
@@ -293,8 +433,12 @@ test("preview preserves every Excel column in source order, including extra colu
   const view = fixture.render();
   assert.deepEqual(view.nodes.filter((node) => node.type === "th" && node.props.scope === "col").map((node) => node.props.children), ["Riga", ...columns, "Stato"]);
   const tableRows = view.find((node) => node.type === "tbody").props.children;
-  assert.equal(tableRows[0].props.className, "table-success");
-  assert.equal(tableRows[1].props.className, "table-danger");
+  assert.equal(tableRows[0].props.className, undefined);
+  assert.ok(tableRows[0].props.children[1].every((node) => node.props.className === "doctor-import-cell-valid"));
+  assert.equal(tableRows[1].props.className, undefined);
+  assert.deepEqual(tableRows[1].props.children[1].map((node) => node.props.className), [
+    "doctor-import-cell-valid", "doctor-import-cell-valid", "doctor-import-cell-valid", "doctor-import-cell-valid", "doctor-import-cell-invalid", "doctor-import-cell-invalid", "doctor-import-cell-valid", "doctor-import-cell-invalid", "doctor-import-cell-valid",
+  ]);
   const cells = view.nodes.filter((node) => node.type === "td");
   for (const value of ["Mario", "Rossi", "MARIO@example.it", "0039 03331234567", "Nota su due\nrighe", "ABC-001"]) {
     assert.ok(cells.some((cell) => cell.props.children === value), `Missing source value: ${value}`);
@@ -322,7 +466,7 @@ test("every Excel column reports empty or whitespace-only cells, including extra
   }
 });
 
-test("preview labels missing optional data without yellow highlighting or a preselected profession", async () => {
+test("preview blocks a missing profession while leaving optional data empty and no profession preselected", async () => {
   const fixture = componentFixture();
   const columns = ["Cognome", "Nome", "Ospedale", "Reparto", "Professione", "Telefono", "Email", "Note", "Extra"];
   await fixture.upload([["Rossi", "Mario", "Ospedale San Carlo", "Cardiologia", "", " ", "", "", ""]], columns);
@@ -330,8 +474,30 @@ test("preview labels missing optional data without yellow highlighting or a pres
   assert.equal(view.nodes.filter((node) => node.props?.children === "Dato mancante").length, 5);
   assert.equal(view.nodes.filter((node) => node.props?.className?.includes("table-warning")).length, 0);
   assert.equal(view.find((node) => node.props?.["aria-label"] === "Professione per la riga 2").props.value, "");
-  assert.equal(view.find((node) => node.type === "tbody").props.children[0].props.className, "table-success");
-  assert.equal(view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.disabled, false);
+  assert.deepEqual(view.find((node) => node.type === "tbody").props.children[0].props.children[1].map((node) => node.props.className), [
+    "doctor-import-cell-valid", "doctor-import-cell-valid", "doctor-import-cell-valid", "doctor-import-cell-valid", "doctor-import-cell-invalid", "doctor-import-cell-invalid", "doctor-import-cell-invalid", "doctor-import-cell-invalid", "doctor-import-cell-invalid",
+  ]);
+  assert.ok(view.find((node) => node.props?.children === "Professione mancante"));
+  const button = view.find((node) => node.type === "button" && node.props.children === "Importa medici");
+  assert.equal(button.props.disabled, false);
+  await button.props.onClick();
+  assert.equal(fixture.calls.length, 0);
+  assert.match(JSON.stringify(fixture.render().find((node) => node.type === "dialog")), /Professione mancante/);
+  fixture.render().find((node) => node.props?.["aria-label"] === "Chiudi elenco problemi").props.onClick();
+  view.find((node) => node.props?.["aria-label"] === "Professione per la riga 2").props.onChange({ target: { value: "Medico" } });
+  const corrected = fixture.render();
+  assert.equal(corrected.nodes.filter((node) => node.props?.children === "Dato mancante").length, 4);
+  assert.equal(corrected.find((node) => node.type === "tbody").props.children[0].props.children[1][4].props.className, "doctor-import-cell-valid");
+  assert.ok(corrected.find((node) => node.type === "tbody").props.children[0].props.children[1].slice(5).every((node) => node.props.className === "doctor-import-cell-invalid"));
+  assert.equal(corrected.find((node) => node.type === "button" && node.props.children === "Importa medici").props.disabled, false);
+});
+
+test("empty and whitespace-only profession cells block record creation even for repeated doctors", () => {
+  for (const value of ["", "   "]) {
+    const rows = parseDoctorImportRows([[...headers, "Professione"], [...mario, "", "Medico"], [...mario, "", value]], hospitals);
+    assert.ok(getDoctorImportIssues(rows[1], hospitals).includes("Professione mancante"));
+    assert.throws(() => build(rows), /Riga 3: Professione mancante/);
+  }
 });
 
 test("selecting a missing profession clears its missing-data indication", async () => {
@@ -342,7 +508,7 @@ test("selecting a missing profession clears its missing-data indication", async 
   view.find((node) => node.props?.["aria-label"] === "Professione per la riga 2").props.onChange({ target: { value: "Chirurgo" } });
   view = fixture.render();
   assert.ok(!view.find((node) => node.props?.children === "Dato mancante"));
-  assert.equal(view.find((node) => node.type === "tbody").props.children[0].props.className, "table-success");
+  assert.ok(view.find((node) => node.type === "tbody").props.children[0].props.children[1].every((node) => node.props.className === "doctor-import-cell-valid"));
 });
 
 test("Excel import is a separate configurable permission", () => {
