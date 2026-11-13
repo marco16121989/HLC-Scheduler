@@ -1,6 +1,26 @@
 {
-  "lastProcessedCommit": "32ce82dc7f452a2f2b7076a0323a6d65275b7df1",
+  "lastProcessedCommit": "4d505a4ba03719e92b685ba8cf49d042b4859e19",
   "updates": [
+    {
+      "version": "1.0.5",
+      "releaseNumber": 5,
+      "sourceCommit": "4d505a4ba03719e92b685ba8cf49d042b4859e19",
+      "date": "2026-11-12",
+      "summary": "Aggiornate le sezioni ospedali, reparti e medici.",
+      "changes": [
+        "Aggiornate le sezioni ospedali, reparti e medici."
+      ]
+    },
+    {
+      "version": "1.0.4",
+      "releaseNumber": 4,
+      "sourceCommit": "a6d5d7432b69977adc2cdcb9f5aed127db04302e",
+      "date": "2026-11-12",
+      "summary": "Aggiornate le sezioni ospedali, reparti e medici.",
+      "changes": [
+        "Aggiornate le sezioni ospedali, reparti e medici."
+      ]
+    },
     {
       "version": "1.0.3",
       "releaseNumber": 3,
