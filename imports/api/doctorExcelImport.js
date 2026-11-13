@@ -135,7 +135,7 @@ export const buildDoctorImportRecords = ({ rows, hospitals, doctors, presidentId
     const key = JSON.stringify([normalizeImportValue(row.lastName), normalizeImportValue(row.firstName)]);
     let doctor = groups.get(key);
     if (!doctor) {
-      doctor = { id: createId(), firstName: row.firstName, lastName: row.lastName, phone: row.phone, email: row.email, departmentIds: [], presidentId, doctorType: "Consulente", professionalRole: "Medico", notes: "", officeInstructions: "" };
+      doctor = { id: createId(), firstName: row.firstName, lastName: row.lastName, phone: row.phone, email: row.email, departmentIds: [], presidentId, doctorType: "Non indicato", professionalRole: "Medico", notes: "", officeInstructions: "" };
       groups.set(key, doctor);
     }
     for (const field of ["phone", "email"]) {

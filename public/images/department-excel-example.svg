@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" fill="none">
+  <title>Esempio di foglio Excel per importare reparti</title>
+  <desc>Una sola colonna A. Nella prima riga scrivi Reparto, poi un nome per riga: Cardiologia, Chirurgia generale, Medicina interna, Neurologia.</desc>
+  <rect width="1200" height="520" rx="20" fill="#F4F7FA"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="36" y="30" width="7" height="60" rx="3.5" fill="#198754"/>
+    <text x="62" y="56" font-size="28" font-weight="700" fill="#173B32">Come organizzare il foglio Excel</text>
+    <text x="62" y="86" font-size="20" fill="#526273">Una sola colonna, un reparto per riga.</text>
+
+    <rect x="36" y="120" width="530" height="348" rx="8" fill="white" stroke="#CCD6DF"/>
+    <path d="M44 120H558Q566 120 566 128V164H36V128Q36 120 44 120" fill="#E8EEF2"/>
+    <path d="M36 164H90V468H44Q36 468 36 460Z" fill="#E8EEF2"/>
+    <path d="M90 164H566V224H90Z" fill="#198754"/>
+    <path d="M90 224H566V284H90ZM90 344H566V404H90Z" fill="#F0F8F3"/>
+    <g stroke="#CCD6DF">
+      <path d="M90 120V468M36 164H566M36 224H566M36 284H566M36 344H566M36 404H566"/>
+    </g>
+    <g font-size="18" fill="#526273" text-anchor="middle">
+      <text x="328" y="148">A</text>
+      <text x="63" y="201">1</text><text x="63" y="261">2</text>
+      <text x="63" y="321">3</text><text x="63" y="381">4</text><text x="63" y="441">5</text>
+    </g>
+    <text x="112" y="202" font-size="25" fill="white" font-weight="700">Reparto</text>
+    <g font-size="24" fill="#243746">
+      <text x="112" y="262">Cardiologia</text>
+      <text x="112" y="322">Chirurgia generale</text>
+      <text x="112" y="382">Medicina interna</text>
+      <text x="112" y="442">Neurologia</text>
+    </g>
+
+    <rect x="638" y="140" width="526" height="116" rx="12" fill="#E5F3EB"/>
+    <text x="662" y="178" font-size="24" font-weight="700" fill="#176340">Prima riga: Reparto</text>
+    <text x="662" y="214" font-size="21" fill="#243746">Usa questa intestazione nella colonna A.</text>
+    <path d="M638 194H584M590 188L582 194L590 200" stroke="#198754" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="638" y="278" width="526" height="156" rx="12" fill="#E3F0FC"/>
+    <text x="662" y="316" font-size="24" font-weight="700" fill="#175D95">Dalla seconda riga: i nomi</text>
+    <text x="662" y="352" font-size="21" fill="#243746">Inserisci un reparto per ogni riga.</text>
+    <text x="662" y="386" font-size="21" fill="#243746">I nomi già presenti vengono saltati.</text>
+    <text x="36" y="500" font-size="18" fill="#526273">L'importazione aggiunge i modelli generali dei reparti, da associare successivamente agli ospedali.</text>
+  </g>
+</svg>

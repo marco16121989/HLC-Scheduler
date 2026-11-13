@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
 
-export const Departments = ({ departments, setDepartments, hospitals, presidentId, readOnly = false }) => {
+export const Departments = ({ departments, setDepartments, hospitals, presidentId, onImportExcel, readOnly = false }) => {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -89,7 +89,9 @@ export const Departments = ({ departments, setDepartments, hospitals, presidentI
               Questa sezione contiene soltanto i modelli generali dei reparti, non i reparti effettivi degli ospedali. Dopo aver creato un modello, il reparto deve essere inserito negli ospedali in cui è realmente presente.
             </p>
           </div>
-          {!readOnly && <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>}
+          {!readOnly && <div className="d-flex flex-wrap gap-2">
+            <button className="btn btn-primary" type="button" onClick={openCreateModal}>Inserisci</button>
+          </div>}
         </div>
       </div>
     </div>

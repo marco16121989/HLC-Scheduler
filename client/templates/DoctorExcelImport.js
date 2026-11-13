@@ -90,6 +90,14 @@ export const DoctorExcelImport = ({ onBack, hospitals, doctors, presidentId, can
     }));
   };
 
+  const removeRow = (rowNumber) => {
+    if (saving || loading || editing) return;
+    setRows((current) => current.filter((row) => row.rowNumber !== rowNumber));
+    setImportProblems(null);
+    setError("");
+    setSuccess("");
+  };
+
   const importDoctors = async () => {
     if (!canImport || saving || loading || editing) return;
     setError("");
@@ -168,6 +176,7 @@ export const DoctorExcelImport = ({ onBack, hospitals, doctors, presidentId, can
                   <th scope="col">Riga</th>
                   {rows[0].sourceColumns.map((column) => <th scope="col" key={column.index} title={column.field ? undefined : "Colonna visualizzata, non importata"}>{column.label}</th>)}
                   <th scope="col">Stato</th>
+                  <th scope="col">Azioni</th>
                 </tr></thead>
                 <tbody>{rows.map((row, index) => {
                   const hospital = visibleHospitals.find((item) => item.id === row.hospitalId);
@@ -226,6 +235,9 @@ export const DoctorExcelImport = ({ onBack, hospitals, doctors, presidentId, can
                         {issues.map((issue) => <span key={issue} className="badge text-bg-danger text-wrap text-start">{issue}</span>)}
                       </div> : <span className="badge text-bg-success">Pronto</span>}
                       {missingCount > 0 && <div className="small text-secondary mt-1">{missingCount} {missingCount === 1 ? "dato mancante" : "dati mancanti"}</div>}
+                    </td>
+                    <td>
+                      <button className="btn btn-outline-danger btn-sm" type="button" aria-label={`Elimina riga Excel ${row.rowNumber}`} disabled={saving || loading || Boolean(editing)} onClick={() => removeRow(row.rowNumber)}>Elimina riga</button>
                     </td>
                   </tr>;
                 })}</tbody>

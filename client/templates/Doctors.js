@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { confirmAction } from "./ConfirmDialog.js";
 import { PaginationControls, usePagination } from "./Pagination.js";
 import { DoctorContactSearch } from "./DoctorContactSearch.js";
+import { formatCasUserLabel } from "./CasRoleBadge.js";
 
 const doctorTypes = [
   "Consulente",
   "Collaborazione storica",
   "Nuova collaborazione",
   "Non collabora",
+  "Non indicato",
 ];
 const doctorTypeBadgeClasses = {
   Consulente: "text-bg-info",
@@ -73,6 +75,7 @@ export const Doctors = ({
   doctors,
   setDoctors,
   hospitals,
+  users = [],
   presidentId,
   currentUser,
   onImportExcel,
@@ -88,6 +91,7 @@ export const Doctors = ({
   const [notes, setNotes] = useState("");
   const [officeInstructions, setOfficeInstructions] = useState("");
   const [departmentIds, setDepartmentIds] = useState([]);
+  const [casIds, setCasIds] = useState([]);
   const [selectedHospitalIds, setSelectedHospitalIds] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
@@ -104,6 +108,10 @@ export const Doctors = ({
   const [contactSearchOpen, setContactSearchOpen] = useState(false);
 
   const isEditing = editingId !== null;
+  const availableCasUsers = users.filter((user) =>
+    (user.role === "Presidente" && user.id === presidentId) ||
+    (user.role === "CAS" && (user.presidentId || user.associationId) === presidentId),
+  ).sort((first, second) => (first.username || "").localeCompare(second.username || "", "it-IT"));
   const visibleDoctors = doctors.filter(
     (doctor) => doctor.presidentId === presidentId,
   );
@@ -181,6 +189,7 @@ export const Doctors = ({
     setNotes("");
     setOfficeInstructions("");
     setDepartmentIds([]);
+    setCasIds([]);
     setSelectedHospitalIds([]);
     setEditingId(null);
     setError("");
@@ -252,6 +261,7 @@ export const Doctors = ({
       officeInstructions: normalizedOfficeInstructions,
       presidentId,
       departmentIds: validDepartmentIds,
+      casIds: [...new Set(casIds)],
     };
 
     if (isEditing) {
@@ -272,6 +282,7 @@ export const Doctors = ({
 
   const handleEdit = (doctor) => {
     setEditingId(doctor.id);
+    setCasIds(doctor.casIds || []);
     setFirstName(doctor.firstName);
     setLastName(doctor.lastName);
     setPhone(doctor.phone || "");
@@ -585,6 +596,19 @@ export const Doctors = ({
                     </div>
 
                     <div className="mt-3">
+                      <fieldset>
+                        <legend className="form-label fs-6">CAS assegnato</legend>
+                        {availableCasUsers.map((casUser) => <div className="form-check" key={casUser.id}>
+                          <input className="form-check-input" type="checkbox" id={`doctor-cas-${casUser.id}`} checked={casIds.includes(casUser.id)} onChange={(event) => {
+                            setCasIds((current) => event.target.checked ? [...new Set([...current, casUser.id])] : current.filter((id) => id !== casUser.id));
+                          }} />
+                          <label className="form-check-label" htmlFor={`doctor-cas-${casUser.id}`}>{formatCasUserLabel(casUser)}</label>
+                        </div>)}
+                        {availableCasUsers.length === 0 && <p className="text-secondary mb-0">Nessun CAS disponibile.</p>}
+                      </fieldset>
+                    </div>
+
+                    <div className="mt-3">
                       <label className="form-label" htmlFor="doctor-notes">
                         Note generali del medico
                       </label>
@@ -784,6 +808,7 @@ export const Doctors = ({
                           <th>Tipologia</th>
                           <th>Contatti</th>
                           <th>Reparti</th>
+                          <th>CAS assegnato</th>
                           <th>Note</th>
                           <th className="text-end">Azioni</th>
                         </tr>
@@ -791,7 +816,7 @@ export const Doctors = ({
                       <tbody>
                         {filteredDoctors.length === 0 ? (
                           <tr>
-                            <td className="text-center text-secondary py-4" colSpan="8">
+                            <td className="text-center text-secondary py-4" colSpan="9">
                               {hasActiveFilters
                                 ? "Nessun medico corrisponde ai filtri selezionati."
                                 : "Nessun medico inserito."}
@@ -802,6 +827,7 @@ export const Doctors = ({
                               const departmentLabels =
                                 getDepartmentLabels(doctor);
                               const doctorNote = getDoctorGeneralNote(doctor);
+                              const assignedCasUsers = (doctor.casIds || []).map((id) => users.find((user) => user.id === id));
 
                               return (
                               <tr
@@ -841,7 +867,7 @@ export const Doctors = ({
                                 </td>
                                 <td data-label="Reparti">
                                   {departmentLabels.length > 0 ? (
-                                    <div className="d-flex flex-wrap gap-1">
+                                    <div className="d-flex flex-column align-items-start gap-1">
                                       {departmentLabels.map((label) => (
                                         <span
                                           className="badge text-bg-secondary"
@@ -856,6 +882,11 @@ export const Doctors = ({
                                       Nessun reparto
                                     </span>
                                   )}
+                                </td>
+                                <td data-label="CAS assegnato">
+                                  {(doctor.casIds || []).length ? <div className="d-flex flex-column align-items-start gap-1">
+                                    {assignedCasUsers.map((user, index) => <span className="badge text-bg-secondary" key={doctor.casIds[index]}>{user ? formatCasUserLabel(user) : "CAS non disponibile"}</span>)}
+                                  </div> : <span className="text-secondary">Non assegnato</span>}
                                 </td>
                                 <td className="doctor-notes-cell" data-label="Note">
                                   {doctorNote ? <DoctorNotePreview note={doctorNote} /> : (

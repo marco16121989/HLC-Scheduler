@@ -4,6 +4,7 @@ import { useTracker } from "meteor/react-meteor-data";
 import { Users } from "./Users.js";
 import { Hospitals } from "./Hospitals.js";
 import { Departments } from "./Departments.js";
+import { DepartmentExcelImport } from "./DepartmentExcelImport.js";
 import { Doctors } from "./Doctors.js";
 import { DoctorExcelImport } from "./DoctorExcelImport.js";
 import { Patients } from "./Patients.js";
@@ -72,7 +73,8 @@ const DATA_RESOURCES_BY_VIEW = {
   permissions: ["users"],
   hospitals: ["users", "hospitals", "departments", "doctors"],
   departments: ["hospitals", "departments"],
-  doctors: ["hospitals", "doctors"],
+  "departments-import": ["departments"],
+  doctors: ["users", "hospitals", "doctors"],
   "doctors-import": ["hospitals", "doctors"],
   patients: ["users", "hospitals", "doctors", "patients", "absences"],
   "follow-up": ["users", "hospitals", "doctors", "follow-up", "absences"],
@@ -82,7 +84,7 @@ const DATA_RESOURCES_BY_VIEW = {
   reports: ["report-patients", "users"],
   "annual-report": ["users", "presentations", "doctors", "hospitals"],
   presentations: ["presentations"],
-  cas: ["users", "hospitals"],
+  cas: ["users", "hospitals", "doctors"],
   gvp: ["users", "hospitals"],
 };
 
@@ -555,7 +557,7 @@ export const Home = ({
                   </li>
                   <li className="nav-item menu-order-health">
                     <button
-                      className={`nav-link w-100 ${!canViewPage("departments") ? "d-none" : ""} ${activeView === "departments" ? "active" : ""}`}
+                      className={`nav-link w-100 ${!canViewPage("departments") ? "d-none" : ""} ${["departments", "departments-import"].includes(activeView) ? "active" : ""}`}
                       type="button"
                       onClick={() => openView("departments")}
                     >
@@ -743,16 +745,20 @@ export const Home = ({
           />
         ) : activeView === "departments" && presidentId && canViewPage("departments") ? (
           <Departments
+            onImportExcel={() => openView("departments-import")}
             departments={departments}
             setDepartments={setDepartments}
             hospitals={hospitals}
             presidentId={presidentId}
             readOnly={!canEditPage("departments")}
           />
+        ) : activeView === "departments-import" && presidentId && canViewPage("departments") ? (
+          <DepartmentExcelImport key={presidentId} departments={departments} presidentId={presidentId} canImport={canEditPage("departments")} onBack={() => openView("departments")} />
         ) : activeView === "doctors-import" && presidentId && canViewPage("doctors-import") ? (
           <DoctorExcelImport key={presidentId} hospitals={hospitals} doctors={doctors} presidentId={presidentId} canImport={canEditPage("doctors-import")} onBack={() => openView("doctors")} />
         ) : activeView === "doctors" && presidentId && canViewPage("doctors") ? (
           <Doctors
+            users={users}
             doctors={doctors}
             setDoctors={setDoctors}
             hospitals={hospitals}
@@ -801,6 +807,7 @@ export const Home = ({
             hospitals={hospitals}
             manager={user}
             managedRole="CAS"
+            doctors={doctors}
           />
         ) : activeView === "gvp" && canViewPage("gvp") && ["Presidente", "CAS", "GVP"].includes(user.role) ? (
           <Users

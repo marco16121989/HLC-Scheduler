@@ -545,6 +545,21 @@ const replaceRecords = async (collection, records, scope = {}) => {
   }
 };
 
+const validateDoctorAssignments = async (records) => {
+  for (const record of records) {
+    if (record.casIds === undefined) continue;
+    check(record.casIds, [String]);
+    const casIds = [...new Set(record.casIds)];
+    if (!casIds.length) continue;
+    const users = await Meteor.users.find({ _id: { $in: casIds } }, { fields: publicUserFields }).fetchAsync();
+    if (users.length !== casIds.length || (await Promise.all(users.map(async (user) =>
+      ["Presidente", "CAS"].includes(user.profile?.role) && await getActorPresidentId(user) === record.presidentId,
+    ))).some((valid) => !valid)) {
+      throw new Meteor.Error("not-authorized", "Assegnazione a un CAS non valido o esterno all'organizzazione.");
+    }
+  }
+};
+
 const validatePatientAssignments = async (records, presidentId) => {
   if (!presidentId) return;
   const casIds = [...new Set(records.flatMap((record) => getAssignedCasIds(record)))];
@@ -733,7 +748,7 @@ Meteor.publish("hlc-data", async function publishHlcData(resources = []) {
     }
     if (wants("hospitals")) cursors.push(HospitalsCollection.find({ presidentId }));
     if (wants("hospitality")) cursors.push(HospitalityOffersCollection.find(getPagePermission({ ...actor.profile, role }, "hospitality").view ? { presidentId } : { _id: null }, { sort: { hostName: 1 } }));
-    if (wants("doctors")) cursors.push(DoctorsCollection.find({ presidentId }, { fields: { presidentId: 1, firstName: 1, lastName: 1, phone: 1, email: 1, doctorType: 1, professionalRole: 1, notes: 1, doctorNotes: 1, officeInstructions: 1, departmentIds: 1 } }));
+    if (wants("doctors")) cursors.push(DoctorsCollection.find({ presidentId }, { fields: { presidentId: 1, firstName: 1, lastName: 1, phone: 1, email: 1, doctorType: 1, professionalRole: 1, notes: 1, doctorNotes: 1, officeInstructions: 1, departmentIds: 1, casIds: 1 } }));
     if (wants("files") && getPagePermission({ ...actor.profile, role }, "useful-files").view) cursors.push(UsefulFilesCollection.find({ presidentId }, { fields: { dataUrl: 0 }, sort: { createdAt: -1 } }));
     if (wants("absences")) {
       const organizationUserIds = (await Meteor.users.find({ $or: [{ _id: presidentId }, { "profile.presidentId": presidentId }, { "profile.associationId": presidentId }] }, { fields: { _id: 1 } }).fetchAsync()).map((user) => user._id);
@@ -2213,6 +2228,7 @@ Meteor.methods({
     ) {
       throw new Meteor.Error("not-authorized", "Dati fuori dalla tua organizzazione.");
     }
+    if (kind === "doctors") await validateDoctorAssignments(records);
     if (kind === "patients" && !this.hlcPatientAssignmentsAlreadyValidated) {
       // I client che inviano l'intero elenco non possono sovrascrivere o eliminare
       // pazienti in follow up che non sono autorizzati a vedere.
@@ -2386,6 +2402,29 @@ Meteor.methods({
     }
   },
 
+  async "hlc.importDepartments"(names) {
+    requireUser(this);
+    check(names, [String]);
+    const actor = await Meteor.users.findOneAsync(this.userId);
+    requirePageEdit(actor, "departments");
+    const presidentId = await getActorPresidentId(actor);
+    if (!presidentId) throw new Meteor.Error("not-authorized", "Organizzazione non disponibile.");
+    if (!names.length || names.some((name) => !name.trim())) {
+      throw new Meteor.Error("invalid-record", "Inserisci almeno un reparto e completa tutti i nomi.");
+    }
+    const existing = await DepartmentsCollection.find({ presidentId }).fetchAsync();
+    const knownNames = new Set(existing.map((department) => normalizeImportValue(department.name)));
+    const prepared = [];
+    for (const name of names) {
+      const key = normalizeImportValue(name);
+      if (knownNames.has(key)) continue;
+      knownNames.add(key);
+      prepared.push({ _id: Random.id(), name: name.trim(), presidentId });
+    }
+    for (const record of prepared) await DepartmentsCollection.insertAsync(record);
+    return { imported: prepared.length, skipped: names.length - prepared.length };
+  },
+
   async "hlc.importDoctors"(records) {
     requireUser(this);
     check(records, [Object]);
@@ -2443,6 +2482,7 @@ Meteor.methods({
       hospitality: HospitalityOffersCollection,
     };
     const collection = collections[kind];
+    if (kind === "doctors") await validateDoctorAssignments(changes.upserts);
     for (const record of changes.upserts) {
       const cleaned = cleanRecord(record);
       const { _id, ...fields } = cleaned;
@@ -2716,6 +2756,9 @@ Meteor.methods({
         }
         if (!record.password) {
           throw new Meteor.Error("password-required", "Password obbligatoria.");
+        }
+        if (await Accounts.findUserByUsername(username, { fields: { _id: 1 } })) {
+          throw new Meteor.Error("username-exists", "Nome utente già in uso. Scegli un nome utente diverso.");
         }
         const newId = await Accounts.createUserAsync({
           username,

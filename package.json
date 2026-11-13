@@ -7,6 +7,8 @@
     "test-app": "node scripts/safe-meteor-test.cjs --full-app",
     "test:updates": "node --test tests/softwareUpdates.cjs tests/softwareUpdateApproval.cjs",
     "test:doctor-import": "node tests/doctorExcelImport.cjs",
+    "test:doctor-assignments": "node tests/doctorAssignments.cjs",
+    "test:department-import": "node tests/departmentExcelImport.cjs",
     "updates:generate": "node scripts/generate-software-updates.cjs",
     "visualize": "meteor --production --extra-packages bundle-visualizer"
   },

@@ -62,6 +62,7 @@ test("repeated doctors become one doctor with all distinct departments", () => {
   assert.equal(records.length, 1);
   assert.deepEqual(records[0].departmentIds, ["d1", "d3"]);
   assert.equal(records[0].presidentId, "p1");
+  assert.equal(records[0].doctorType, "Non indicato");
 });
 
 test("blocks incomplete names, invalid headers, existing doctors, reused emails and conflicting contacts", () => {
@@ -431,7 +432,7 @@ test("preview preserves every Excel column in source order, including extra colu
     ["anna@example.it", "Anna", "Bianchi", "03339876543", "Sconosciuto", "Chirurgia", "Chirurgo", "", "ABC-002"],
   ], columns);
   const view = fixture.render();
-  assert.deepEqual(view.nodes.filter((node) => node.type === "th" && node.props.scope === "col").map((node) => node.props.children), ["Riga", ...columns, "Stato"]);
+  assert.deepEqual(view.nodes.filter((node) => node.type === "th" && node.props.scope === "col").map((node) => node.props.children), ["Riga", ...columns, "Stato", "Azioni"]);
   const tableRows = view.find((node) => node.type === "tbody").props.children;
   assert.equal(tableRows[0].props.className, undefined);
   assert.ok(tableRows[0].props.children[1].every((node) => node.props.className === "doctor-import-cell-valid"));
@@ -509,6 +510,33 @@ test("selecting a missing profession clears its missing-data indication", async 
   view = fixture.render();
   assert.ok(!view.find((node) => node.props?.children === "Dato mancante"));
   assert.ok(view.find((node) => node.type === "tbody").props.children[0].props.children[1].every((node) => node.props.className === "doctor-import-cell-valid"));
+});
+
+test("removing a preview row clears conflicts, preserves Excel row numbers and excludes it from import", async () => {
+  const fixture = componentFixture();
+  await fixture.upload([
+    [...mario, "", "Medico"],
+    [...mario.slice(0, 3), "Medicina interna", ...mario.slice(4), "", "Chirurgo"],
+    ["Bianchi", "Anna", "Ospedale Maggiore", "Chirurgia", "", "", "", "Medico"],
+  ], [...headers, "Professione"]);
+  assert.ok(fixture.render().find((node) => node.props?.role === "alert"));
+  fixture.render().find((node) => node.props?.["aria-label"] === "Elimina riga Excel 3").props.onClick();
+  const view = fixture.render();
+  assert.deepEqual(view.nodes.filter((node) => node.type === "tr" && node.key !== null).map((node) => node.key), ["2", "4"]);
+  assert.ok(!view.find((node) => node.props?.role === "alert"));
+  await view.find((node) => node.type === "button" && node.props.children === "Importa medici").props.onClick();
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.calls[0][1].length, 2);
+  assert.deepEqual(fixture.calls[0][1][0].departmentIds, ["d1"]);
+  assert.equal(fixture.calls[0][1][0].professionalRole, "Medico");
+});
+
+test("removing the last preview row leaves no import button and makes no server call", async () => {
+  const fixture = componentFixture();
+  await fixture.upload([mario]);
+  fixture.render().find((node) => node.props?.["aria-label"] === "Elimina riga Excel 2").props.onClick();
+  assert.ok(!fixture.render().find((node) => node.type === "button" && node.props.children === "Importa medici"));
+  assert.equal(fixture.calls.length, 0);
 });
 
 test("Excel import is a separate configurable permission", () => {

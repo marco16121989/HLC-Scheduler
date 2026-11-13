@@ -12,6 +12,7 @@ export const MANAGEABLE_PAGES = [
 ];
 
 export const getPagePermission = (user, pageId) => {
+  if (pageId === "departments-import") return getPagePermission(user, "departments");
   if (pageId === "manual") return { view: ["Presidente", "CAS", "GVP"].includes(user?.role), edit: false };
   if (pageId === "follow-up") return { view: ["Presidente", "CAS"].includes(user?.role), edit: false };
   if (user?.role === "Admin") return { view: true, edit: true };

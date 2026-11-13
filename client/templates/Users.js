@@ -156,6 +156,10 @@ const createEmptyForm = (role, manager, users) => {
 
   return {
     username: "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
     password: "",
     role,
     presidentId: getDefaultPresidentId(role, manager, users),
@@ -169,7 +173,7 @@ const createEmptyForm = (role, manager, users) => {
   };
 };
 
-export const Users = ({ users, setUsers, hospitals = [], manager = null, managedRole = null }) => {
+export const Users = ({ users, setUsers, hospitals = [], doctors = [], manager = null, managedRole = null }) => {
   const isPresidentManager = manager?.role === "Presidente";
   const isCasManager = manager?.role === "CAS";
   const isGvpManager = manager?.role === "GVP";
@@ -400,6 +404,12 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       : validPresidentId;
     const updatedUser = {
       username,
+      ...(["CAS", "GVP"].includes(role) ? {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim().toLowerCase(),
+        phone: form.phone.trim(),
+      } : {}),
       role,
       presidentId: resolvedPresidentId,
       casId: validCasId,
@@ -427,62 +437,61 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       } : {}),
     };
 
-    if (isEditing) {
-      if (role === "CAS") {
-        try {
+    try {
+      if (isEditing) {
+        if (role === "CAS") {
           await Meteor.callAsync("hlc.updateCasHospitalAssignments", editingId, hospitalAssignments);
-        } catch (methodError) {
-          setError(methodError.reason || "Impossibile salvare ospedali e reparti del CAS.");
-          return;
         }
+        await setUsers((current) =>
+          current.map((user) => {
+            if (user.id === editingId) {
+              return {
+                ...user,
+                ...updatedUser,
+                ...(form.password ? { password: form.password } : {}),
+              };
+            }
+
+            if (
+              editingUser?.role === "CAS" &&
+              user.role === "GVP" &&
+              getCasIds(user).includes(editingId)
+            ) {
+              return role === "CAS"
+                ? {
+                    ...user,
+                    presidentId: validPresidentId,
+                    casId: editingId,
+                    casIds: [...new Set([...getCasIds(user).filter((id) => id !== editingId), editingId])],
+                    associationId: editingId,
+                  }
+                : {
+                    ...user,
+                    casId: getCasIds(user).filter((id) => id !== editingId)[0] || "",
+                    casIds: getCasIds(user).filter((id) => id !== editingId),
+                    associationId: getCasIds(user).filter((id) => id !== editingId)[0] || "",
+                  };
+            }
+
+            return user;
+          }),
+        );
+      } else {
+        await setUsers((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            ...updatedUser,
+            password: form.password,
+          },
+        ]);
       }
-      setUsers((current) =>
-        current.map((user) => {
-          if (user.id === editingId) {
-            return {
-              ...user,
-              ...updatedUser,
-              ...(form.password ? { password: form.password } : {}),
-            };
-          }
 
-          if (
-            editingUser?.role === "CAS" &&
-            user.role === "GVP" &&
-            getCasIds(user).includes(editingId)
-          ) {
-            return role === "CAS"
-              ? {
-                  ...user,
-                  presidentId: validPresidentId,
-                  casId: editingId,
-                  casIds: [...new Set([...getCasIds(user).filter((id) => id !== editingId), editingId])],
-                  associationId: editingId,
-                }
-              : {
-                  ...user,
-                  casId: getCasIds(user).filter((id) => id !== editingId)[0] || "",
-                  casIds: getCasIds(user).filter((id) => id !== editingId),
-                  associationId: getCasIds(user).filter((id) => id !== editingId)[0] || "",
-                };
-          }
-
-          return user;
-        }),
-      );
-    } else {
-      setUsers((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          ...updatedUser,
-          password: form.password,
-        },
-      ]);
+      resetForm();
+      setMobileFormOpen(false);
+    } catch (methodError) {
+      setError(methodError.reason || methodError.message || "Impossibile salvare l'utente.");
     }
-
-    resetForm();
-    setMobileFormOpen(false);
   };
 
   const handleEdit = (user) => {
@@ -493,6 +502,10 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
     setEditingId(user.id);
     setForm({
       username: user.username,
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email || "",
+      phone: user.phone || "",
       password: "",
       role: availableRoles.includes(user.role) ? user.role : availableRoles[0],
       presidentId: getPresidentId(user, users),
@@ -580,9 +593,14 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
       return;
     }
 
-    setUsers((current) =>
-      current.filter((item) => !userIdsToDelete.has(item.id)),
-    );
+    try {
+      await setUsers((current) =>
+        current.filter((item) => !userIdsToDelete.has(item.id)),
+      );
+    } catch (methodError) {
+      setError(methodError.reason || methodError.message || "Impossibile eliminare l'utente.");
+      return;
+    }
     resetForm();
     setMobileFormOpen(false);
   };
@@ -849,6 +867,13 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                       />
                     </div>
 
+                    {["CAS", "GVP"].includes(form.role) && <>
+                      {[["firstName", "Nome", "text", "given-name"], ["lastName", "Cognome", "text", "family-name"], ["email", "Email", "email", "email"], ["phone", "Telefono", "tel", "tel"]].map(([name, label, type, autoComplete]) => <div className="mb-3" key={name}>
+                        <label className="form-label" htmlFor={`user-${name}`}>{label}</label>
+                        <input className="form-control" id={`user-${name}`} name={name} type={type} autoComplete={autoComplete} value={form[name]} onChange={handleChange} />
+                      </div>)}
+                    </>}
+
                     {!managedRole && (
                       <div className="mb-3">
                         <label className="form-label" htmlFor="user-role">Ruolo</label>
@@ -1095,9 +1120,11 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                         ) : (
                         <tr>
                           <th className="user-name-column">Nome utente</th>
+                          {["CAS", "GVP"].includes(managedRole) && <th>Telefono</th>}
                           {!managedRole && <th>Ruolo</th>}
                           {managedRole !== "CAS" && <th className="text-nowrap">Associato a</th>}
                           <th>Sede</th>
+                          {managedRole === "CAS" && <th>Medici assegnati</th>}
                           {!managedRole && <th>Password</th>}
                           <th className="text-end">Azioni</th>
                         </tr>
@@ -1106,7 +1133,7 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                       <tbody>
                         {displayRows.length === 0 ? (
                           <tr>
-                            <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" ? "5" : managedRole ? "5" : "6"}>
+                            <td className="text-center text-secondary py-4" colSpan={manager?.role === "Admin" || managedRole ? "5" : "6"}>
                               {manager?.role === "Admin" && presidentSearch.trim()
                                 ? "Nessun presidente corrisponde al nome utente o alla città cercati."
                                 : casFilter !== "all" || hospitalFilter !== "all" || departmentFilter !== "all"
@@ -1133,6 +1160,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                             </tr>;
                             const associationLabel = getAssociationLabel(user);
                             const hospitalLabels = getHospitalLabels(user);
+                            const associatedDoctors = managedRole === "CAS" ? doctors.filter((doctor) =>
+                              doctor.presidentId === getPresidentId(user, users) && (doctor.casIds || []).includes(user.id),
+                            ).sort((first, second) => `${first.lastName || ""} ${first.firstName || ""}`.localeCompare(`${second.lastName || ""} ${second.firstName || ""}`, "it-IT")) : [];
                             const casId = getCasId(user);
                             const depth =
                               user.role === "CAS" || (user.role === "GVP" && !casId)
@@ -1207,6 +1237,9 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                     {roles.includes(user.role) ? user.role : "Admin"}
                                   </span>
                                 </td>}
+                                {["CAS", "GVP"].includes(managedRole) && <>
+                                  <td data-label="Telefono">{user.phone ? <a href={`tel:${user.phone}`} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{user.phone}</a> : "-"}</td>
+                                </>}
                                 {managedRole !== "CAS" && <td data-label="Associato a">
                                   {associationLabel ? (
                                     <span className="badge text-bg-success association-badge">
@@ -1243,6 +1276,11 @@ export const Users = ({ users, setUsers, hospitals = [], manager = null, managed
                                     <span className="text-secondary">-</span>
                                   )}
                                 </td>
+                                {managedRole === "CAS" && <td data-label="Medici assegnati">
+                                  {associatedDoctors.length > 0 ? <div className="d-flex flex-column align-items-start gap-1">
+                                    {associatedDoctors.map((doctor) => <span className="badge text-bg-secondary" key={doctor.id}>{doctor.lastName} {doctor.firstName}</span>)}
+                                  </div> : <span className="text-secondary">Nessun medico assegnato</span>}
+                                </td>}
                                 {!managedRole && <td aria-label="Password impostata" data-label="Password">********</td>}
                                 <td className="text-end" data-label="Azioni">
                                   {canEditManagedUser(user) && <button

@@ -274,7 +274,7 @@ export const App = () => {
   };
   const setUsers = (update) => {
     const next = typeof update === "function" ? update(users) : update;
-    callServer("hlc.syncUsers", next);
+    return Meteor.callAsync("hlc.syncUsers", next);
   };
   const setPresentations = (update) => {
     const next = typeof update === "function" ? update(presentations) : update;
